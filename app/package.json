@@ -58,7 +58,7 @@
   "build": {
     "appId": "com.astgl.jdex",
     "productName": "JDex",
-    "copyright": "Copyright © 2024-2025 James Cruce / ASTGL",
+    "copyright": "Copyright © 2024-2026 James Cruce / ASTGL",
     "afterSign": "scripts/notarize.js",
     "directories": {
       "output": "dist-electron",
