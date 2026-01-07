@@ -22,6 +22,7 @@ if (process.platform === 'win32') {
 }
 
 let mainWindow;
+const isMac = process.platform === 'darwin';
 
 const createWindow = () => {
   // Create the browser window.
@@ -34,9 +35,11 @@ const createWindow = () => {
       nodeIntegration: false,
       contextIsolation: true,
     },
-    titleBarStyle: 'hiddenInset', // macOS only - gives a cleaner look
+    // macOS: hidden title bar with inset traffic lights
+    // Windows/Linux: standard title bar
+    ...(isMac ? { titleBarStyle: 'hiddenInset' } : {}),
     backgroundColor: '#0f172a', // Match app background
-    icon: path.join(__dirname, '../public/jdex-icon.png'),
+    icon: path.join(__dirname, '../public/jdex-icon.svg'),
   });
 
   // Load the app
@@ -54,10 +57,11 @@ const createWindow = () => {
   });
 };
 
-// Custom menu
+// Cross-platform menu template
 const menuTemplate = [
-  {
-    label: 'JDex',
+  // App menu (macOS only - on Windows/Linux this appears under File)
+  ...(isMac ? [{
+    label: app.name,
     submenu: [
       { role: 'about' },
       { type: 'separator' },
@@ -69,7 +73,15 @@ const menuTemplate = [
       { type: 'separator' },
       { role: 'quit' }
     ]
+  }] : []),
+  // File menu
+  {
+    label: 'File',
+    submenu: [
+      isMac ? { role: 'close' } : { role: 'quit' }
+    ]
   },
+  // Edit menu
   {
     label: 'Edit',
     submenu: [
@@ -79,14 +91,32 @@ const menuTemplate = [
       { role: 'cut' },
       { role: 'copy' },
       { role: 'paste' },
-      { role: 'selectAll' }
+      ...(isMac ? [
+        { role: 'pasteAndMatchStyle' },
+        { role: 'delete' },
+        { role: 'selectAll' },
+        { type: 'separator' },
+        {
+          label: 'Speech',
+          submenu: [
+            { role: 'startSpeaking' },
+            { role: 'stopSpeaking' }
+          ]
+        }
+      ] : [
+        { role: 'delete' },
+        { type: 'separator' },
+        { role: 'selectAll' }
+      ])
     ]
   },
+  // View menu
   {
     label: 'View',
     submenu: [
       { role: 'reload' },
       { role: 'forceReload' },
+      { role: 'toggleDevTools' },
       { type: 'separator' },
       { role: 'resetZoom' },
       { role: 'zoomIn' },
@@ -95,15 +125,23 @@ const menuTemplate = [
       { role: 'togglefullscreen' }
     ]
   },
+  // Window menu
   {
     label: 'Window',
     submenu: [
       { role: 'minimize' },
       { role: 'zoom' },
-      { type: 'separator' },
-      { role: 'front' }
+      ...(isMac ? [
+        { type: 'separator' },
+        { role: 'front' },
+        { type: 'separator' },
+        { role: 'window' }
+      ] : [
+        { role: 'close' }
+      ])
     ]
   },
+  // Help menu
   {
     label: 'Help',
     submenu: [
@@ -112,8 +150,17 @@ const menuTemplate = [
         click: () => shell.openExternal('https://johnnydecimal.com/')
       },
       {
-        label: 'JDex Documentation',
+        label: 'JDex on GitHub',
         click: () => shell.openExternal('https://github.com/Jmeg8r/JDEX')
+      },
+      {
+        label: 'Report an Issue',
+        click: () => shell.openExternal('https://github.com/Jmeg8r/JDEX/issues')
+      },
+      { type: 'separator' },
+      {
+        label: 'About ASTGL',
+        click: () => shell.openExternal('https://astgl.com')
       }
     ]
   }

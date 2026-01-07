@@ -6,7 +6,7 @@
   **Personal Knowledge Organization Made Simple**
   
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-  [![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](https://github.com/Jmeg8r/JDEX/releases)
+  [![Version](https://img.shields.io/badge/version-2.0.1-green.svg)](https://github.com/Jmeg8r/JDEX/releases)
   [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/Jmeg8r/JDEX)
 </div>
 
@@ -63,9 +63,13 @@ Every item has a unique identifier. Need that invoice? It's in `11.01`. Need the
 3. First launch: Right-click → Open (macOS security requirement for unsigned apps)
 4. Subsequent launches: Just double-click
 
-### Windows (Coming Soon)
+### Windows
 
-Windows builds are in development. Follow this repo for updates!
+1. Download `JDex Setup 2.0.1.exe` (installer) or `JDex 2.0.1.exe` (portable) from [Releases](https://github.com/Jmeg8r/JDEX/releases)
+2. Run the installer or portable executable
+3. The app is EV code signed by FTL Consulting LLC - no SmartScreen warnings
+
+**Note:** Windows builds are signed with an Extended Validation (EV) certificate for immediate trust.
 
 ### Linux (Coming Soon)
 
@@ -169,7 +173,7 @@ jdex/
 - [x] SQLite database backend
 - [x] Search functionality
 - [x] macOS distribution
-- [ ] Windows distribution
+- [x] Windows distribution (EV code signed)
 - [ ] Linux distribution
 - [ ] File system integration (create/manage actual folders)
 - [ ] Cloud sync options
