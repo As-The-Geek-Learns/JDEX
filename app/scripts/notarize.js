@@ -2,7 +2,7 @@ import { notarize } from '@electron/notarize';
 
 export default async function notarizing(context) {
   const { electronPlatformName, appOutDir } = context;
-  
+
   // Only notarize macOS builds
   if (electronPlatformName !== 'darwin') {
     return;
@@ -19,9 +19,9 @@ export default async function notarizing(context) {
       tool: 'notarytool',
       appPath: appPath,
       // Use your existing notarytool profile
-      keychainProfile: 'notarytool-profile'
+      keychainProfile: 'notarytool-profile',
     });
-    
+
     console.log(`✅ Notarization complete!`);
   } catch (error) {
     console.error('❌ Notarization failed:', error);

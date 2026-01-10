@@ -59,8 +59,8 @@ const menuTemplate = [
       { role: 'hideOthers' },
       { role: 'unhide' },
       { type: 'separator' },
-      { role: 'quit' }
-    ]
+      { role: 'quit' },
+    ],
   },
   {
     label: 'Edit',
@@ -71,8 +71,8 @@ const menuTemplate = [
       { role: 'cut' },
       { role: 'copy' },
       { role: 'paste' },
-      { role: 'selectAll' }
-    ]
+      { role: 'selectAll' },
+    ],
   },
   {
     label: 'View',
@@ -84,37 +84,32 @@ const menuTemplate = [
       { role: 'zoomIn' },
       { role: 'zoomOut' },
       { type: 'separator' },
-      { role: 'togglefullscreen' }
-    ]
+      { role: 'togglefullscreen' },
+    ],
   },
   {
     label: 'Window',
-    submenu: [
-      { role: 'minimize' },
-      { role: 'zoom' },
-      { type: 'separator' },
-      { role: 'front' }
-    ]
+    submenu: [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }],
   },
   {
     label: 'Help',
     submenu: [
       {
         label: 'Johnny Decimal Website',
-        click: () => shell.openExternal('https://johnnydecimal.com/')
+        click: () => shell.openExternal('https://johnnydecimal.com/'),
       },
       {
         label: 'JDex Documentation',
-        click: () => shell.openExternal('https://github.com/')
-      }
-    ]
-  }
+        click: () => shell.openExternal('https://github.com/'),
+      },
+    ],
+  },
 ];
 
 app.whenReady().then(() => {
   const menu = Menu.buildFromTemplate(menuTemplate);
   Menu.setApplicationMenu(menu);
-  
+
   createWindow();
 
   app.on('activate', () => {

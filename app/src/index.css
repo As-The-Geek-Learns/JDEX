@@ -17,7 +17,11 @@
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   min-height: 100vh;
   color: #e2e8f0;
@@ -67,14 +71,30 @@ body {
 }
 
 /* Area colors */
-.area-00 { border-left-color: #6b7280; }
-.area-10 { border-left-color: #0d9488; }
-.area-20 { border-left-color: #2563eb; }
-.area-30 { border-left-color: #ea580c; }
-.area-40 { border-left-color: #8b5cf6; }
-.area-50 { border-left-color: #dc2626; }
-.area-60 { border-left-color: #16a34a; }
-.area-90 { border-left-color: #78716c; }
+.area-00 {
+  border-left-color: #6b7280;
+}
+.area-10 {
+  border-left-color: #0d9488;
+}
+.area-20 {
+  border-left-color: #2563eb;
+}
+.area-30 {
+  border-left-color: #ea580c;
+}
+.area-40 {
+  border-left-color: #8b5cf6;
+}
+.area-50 {
+  border-left-color: #dc2626;
+}
+.area-60 {
+  border-left-color: #16a34a;
+}
+.area-90 {
+  border-left-color: #78716c;
+}
 
 /* Glass morphism card */
 .glass-card {
@@ -86,7 +106,9 @@ body {
 
 /* Hover effects */
 .hover-lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .hover-lift:hover {
@@ -95,11 +117,15 @@ body {
 }
 
 /* Input styling */
-input, textarea, select {
+input,
+textarea,
+select {
   font-family: inherit;
 }
 
-input:focus, textarea:focus, select:focus {
+input:focus,
+textarea:focus,
+select:focus {
   outline: none;
   ring: 2px;
   ring-color: var(--jd-teal);
@@ -107,8 +133,14 @@ input:focus, textarea:focus, select:focus {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
@@ -116,8 +148,13 @@ input:focus, textarea:focus, select:focus {
 }
 
 @keyframes pulse-subtle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 .animate-pulse-subtle {

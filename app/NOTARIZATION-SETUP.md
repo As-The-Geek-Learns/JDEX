@@ -23,17 +23,20 @@ This will install the `@electron/notarize` package.
 ### Step 2: Get Your Apple Team ID (2 minutes)
 
 **Option A - From Apple Developer Website:**
+
 1. Go to https://developer.apple.com/account
 2. Sign in with your Apple ID
 3. Click "Membership" in the sidebar
 4. Copy your **Team ID** (10 characters, like `ABC1234DEF`)
 
 **Option B - From Command Line:**
+
 ```bash
 security find-identity -v -p codesigning
 ```
 
 Look for a line like:
+
 ```
 1) 4FFFC91C9E1777DDF33ACBE93C97168A96405A29 "Apple Development: Your Name (TEAMID)"
 ```
@@ -65,11 +68,13 @@ xcrun notarytool store-credentials "AC_PASSWORD" \
 ```
 
 **Replace:**
+
 - `YOUR_APPLE_ID@example.com` → Your actual Apple ID email
 - `ABC1234DEF` → Your Team ID from Step 2
 - `xxxx-xxxx-xxxx-xxxx` → The app-specific password from Step 3
 
 **Expected output:**
+
 ```
 This process stores your credentials securely in the Keychain. You reference these credentials later using a profile name.
 
@@ -160,6 +165,7 @@ vite v5.4.21 building for production...
 **Problem:** Apple ID, Team ID, or password is wrong
 
 **Solution:**
+
 ```bash
 # Delete the stored credentials
 security delete-generic-password -s "AC_PASSWORD"
@@ -176,12 +182,14 @@ xcrun notarytool store-credentials "AC_PASSWORD" \
 **Problem:** App doesn't meet Apple's requirements
 
 **Solution:**
+
 ```bash
 # Check notarization log
 xcrun notarytool log <submission-id> --keychain-profile AC_PASSWORD
 ```
 
 Common issues:
+
 - Missing entitlements (we already set these up)
 - Unsigned libraries (shouldn't happen with Electron)
 - Hardened runtime not enabled (we already enabled it)
@@ -191,6 +199,7 @@ Common issues:
 **Problem:** Apple's servers might be slow
 
 **Solution:**
+
 - Check status: https://developer.apple.com/system-status/
 - Wait it out, or cancel and retry later
 - First notarization is always slowest
@@ -200,6 +209,7 @@ Common issues:
 **Problem:** Package not installed
 
 **Solution:**
+
 ```bash
 npm install --save-dev @electron/notarize
 ```
@@ -209,6 +219,7 @@ npm install --save-dev @electron/notarize
 ## 📊 Before vs After
 
 ### Before Notarization:
+
 ```
 ❌ User opens DMG
 ❌ Drags to Applications
@@ -220,6 +231,7 @@ npm install --save-dev @electron/notarize
 ```
 
 ### After Notarization:
+
 ```
 ✅ User opens DMG
 ✅ Drags to Applications
@@ -238,13 +250,15 @@ npm install --save-dev @electron/notarize
 - **Code signing:** Free (included in developer account)
 - **Your time:** ~15 minutes setup, automatic after that
 
-**Worth it for:** 
+**Worth it for:**
+
 - ✅ Free apps you want widely distributed
 - ✅ Any paid apps
 - ✅ Apps for clients
 - ✅ Professional portfolio pieces
 
 **Skip it for:**
+
 - ❌ Personal-only tools
 - ❌ Internal company tools
 - ❌ Proof-of-concept projects
@@ -262,6 +276,7 @@ npm run electron:build
 ```
 
 You never need to:
+
 - Re-enter credentials
 - Manually notarize
 - Right-click to open
@@ -286,9 +301,11 @@ With notarization complete, you can:
 After successful notarization, update your README:
 
 **Change this:**
+
 > First launch: Right-click → Open (macOS security requirement)
 
 **To this:**
+
 > First launch: Double-click to open - fully notarized!
 
 ---

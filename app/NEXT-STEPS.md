@@ -45,6 +45,7 @@ chmod +x build-icons.sh
 ```
 
 You should see:
+
 ```
 ✅ All icon formats created successfully!
    📁 build/icon.icns (macOS)
@@ -59,6 +60,7 @@ npm run electron:build
 ```
 
 **Expected Output - All Clean! 🎉**
+
 ```
 ✓ vite build completed
 ✓ electron-builder packaging
@@ -68,12 +70,14 @@ npm run electron:build
 ```
 
 **No more errors about:**
+
 - ❌ "Cannot detect repository"
 - ❌ "Cannot read properties of null"
 - ❌ "default Electron icon is used"
 
 **You will still see:**
-- ⚠️  "skipped macOS notarization" - This is OK! See decision below.
+
+- ⚠️ "skipped macOS notarization" - This is OK! See decision below.
 
 ### Step 4: Test the App (5 minutes)
 
@@ -110,6 +114,7 @@ git push origin main
 ### Option A: YES - I have an Apple Developer Account
 
 **Benefits:**
+
 - No "unidentified developer" warnings
 - Users can double-click to install (no right-click needed)
 - More professional appearance
@@ -120,6 +125,7 @@ git push origin main
 ### Option B: NO - I don't have an Apple Developer Account
 
 **This is perfectly fine!**
+
 - Your app works exactly the same
 - Users just need to right-click → Open (one time)
 - Common for indie/free apps
@@ -140,12 +146,14 @@ git push origin main
 3. **Release title:** `JDex 2.0 - First Public Release`
 
 4. **Description:**
+
 ```markdown
 ## What's New
 
 JDex 2.0 is the first public release of the Johnny Decimal Index Manager!
 
 ### Features
+
 - 🗂️ Visual Johnny Decimal index management
 - 🔍 Instant search across your entire index
 - 💾 SQLite-based local storage
@@ -155,6 +163,7 @@ JDex 2.0 is the first public release of the Johnny Decimal Index Manager!
 ### Installation
 
 **macOS (Apple Silicon)**
+
 1. Download `JDex-2.0.0-arm64.dmg`
 2. Open the DMG and drag JDex to Applications
 3. First launch: Right-click → Open
@@ -167,6 +176,7 @@ Coming soon! For now, clone and build from source.
 Coming soon!
 
 ### Known Issues
+
 - First launch requires right-click → Open (standard for non-notarized apps)
 - Intel Mac builds not yet available
 
@@ -194,6 +204,7 @@ Coming soon!
 4. **Price:** $0 (Free)
 
 5. **Description:**
+
 ```
 Organize your digital life with the Johnny Decimal system.
 
@@ -201,7 +212,7 @@ JDex is a desktop app that helps you create and manage a Johnny Decimal index - 
 
 Instead of nested folders 15 levels deep, everything gets a simple ID:
 • 11.01 Invoices
-• 21.03 Project Mockups  
+• 21.03 Project Mockups
 • 32.05 Meeting Notes
 
 Find anything instantly. Stay organized effortlessly.
@@ -232,11 +243,13 @@ Built by James Cruce | As The Geek Learns
 ## 🎨 Optional: Add Screenshots
 
 Take some nice screenshots of JDex for:
+
 - GitHub README (add to top of file)
 - Gumroad product page
 - Social media announcements
 
 **What to capture:**
+
 1. Main index view (show a populated example)
 2. Search functionality in action
 3. Category creation/editing
@@ -247,6 +260,7 @@ Take some nice screenshots of JDex for:
 ## 📱 Optional: Announce on Social Media
 
 **Twitter/X:**
+
 ```
 Just released JDex v2.0 - a free, open-source desktop app for the Johnny Decimal organizational system! 🗂️
 
@@ -273,7 +287,9 @@ Technical deep-dive on building an Electron app, the decisions you made, challen
 ## 🔮 Future Considerations
 
 ### Paid Features (Later)
+
 Once you have users and feedback:
+
 - Cloud sync
 - Team collaboration
 - Advanced reporting
@@ -281,6 +297,7 @@ Once you have users and feedback:
 - File system integration
 
 ### Distribution Improvements
+
 - Create Intel Mac build (requires building on Intel Mac or CI/CD)
 - Windows builds (requires Windows machine or CI/CD)
 - Linux builds (can build on macOS with proper setup)
@@ -292,6 +309,7 @@ Once you have users and feedback:
 ## ✅ Summary
 
 **You've successfully:**
+
 - ✅ Cleaned up all build warnings
 - ✅ Created professional documentation
 - ✅ Set up proper icon assets
@@ -299,12 +317,14 @@ Once you have users and feedback:
 - ✅ Prepared for Gumroad release
 
 **Your builds are now:**
+
 - ✅ Professional quality
 - ✅ Ready for distribution
 - ✅ Properly branded
 - ✅ Error-free (except optional notarization)
 
 **You're ready to:**
+
 1. Run `./build-icons.sh`
 2. Run `npm run electron:build`
 3. Create GitHub release
@@ -316,6 +336,7 @@ Once you have users and feedback:
 ## 🆘 If You Need Help
 
 Refer to:
+
 - `DISTRIBUTION-SETUP.md` - Detailed technical instructions
 - `README.md` - User-facing documentation
 - GitHub Issues - Report problems

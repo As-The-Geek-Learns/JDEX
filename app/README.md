@@ -107,7 +107,7 @@ Linux builds (AppImage, .deb) are in development. Follow this repo for updates!
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
 
 ### Development Setup
@@ -184,6 +184,7 @@ jdex/
 JDex follows the Johnny Decimal philosophy of **"A place for everything, and everything in its place."**
 
 The tool is designed to:
+
 - **Stay out of your way** - Quick to learn, fast to use
 - **Respect your data** - Local-first, SQLite-based, easily exportable
 - **Be maintainable** - Clean code, well-documented, easy to extend
@@ -202,8 +203,9 @@ More projects and technical writing at [As The Geek Learns](https://astgl.com).
 ## Contributing
 
 Contributions welcome! Whether it's:
+
 - 🐛 Bug reports
-- 💡 Feature suggestions  
+- 💡 Feature suggestions
 - 📝 Documentation improvements
 - 🔧 Code contributions
 

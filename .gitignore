@@ -49,3 +49,6 @@ release/
 jdex-cursor-config/
 jdex-cursor-config.zip
 rules/
+
+# Husky
+.husky/_

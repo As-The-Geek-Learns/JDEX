@@ -16,7 +16,7 @@ if (process.platform === 'win32') {
     if (squirrelStartup.default) {
       app.quit();
     }
-  } catch (e) {
+  } catch (_e) {
     // Module not available, skip
   }
 }
@@ -60,26 +60,28 @@ const createWindow = () => {
 // Cross-platform menu template
 const menuTemplate = [
   // App menu (macOS only - on Windows/Linux this appears under File)
-  ...(isMac ? [{
-    label: app.name,
-    submenu: [
-      { role: 'about' },
-      { type: 'separator' },
-      { role: 'services' },
-      { type: 'separator' },
-      { role: 'hide' },
-      { role: 'hideOthers' },
-      { role: 'unhide' },
-      { type: 'separator' },
-      { role: 'quit' }
-    ]
-  }] : []),
+  ...(isMac
+    ? [
+        {
+          label: app.name,
+          submenu: [
+            { role: 'about' },
+            { type: 'separator' },
+            { role: 'services' },
+            { type: 'separator' },
+            { role: 'hide' },
+            { role: 'hideOthers' },
+            { role: 'unhide' },
+            { type: 'separator' },
+            { role: 'quit' },
+          ],
+        },
+      ]
+    : []),
   // File menu
   {
     label: 'File',
-    submenu: [
-      isMac ? { role: 'close' } : { role: 'quit' }
-    ]
+    submenu: [isMac ? { role: 'close' } : { role: 'quit' }],
   },
   // Edit menu
   {
@@ -91,24 +93,19 @@ const menuTemplate = [
       { role: 'cut' },
       { role: 'copy' },
       { role: 'paste' },
-      ...(isMac ? [
-        { role: 'pasteAndMatchStyle' },
-        { role: 'delete' },
-        { role: 'selectAll' },
-        { type: 'separator' },
-        {
-          label: 'Speech',
-          submenu: [
-            { role: 'startSpeaking' },
-            { role: 'stopSpeaking' }
+      ...(isMac
+        ? [
+            { role: 'pasteAndMatchStyle' },
+            { role: 'delete' },
+            { role: 'selectAll' },
+            { type: 'separator' },
+            {
+              label: 'Speech',
+              submenu: [{ role: 'startSpeaking' }, { role: 'stopSpeaking' }],
+            },
           ]
-        }
-      ] : [
-        { role: 'delete' },
-        { type: 'separator' },
-        { role: 'selectAll' }
-      ])
-    ]
+        : [{ role: 'delete' }, { type: 'separator' }, { role: 'selectAll' }]),
+    ],
   },
   // View menu
   {
@@ -122,8 +119,8 @@ const menuTemplate = [
       { role: 'zoomIn' },
       { role: 'zoomOut' },
       { type: 'separator' },
-      { role: 'togglefullscreen' }
-    ]
+      { role: 'togglefullscreen' },
+    ],
   },
   // Window menu
   {
@@ -131,15 +128,10 @@ const menuTemplate = [
     submenu: [
       { role: 'minimize' },
       { role: 'zoom' },
-      ...(isMac ? [
-        { type: 'separator' },
-        { role: 'front' },
-        { type: 'separator' },
-        { role: 'window' }
-      ] : [
-        { role: 'close' }
-      ])
-    ]
+      ...(isMac
+        ? [{ type: 'separator' }, { role: 'front' }, { type: 'separator' }, { role: 'window' }]
+        : [{ role: 'close' }]),
+    ],
   },
   // Help menu
   {
@@ -147,29 +139,29 @@ const menuTemplate = [
     submenu: [
       {
         label: 'Johnny Decimal Website',
-        click: () => shell.openExternal('https://johnnydecimal.com/')
+        click: () => shell.openExternal('https://johnnydecimal.com/'),
       },
       {
         label: 'JDex on GitHub',
-        click: () => shell.openExternal('https://github.com/Jmeg8r/JDEX')
+        click: () => shell.openExternal('https://github.com/Jmeg8r/JDEX'),
       },
       {
         label: 'Report an Issue',
-        click: () => shell.openExternal('https://github.com/Jmeg8r/JDEX/issues')
+        click: () => shell.openExternal('https://github.com/Jmeg8r/JDEX/issues'),
       },
       { type: 'separator' },
       {
         label: 'About ASTGL',
-        click: () => shell.openExternal('https://astgl.com')
-      }
-    ]
-  }
+        click: () => shell.openExternal('https://astgl.com'),
+      },
+    ],
+  },
 ];
 
 app.whenReady().then(() => {
   const menu = Menu.buildFromTemplate(menuTemplate);
   Menu.setApplicationMenu(menu);
-  
+
   createWindow();
 
   app.on('activate', () => {

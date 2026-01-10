@@ -37,6 +37,7 @@ chmod +x build-icons.sh
 ```
 
 **Expected output:**
+
 ```
 ✅ All icon formats created successfully!
    📁 build/icon.icns (macOS)
@@ -51,6 +52,7 @@ npm run electron:build
 ```
 
 **What happens:**
+
 1. Vite builds frontend (~30 sec)
 2. Electron-builder packages (~30 sec)
 3. Code signing happens (~30 sec)
@@ -86,6 +88,7 @@ open dist-electron/JDex-2.0.0-arm64.dmg
 ## 🎯 That's It!
 
 Since you already went through the credential setup for your previous app, you just needed:
+
 - The notarize.js script configured (✅ done)
 - The package.json updated (✅ done)
 - Icons generated (⏳ step 2)
@@ -96,6 +99,7 @@ Since you already went through the credential setup for your previous app, you j
 ## 💡 For Future Apps
 
 Your `"notarytool-profile"` works for:
+
 - ✅ JDex (this app)
 - ✅ Income Investor Suite (future)
 - ✅ Any other ASTGL apps
@@ -110,11 +114,13 @@ Just copy the `scripts/notarize.js` file to other projects and it works automati
 ### If notarization fails:
 
 **Check credentials are still valid:**
+
 ```bash
 xcrun notarytool history --keychain-profile "notarytool-profile"
 ```
 
 This will either:
+
 - ✅ Show your notarization history (credentials work!)
 - ❌ Ask you to re-authenticate (credentials expired)
 

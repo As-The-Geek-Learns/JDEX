@@ -1,6 +1,7 @@
 # JDex Distribution Setup Guide
 
 ## Current Status
+
 ✅ Updated package.json with repository info
 ✅ Created build directory structure  
 ✅ Created macOS entitlements file
@@ -26,8 +27,9 @@ chmod +x build-icons.sh
 ```
 
 This will create:
+
 - `build/icon.icns` (macOS)
-- `build/icon.ico` (Windows)  
+- `build/icon.ico` (Windows)
 - `build/icon.png` (Linux)
 
 ## Step 3: Test the Clean Build
@@ -39,10 +41,11 @@ npm run electron:build
 ```
 
 **Expected Results:**
+
 - ✅ No "default Electron icon" warning
 - ✅ No "Cannot detect repository" warnings
 - ✅ No "Cannot read properties of null" errors
-- ⚠️  Still shows "skipped macOS notarization" (this is OK for now)
+- ⚠️ Still shows "skipped macOS notarization" (this is OK for now)
 
 ## Step 4: Verify the Build
 
@@ -53,6 +56,7 @@ ls -lh dist-electron/
 ```
 
 You should see:
+
 - `JDex-2.0.0-arm64.dmg` - Disk image for distribution
 - `JDex-2.0.0-arm64-mac.zip` - Zip archive for distribution
 
@@ -61,6 +65,7 @@ You should see:
 Double-click the DMG file and test installing JDex.
 
 **What You'll See:**
+
 - Custom JDex icon (teal gradient with "JD")
 - macOS may warn "App from unidentified developer" (expected without notarization)
 - To open: Right-click → Open (first time only)
@@ -74,6 +79,7 @@ Double-click the DMG file and test installing JDex.
 ### If YES - Let's Enable Notarization
 
 1. **Find your Team ID:**
+
 ```bash
 xcrun altool --list-providers -u "YOUR_APPLE_ID" -p "@keychain:AC_PASSWORD"
 ```
@@ -85,6 +91,7 @@ xcrun altool --list-providers -u "YOUR_APPLE_ID" -p "@keychain:AC_PASSWORD"
    - Generate new (save it!)
 
 3. **Store credentials in Keychain:**
+
 ```bash
 xcrun notarytool store-credentials "AC_PASSWORD" \
   --apple-id "your-apple-id@email.com" \
@@ -93,16 +100,19 @@ xcrun notarytool store-credentials "AC_PASSWORD" \
 ```
 
 4. **Install notarization package:**
+
 ```bash
 npm install --save-dev @electron/notarize
 ```
 
 5. **Update package.json build section** - add after "entitlementsInherit":
+
 ```json
 "afterSign": "scripts/notarize.js"
 ```
 
 6. **Create notarization script** at `scripts/notarize.js`:
+
 ```javascript
 import { notarize } from '@electron/notarize';
 import { build } from '../package.json' assert { type: 'json' };
@@ -118,12 +128,13 @@ export default async function notarizing(context) {
   return await notarize({
     tool: 'notarytool',
     appPath: `${appOutDir}/${appName}.app`,
-    keychainProfile: 'AC_PASSWORD'
+    keychainProfile: 'AC_PASSWORD',
   });
 }
 ```
 
 7. **Make script directory:**
+
 ```bash
 mkdir scripts
 # Then move the notarize.js content above into scripts/notarize.js
@@ -134,6 +145,7 @@ Now builds will be automatically notarized!
 ### If NO - Skip Notarization
 
 That's perfectly fine! Your app works great without it. Users will just need to:
+
 1. Right-click the app
 2. Select "Open"
 3. Click "Open" in the dialog
@@ -164,12 +176,14 @@ This is standard for indie Mac apps and only needs to be done once per user.
 ## Questions?
 
 - **"The build worked but I see a generic icon in Finder"** - Clear icon cache:
+
   ```bash
   sudo rm -rf /Library/Caches/com.apple.iconservices.store
   killall Finder
   ```
 
 - **"Notarization is taking forever"** - First notarization can take 5-15 minutes. Check status:
+
   ```bash
   xcrun notarytool log <submission-id> --keychain-profile AC_PASSWORD
   ```
