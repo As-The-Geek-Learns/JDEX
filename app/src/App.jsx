@@ -35,10 +35,6 @@ import {
   HardDrive,
   FolderOpen,
 } from 'lucide-react';
-import CloudDriveSettings from './components/Settings/CloudDriveSettings.jsx';
-import LicenseSettings from './components/Settings/LicenseSettings.jsx';
-import FileOrganizer from './components/FileOrganizer/FileOrganizer.jsx';
-import { LicenseProvider } from './context/LicenseContext.jsx';
 import {
   initDatabase,
   getAreas,
@@ -1381,20 +1377,6 @@ function SettingsModal({ isOpen, onClose, areas, categories, onDataChange }) {
             Categories
           </button>
           <button
-            onClick={() => setActiveTab('cloud')}
-            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'cloud' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
-          >
-            <Cloud size={16} className="inline mr-2" />
-            Cloud Storage
-          </button>
-          <button
-            onClick={() => setActiveTab('license')}
-            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'license' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
-          >
-            <Shield size={16} className="inline mr-2" />
-            License
-          </button>
-          <button
             onClick={() => setActiveTab('database')}
             className={`px-6 py-3 font-medium transition-colors ${activeTab === 'database' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
           >
@@ -1675,14 +1657,6 @@ function SettingsModal({ isOpen, onClose, areas, categories, onDataChange }) {
             </div>
           )}
 
-          {activeTab === 'cloud' && (
-            <CloudDriveSettings />
-          )}
-
-          {activeTab === 'license' && (
-            <LicenseSettings />
-          )}
-
           {activeTab === 'database' && (
             <div className="space-y-6">
               <div className="glass-card p-4">
@@ -1891,7 +1865,6 @@ export default function App() {
   const [editingFolder, setEditingFolder] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [showFileOrganizer, setShowFileOrganizer] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Initialize database
@@ -2100,7 +2073,6 @@ export default function App() {
   }
 
   return (
-    <LicenseProvider>
     <div className="min-h-screen flex">
       {/* Sidebar */}
       <aside
@@ -2137,13 +2109,6 @@ export default function App() {
             >
               <Plus size={18} />
               New Item (XX.XX.XX)
-            </button>
-            <button
-              onClick={() => setShowFileOrganizer(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors"
-            >
-              <HardDrive size={18} />
-              File Organizer
             </button>
             <button
               onClick={() => setShowSettings(true)}
@@ -2399,11 +2364,6 @@ export default function App() {
         onDataChange={triggerRefresh}
       />
 
-      {/* File Organizer (full-screen overlay) */}
-      {showFileOrganizer && (
-        <FileOrganizer onClose={() => setShowFileOrganizer(false)} />
-      )}
     </div>
-    </LicenseProvider>
   );
 }
