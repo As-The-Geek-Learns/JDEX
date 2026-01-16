@@ -105,6 +105,25 @@ jobs:
           du -sh dist/
 
   # ===========================================================================
+  # Static Security Analysis (Semgrep)
+  # ===========================================================================
+  security-scan:
+    name: Security Scan (Semgrep)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/javascript
+            p/secrets
+
+  # ===========================================================================
   # Secrets Scan
   # ===========================================================================
   secrets-scan:
