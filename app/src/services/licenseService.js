@@ -21,7 +21,7 @@
 
 const STORAGE_KEY = 'jdex_license';
 const USAGE_KEY = 'jdex_usage';
-const GUMROAD_PRODUCT_ID = 'jdex-premium'; // Your Gumroad product permalink
+const GUMROAD_PRODUCT_ID = 'jdex-premium'; // Gumroad product: https://astgl.gumroad.com/l/jdex-premium
 
 /**
  * License tiers with their limits.
