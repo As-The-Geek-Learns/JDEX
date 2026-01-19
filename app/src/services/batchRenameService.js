@@ -12,6 +12,7 @@ import { validateFilePath, sanitizeText } from '../utils/validation.js';
 // =============================================================================
 
 // Characters not allowed in filenames
+// eslint-disable-next-line no-control-regex
 const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\x00-\x1f]/g;
 
 // Windows reserved names
@@ -460,7 +461,9 @@ export function readDirectoryFiles(dirPath) {
         let size = 0;
         try {
           size = fs.statSync(fullPath).size;
-        } catch {}
+        } catch {
+          // Ignore errors reading file size
+        }
         
         return {
           name: entry.name,

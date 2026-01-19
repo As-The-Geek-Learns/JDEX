@@ -414,18 +414,20 @@ export function canPerformAction(action, count = 1) {
       }
       
       // Check monthly limit
-      const remaining = getRemainingQuota('filesOrganized');
-      if (remaining < count) {
-        return {
-          allowed: false,
-          reason: `Monthly limit reached (${tier.limits.filesPerMonth} files)`,
-          remaining,
-        };
+      {
+        const remaining = getRemainingQuota('filesOrganized');
+        if (remaining < count) {
+          return {
+            allowed: false,
+            reason: `Monthly limit reached (${tier.limits.filesPerMonth} files)`,
+            remaining,
+          };
+        }
+        
+        return { allowed: true };
       }
-      
-      return { allowed: true };
     
-    case 'createRule':
+    case 'createRule': {
       const rulesRemaining = getRemainingQuota('rulesCreated');
       if (rulesRemaining < 1) {
         return {
@@ -435,6 +437,7 @@ export function canPerformAction(action, count = 1) {
         };
       }
       return { allowed: true };
+    }
     
     case 'addCloudDrive':
       // Would need to check current count from DB
