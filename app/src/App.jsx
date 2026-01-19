@@ -34,10 +34,12 @@ import {
   RefreshCw,
   HardDrive,
   FolderOpen,
+  BarChart3,
 } from 'lucide-react';
 import CloudDriveSettings from './components/Settings/CloudDriveSettings.jsx';
 import LicenseSettings from './components/Settings/LicenseSettings.jsx';
 import FileOrganizer from './components/FileOrganizer/FileOrganizer.jsx';
+import StatsDashboard from './components/Stats/StatsDashboard.jsx';
 import { LicenseProvider } from './context/LicenseContext.jsx';
 import {
   initDatabase,
@@ -1826,8 +1828,8 @@ function SettingsModal({ isOpen, onClose, areas, categories, onDataChange }) {
   );
 }
 
-// Stats Dashboard - Updated for 4-level structure
-function StatsDashboard({ stats }) {
+// Quick Stats Overview - Summary cards on home view
+function QuickStatsOverview({ stats }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
       <div className="glass-card p-4">
@@ -1892,6 +1894,7 @@ export default function App() {
   const [editingItem, setEditingItem] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showFileOrganizer, setShowFileOrganizer] = useState(false);
+  const [showStatsDashboard, setShowStatsDashboard] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Initialize database
@@ -2146,6 +2149,13 @@ export default function App() {
               File Organizer
             </button>
             <button
+              onClick={() => setShowStatsDashboard(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600/80 to-teal-600/80 text-white hover:from-purple-500/80 hover:to-teal-500/80 transition-all"
+            >
+              <BarChart3 size={18} />
+              Statistics
+            </button>
+            <button
               onClick={() => setShowSettings(true)}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors"
             >
@@ -2249,7 +2259,7 @@ export default function App() {
           )}
 
           {/* Stats */}
-          {currentView === 'home' && !searchQuery && <StatsDashboard stats={stats} />}
+          {currentView === 'home' && !searchQuery && <QuickStatsOverview stats={stats} />}
 
           {/* Current View Title */}
           <div className="flex items-center justify-between mb-4">
@@ -2402,6 +2412,11 @@ export default function App() {
       {/* File Organizer (full-screen overlay) */}
       {showFileOrganizer && (
         <FileOrganizer onClose={() => setShowFileOrganizer(false)} />
+      )}
+
+      {/* Statistics Dashboard (premium feature) */}
+      {showStatsDashboard && (
+        <StatsDashboard onClose={() => setShowStatsDashboard(false)} />
       )}
     </div>
     </LicenseProvider>
