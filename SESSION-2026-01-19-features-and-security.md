@@ -120,6 +120,32 @@ app/package.json - Dependency upgrades
 1. **Manual Testing** - Test drag & drop and batch rename in Electron
 2. **Electron Upgrade** - Refactor `electron/main.js` for ESM compatibility with Electron 35+
 3. **Windows Cloud Detection** - Remaining planned feature
+4. **Gemini Code Review Integration** - Add external AI review to VERIFY phase (see below)
+
+---
+
+## Future Enhancement: Gemini Code Review
+
+### Goal
+Add an external AI (Gemini) code review step to the VERIFY phase to catch issues that Claude might miss.
+
+### Implementation Plan
+1. Get Gemini API key from Google AI Studio
+2. Add `GEMINI_API_KEY` environment variable
+3. Update `scripts/verify.js` to:
+   - Generate diff of changed files
+   - Send to Gemini API for review
+   - Include feedback in verification output
+4. Update `.workflow/checklists/verify-checklist.md` with "External AI Review" section
+
+### Benefits
+- Different AI perspective catches blind spots
+- Security-focused review
+- Documented review results in verification state
+
+### Requirements
+- Gemini API key (free tier available)
+- Node.js fetch or axios for API calls
 
 ---
 
