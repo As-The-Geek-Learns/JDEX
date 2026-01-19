@@ -1,0 +1,54 @@
+{
+  "version": "1.0.0",
+  "project": "jdex-complete-package",
+  "timestamp": "2026-01-19T15:41:54.925Z",
+  "files": {
+    "count": 27,
+    "hashes": {
+      "app/electron/electron-main.js": "b1fbe51e519dd88f8504452ea4b87db755cdf3dcdb87fca8e0b7db864607224e",
+      "app/electron/main.js": "baef02005e1ed0bf85b13371d1081c8756a95770c98ee7763a2826736078e8a4",
+      "app/src/App.jsx": "acba2a88ddee7758437af9ea7359cc7feeda9da2108182c48d61eb3889fab58a",
+      "app/src/components/FileOrganizer/FileOrganizer.jsx": "bd7e017e9692a54addab7141dd145c400bd6fb6ce89c8cb5156f260c6f4450ff",
+      "app/src/components/FileOrganizer/RulesManager.jsx": "ee57919911d2f223edc04e895e6982a882a81682a321b4d8bc7323e6cb810687",
+      "app/src/components/FileOrganizer/ScannerPanel.jsx": "032ff8d33f7ba7b0378dbaa2ece8babf19be40b68b7bf4950ede2de94148a2a2",
+      "app/src/components/FileOrganizer/WatchFolders.jsx": "25012c9649db63637e0afbc3fdddd9730ed398af436a2c08046b83ca1bb63511",
+      "app/src/components/Settings/CloudDriveSettings.jsx": "c66fb43d8c87e5f71c89f30ce111906da83aaaf024a70d81f6ea6f19fd78c863",
+      "app/src/components/Settings/LicenseSettings.jsx": "0b4d43a97cf9fdc0ffe5c36fcb1e03bf66dce000adb2ed544958e5aaea5e0185",
+      "app/src/components/Stats/ActivityChart.jsx": "2fde0339d4cc75ae6b4c98d0d045468d334c0acebec819500c2109feea4c5e12",
+      "app/src/components/Stats/FileTypeChart.jsx": "fe7798aa1a1e5eff0a3207e43b8da9d54b479eb0964aabac68f0575787d2310f",
+      "app/src/components/Stats/StatCard.jsx": "01a9dea274ba5a128e110cde81bdf142cf95a85e92814755b43a6232b4e5f3a1",
+      "app/src/components/Stats/StatsDashboard.jsx": "be612a4abcffa3f5742b3c11e79225da67e7e33d0673c187e76f00b2e802af6a",
+      "app/src/components/Stats/TopRulesCard.jsx": "4462a860c5b3044cbcc079a5aa25cf30396698dcbc50eee62014b9f37dfcc89d",
+      "app/src/context/LicenseContext.jsx": "5af9867c2cd77c431e0ef451f5aec63f22ffaf0f2a5523d3d58bcc009661e626",
+      "app/src/db.js": "6ecacda3ac58c7558883b24e3f708eb0efb3e3f9fee8838962e61742c794c1d4",
+      "app/src/index.css": "4cdefabf18eff640af905a1cce3ef0efbda39b7e8a9c638c81c69cabefbfee68",
+      "app/src/main.jsx": "cac5ad762514c7db1355aaabe99b0495ebe4a31fcbc89c153b352dc882cc94ea",
+      "app/src/services/cloudDriveService.js": "7f7a711abc3bcf16b556d8288ce2a8450ad3894fc56d6174482cd50a89347304",
+      "app/src/services/fileOperations.js": "54e78c297e82082ce235e23225f2f070beee3d143260d7b206dff4c94b510f3b",
+      "app/src/services/fileScannerService.js": "7abd8c94665113ed2c91fd9893a45bbf93c02cd5ab383018c30b6c69f36f63d3",
+      "app/src/services/licenseService.js": "faa72c17606c7e97d7c95c580d91c8a637010448102a71a1f1d3bf343b005b1d",
+      "app/src/services/matchingEngine.js": "d4291a3ca516a52a165f3907eb573618912f0967ada9c062dd42ea37589e0f3c",
+      "app/src/services/statisticsService.js": "0f50370163cb9f28808975d720dd899e0a6321014f72b2bedce46e9782302d72",
+      "app/src/services/watcherService.js": "2a684e11d3c3acc5578336714c094ff811f7b63985046ea1214bd3479b753424",
+      "app/src/utils/errors.js": "014427d404b7ff0011fb6ee18c31261986cf13b3bcb88d07a56b7c35d297ebad",
+      "app/src/utils/validation.js": "37aca620961446835ee81ef8836e40159414a50b8cfdd56360a6de9c901c1433"
+    }
+  },
+  "tests": {
+    "skipped": true
+  },
+  "lint": {
+    "skipped": true
+  },
+  "audit": {
+    "success": false,
+    "output": "# npm audit report\n\nelectron  <35.7.5\nSeverity: moderate\nElectron has ASAR Integrity Bypass via resource modification - https://github.com/advisories/GHSA-vmqv-hx8q-j7mg\nfix available via `npm audit fix --force`\nWill install electron@40.0.0, which is a breaking change\nnode_modules/electron\n\nesbuild  <=0.24.2\nSeverity: moderate\nesbuild enables any website to send any requests to the development server and read the response - https://github.com/advisories/GHSA-67mh-4wv8-2f99\nfix available via `npm"
+  },
+  "summary": {
+    "filesHashed": 27,
+    "testsPass": true,
+    "lintPass": true,
+    "auditPass": false,
+    "overallPass": false
+  }
+}

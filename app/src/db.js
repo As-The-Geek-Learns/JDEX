@@ -14,6 +14,14 @@ let SQL = null;
 // Current schema version - increment when adding migrations
 const SCHEMA_VERSION = 7;
 
+/**
+ * Get the current database instance
+ * @returns {Object|null} The SQL.js database instance or null if not initialized
+ */
+export function getDB() {
+  return db;
+}
+
 // Initialize the database
 export async function initDatabase() {
   if (db) return db;
