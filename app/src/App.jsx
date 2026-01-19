@@ -40,7 +40,9 @@ import CloudDriveSettings from './components/Settings/CloudDriveSettings.jsx';
 import LicenseSettings from './components/Settings/LicenseSettings.jsx';
 import FileOrganizer from './components/FileOrganizer/FileOrganizer.jsx';
 import StatsDashboard from './components/Stats/StatsDashboard.jsx';
+import DropZone from './components/DragDrop/DropZone.jsx';
 import { LicenseProvider } from './context/LicenseContext.jsx';
+import { DragDropProvider, useDragDrop } from './context/DragDropContext.jsx';
 import {
   initDatabase,
   getAreas,
@@ -2104,6 +2106,7 @@ export default function App() {
 
   return (
     <LicenseProvider>
+    <DragDropProvider>
     <div className="min-h-screen flex">
       {/* Sidebar */}
       <aside
@@ -2294,13 +2297,18 @@ export default function App() {
               </h3>
               <div className="space-y-3">
                 {displayFolders.map((folder) => (
-                  <FolderCard
+                  <DropZone
                     key={folder.id}
                     folder={folder}
-                    onEdit={setEditingFolder}
-                    onDelete={handleDeleteFolder}
-                    onOpen={(f) => navigateTo('folder', f)}
-                  />
+                    onSuccess={() => triggerRefresh()}
+                  >
+                    <FolderCard
+                      folder={folder}
+                      onEdit={setEditingFolder}
+                      onDelete={handleDeleteFolder}
+                      onOpen={(f) => navigateTo('folder', f)}
+                    />
+                  </DropZone>
                 ))}
               </div>
             </div>
@@ -2419,6 +2427,7 @@ export default function App() {
         <StatsDashboard onClose={() => setShowStatsDashboard(false)} />
       )}
     </div>
+    </DragDropProvider>
     </LicenseProvider>
   );
 }
