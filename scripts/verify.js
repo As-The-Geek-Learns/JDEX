@@ -20,6 +20,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { runGeminiReview, formatReviewOutput } = require('./geminiReview');
 
 // Configuration - JDex specific paths
 const DEFAULT_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.css', '.json'];
@@ -31,6 +32,8 @@ const args = process.argv.slice(2);
 const options = {
   skipTests: args.includes('--skip-tests'),
   skipLint: args.includes('--skip-lint'),
+  skipGemini: args.includes('--skip-gemini'),
+  geminiBaseRef: args.find(a => a.startsWith('--gemini-base='))?.split('=')[1] || 'HEAD~1',
   outputPath: OUTPUT_PATH
 };
 
@@ -177,6 +180,33 @@ function runAudit() {
   };
 }
 
+async function runGeminiCodeReview() {
+  if (options.skipGemini) {
+    console.log('\nSkipping Gemini review (--skip-gemini)');
+    return { skipped: true, reason: 'Skipped by user' };
+  }
+  
+  console.log('\nRunning Gemini AI code review...');
+  
+  try {
+    const review = await runGeminiReview({
+      baseRef: options.geminiBaseRef,
+      cwd: process.cwd()
+    });
+    
+    // Print formatted output
+    console.log(formatReviewOutput(review));
+    
+    return review;
+  } catch (error) {
+    console.error('Gemini review error:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 // Main verification process
 async function main() {
   console.log('='.repeat(60));
@@ -201,10 +231,16 @@ async function main() {
   const testResults = runTests();
   const lintResults = runLint();
   const auditResults = runAudit();
+  const geminiResults = await runGeminiCodeReview();
+  
+  // Determine if Gemini review passes (passes if skipped, successful with no critical issues, or API unavailable)
+  const geminiPass = geminiResults.skipped || 
+                     (geminiResults.success && geminiResults.passesReview) ||
+                     (!geminiResults.success && geminiResults.reason?.includes('API_KEY'));
   
   // Build verification state
   const verifyState = {
-    version: '1.0.0',
+    version: '1.1.0',
     project: 'jdex-complete-package',
     timestamp: new Date().toISOString(),
     files: {
@@ -214,14 +250,33 @@ async function main() {
     tests: testResults,
     lint: lintResults,
     audit: auditResults,
+    geminiReview: {
+      success: geminiResults.success,
+      skipped: geminiResults.skipped || false,
+      passesReview: geminiResults.passesReview,
+      summary: geminiResults.summary,
+      issueCount: geminiResults.issues?.length || 0,
+      criticalCount: geminiResults.issues?.filter(i => i.severity === 'CRITICAL').length || 0,
+      warningCount: geminiResults.issues?.filter(i => i.severity === 'WARNING').length || 0,
+      infoCount: geminiResults.issues?.filter(i => i.severity === 'INFO').length || 0,
+      securityScore: geminiResults.securityScore,
+      qualityScore: geminiResults.qualityScore,
+      duration: geminiResults.duration,
+      model: geminiResults.model,
+      issues: geminiResults.issues || [],
+      error: geminiResults.error,
+      reason: geminiResults.reason
+    },
     summary: {
       filesHashed: Object.keys(fileHashes).length,
       testsPass: testResults.success || testResults.skipped,
       lintPass: lintResults.success || lintResults.skipped,
       auditPass: auditResults.success,
+      geminiPass: geminiPass,
       overallPass: (testResults.success || testResults.skipped) &&
                    (lintResults.success || lintResults.skipped) &&
-                   auditResults.success
+                   auditResults.success &&
+                   geminiPass
     }
   };
   
@@ -245,6 +300,19 @@ async function main() {
   console.log('Tests:           ' + (verifyState.summary.testsPass ? 'PASS' : 'FAIL'));
   console.log('Lint:            ' + (verifyState.summary.lintPass ? 'PASS' : 'FAIL'));
   console.log('Security Audit:  ' + (verifyState.summary.auditPass ? 'PASS' : 'FAIL'));
+  
+  // Gemini review status
+  if (verifyState.geminiReview.skipped) {
+    console.log('Gemini Review:   SKIPPED (' + (verifyState.geminiReview.reason || 'no reason') + ')');
+  } else if (verifyState.geminiReview.success) {
+    const issues = verifyState.geminiReview.issueCount;
+    const critical = verifyState.geminiReview.criticalCount;
+    console.log('Gemini Review:   ' + (verifyState.summary.geminiPass ? 'PASS' : 'FAIL') + 
+                (issues > 0 ? ' (' + issues + ' issues, ' + critical + ' critical)' : ''));
+  } else {
+    console.log('Gemini Review:   ERROR (' + (verifyState.geminiReview.error || 'unknown error') + ')');
+  }
+  
   console.log('-'.repeat(60));
   console.log('OVERALL:         ' + (verifyState.summary.overallPass ? 'PASS' : 'FAIL'));
   console.log('='.repeat(60));

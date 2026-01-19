@@ -104,7 +104,14 @@ Each development session should:
 ## COMMANDS
 
 - `node scripts/verify.js` - Generate verification state with file hashes
+- `node scripts/verify.js --skip-gemini` - Skip Gemini AI review
+- `node scripts/geminiReview.js` - Run Gemini code review (diff of last commit)
+- `node scripts/geminiReview.js --full` - Full codebase security audit
 - `node scripts/ship.js` - Validate integrity and prepare for shipping
+
+## ENVIRONMENT VARIABLES
+
+- `GEMINI_API_KEY` - Required for AI code review. Get from https://aistudio.google.com/app/apikey
 
 ## ENFORCING THE WORKFLOW
 

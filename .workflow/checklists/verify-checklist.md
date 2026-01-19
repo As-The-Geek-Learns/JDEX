@@ -107,7 +107,57 @@ npm audit --audit-level=high
 
 ---
 
-## 5. File Integrity
+## 5. External AI Code Review (Gemini)
+
+An external AI reviewer (Google Gemini) provides a second perspective on code changes, catching issues that may be missed by the primary AI or human reviewers.
+
+### Setup
+Requires `GEMINI_API_KEY` environment variable. Get a free API key from:
+https://aistudio.google.com/app/apikey
+
+```bash
+export GEMINI_API_KEY="your-api-key-here"
+```
+
+### Running the Review
+The Gemini review runs automatically as part of `verify.js`:
+
+```bash
+node scripts/verify.js                    # Includes Gemini review
+node scripts/verify.js --skip-gemini      # Skip Gemini review
+node scripts/verify.js --gemini-base=HEAD~5  # Review last 5 commits
+```
+
+Or run standalone:
+```bash
+node scripts/geminiReview.js              # Review last commit
+node scripts/geminiReview.js --full       # Full codebase security audit
+node scripts/geminiReview.js --staged     # Review staged changes
+node scripts/geminiReview.js --base=main  # Review against main branch
+```
+
+### Review Criteria
+Gemini reviews code for:
+- **CRITICAL**: Security vulnerabilities (injection, XSS, path traversal, exposed secrets)
+- **WARNING**: Missing validation, error handling, logic errors, race conditions
+- **INFO**: Style improvements, performance, documentation suggestions
+
+### Verification
+- [ ] Gemini review completed (or documented reason for skip)
+- [ ] No CRITICAL issues found
+- [ ] WARNING issues addressed or documented
+- [ ] Review summary included in verification state
+
+### Results
+- **Status:** Pass / Fail / Skipped
+- **Issues Found:** ___
+- **Critical:** ___
+- **Security Score:** ___/10
+- **Quality Score:** ___/10
+
+---
+
+## 6. File Integrity
 
 ### Generate Verification State
 Run the verify script to generate file hashes:
@@ -120,6 +170,7 @@ This creates `.workflow/state/verify-state.json` containing:
 - SHA256 hashes of all modified files
 - Timestamp of verification
 - Test results summary
+- Gemini review results
 - Verification checklist status
 
 ### Verify Output
@@ -129,7 +180,7 @@ This creates `.workflow/state/verify-state.json` containing:
 
 ---
 
-## 6. Documentation
+## 7. Documentation
 
 - [ ] Code comments added where needed
 - [ ] README updated (if public API changed)
@@ -146,6 +197,7 @@ This creates `.workflow/state/verify-state.json` containing:
 | Visual Verification | Pass/Fail | |
 | Code Quality | Pass/Fail | |
 | Security Review | Pass/Fail | |
+| Gemini AI Review | Pass/Fail/Skip | |
 | File Integrity | Pass/Fail | |
 | Documentation | Pass/Fail | |
 

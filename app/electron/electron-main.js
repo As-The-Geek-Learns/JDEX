@@ -1,5 +1,5 @@
 // Electron main process for JDex desktop app
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, session } = require('electron');
 const path = require('path');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -107,6 +107,24 @@ const menuTemplate = [
 ];
 
 app.whenReady().then(() => {
+  // Security: Set Content Security Policy headers
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self';" +
+          "script-src 'self' 'unsafe-inline';" +
+          "style-src 'self' 'unsafe-inline';" +
+          "img-src 'self' data: blob:;" +
+          "font-src 'self';" +
+          "connect-src 'self';" +
+          "frame-ancestors 'none';"
+        ]
+      }
+    });
+  });
+
   const menu = Menu.buildFromTemplate(menuTemplate);
   Menu.setApplicationMenu(menu);
 

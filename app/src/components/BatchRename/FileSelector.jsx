@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Folder, File, Check, X, RefreshCw } from 'lucide-react';
 import { readDirectoryFiles } from '../../services/batchRenameService.js';
+import { validateFilePath, sanitizeText } from '../../utils/validation.js';
 
 /**
  * FileSelector Component
@@ -17,6 +18,31 @@ export default function FileSelector({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Sanitize error messages to prevent XSS
+  const setSafeError = useCallback((message) => {
+    // Sanitize the error message before displaying
+    const safeMessage = sanitizeText(String(message || 'Unknown error'));
+    setError(safeMessage);
+  }, []);
+
+  // Validate and sanitize a user-provided path
+  const validateUserPath = useCallback((inputPath) => {
+    if (!inputPath) return null;
+    
+    try {
+      // Sanitize text first (remove HTML tags, control chars)
+      const sanitized = sanitizeText(inputPath);
+      if (!sanitized) return null;
+      
+      // Validate as a file path (checks for path traversal, etc.)
+      const validated = validateFilePath(sanitized, { allowHome: true });
+      return validated;
+    } catch (err) {
+      setSafeError('Invalid path: ' + (err.message || 'validation failed'));
+      return null;
+    }
+  }, [setSafeError]);
+
   // Handle folder selection via Electron dialog
   const handleSelectFolder = useCallback(async () => {
     try {
@@ -24,9 +50,10 @@ export default function FileSelector({
       
       if (!dialog) {
         // Fallback: prompt for path
-        const path = window.prompt('Enter folder path:');
-        if (path) {
-          loadFolder(path);
+        const inputPath = window.prompt('Enter folder path:');
+        const validatedPath = validateUserPath(inputPath);
+        if (validatedPath) {
+          loadFolder(validatedPath);
         }
         return;
       }
@@ -41,12 +68,13 @@ export default function FileSelector({
       }
     } catch (err) {
       // Fallback for when @electron/remote isn't available
-      const path = window.prompt('Enter folder path:');
-      if (path) {
-        loadFolder(path);
+      const inputPath = window.prompt('Enter folder path:');
+      const validatedPath = validateUserPath(inputPath);
+      if (validatedPath) {
+        loadFolder(validatedPath);
       }
     }
-  }, []);
+  }, [validateUserPath]);
 
   // Load files from a folder
   const loadFolder = useCallback((path) => {
@@ -67,12 +95,13 @@ export default function FileSelector({
         onFilesChange(files);
       }
     } catch (err) {
-      setError(err.message || 'Failed to read folder');
+      // Security: Sanitize error message before display
+      setSafeError(err.message || 'Failed to read folder');
       setAvailableFiles([]);
     }
     
     setLoading(false);
-  }, [onFilesChange]);
+  }, [onFilesChange, setSafeError]);
 
   // Toggle file selection
   const toggleFile = useCallback((file) => {

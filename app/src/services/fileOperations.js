@@ -18,6 +18,7 @@
 
 import { validateFilePath, isPathWithinBase } from '../utils/validation.js';
 import { FileSystemError, Result } from '../utils/errors.js';
+import { sanitizeFilename } from './batchRenameService.js';
 import {
   recordOrganizedFile,
   updateOrganizedFile,
@@ -134,16 +135,21 @@ export function ensureDirectory(dirPath) {
 
 /**
  * Generates a unique filename by adding a numeric suffix.
+ * Sanitizes the filename to remove invalid characters.
  */
 export function generateUniqueFilename(dirPath, filename) {
   const modules = getNodeModules();
   if (!modules) return filename;
   
   const { path, fs } = modules;
-  const ext = path.extname(filename);
-  const base = path.basename(filename, ext);
   
-  let candidate = filename;
+  // Security: Sanitize filename to remove invalid/dangerous characters
+  const sanitized = sanitizeFilename(filename);
+  
+  const ext = path.extname(sanitized);
+  const base = path.basename(sanitized, ext);
+  
+  let candidate = sanitized;
   let counter = 1;
   
   while (fs.existsSync(path.join(dirPath, candidate))) {
@@ -155,7 +161,7 @@ export function generateUniqueFilename(dirPath, filename) {
       throw new FileSystemError(
         'Too many files with similar names',
         'rename',
-        filename
+        sanitized
       );
     }
   }
@@ -218,12 +224,61 @@ export function buildDestinationPath(folderNumber, filename, options = {}) {
   const areaStart = Math.floor(parseInt(categoryNumber) / 10) * 10;
   const areaEnd = areaStart + 9;
   
-  const areaFolder = `${areaStart.toString().padStart(2, '0')}-${areaEnd.toString().padStart(2, '0')} ${folder.area_name || 'Area'}`;
-  const categoryFolder = `${categoryNumber.padStart(2, '0')} ${folder.category_name || 'Category'}`;
-  const jdFolder = `${folderNumber} ${folder.name}`;
+  // Security: Sanitize folder names to prevent path traversal
+  // Remove any path separators or traversal sequences from names
+  const sanitizeFolderName = (name) => {
+    if (!name) return '';
+    return name
+      .replace(/[\/\\]/g, '_')      // Replace path separators with underscore
+      .replace(/\.\./g, '_')         // Remove parent directory references
+      .replace(/[<>:"|?*]/g, '_')    // Remove other invalid filename chars
+      .trim();
+  };
   
-  const folderPath = path.join(basePath, areaFolder, categoryFolder, jdFolder);
-  const fullPath = path.join(folderPath, filename);
+  const safeAreaName = sanitizeFolderName(folder.area_name) || 'Area';
+  const safeCategoryName = sanitizeFolderName(folder.category_name) || 'Category';
+  const safeFolderName = sanitizeFolderName(folder.name) || 'Folder';
+  
+  const areaFolder = `${areaStart.toString().padStart(2, '0')}-${areaEnd.toString().padStart(2, '0')} ${safeAreaName}`;
+  const categoryFolder = `${categoryNumber.padStart(2, '0')} ${safeCategoryName}`;
+  const jdFolder = `${folderNumber} ${safeFolderName}`;
+  
+  // Use path.resolve to normalize paths
+  const folderPath = path.resolve(path.join(basePath, areaFolder, categoryFolder, jdFolder));
+  const fullPath = path.resolve(path.join(folderPath, sanitizeFilename(filename)));
+  
+  // Security: Validate constructed paths to prevent path traversal
+  try {
+    validateFilePath(folderPath, { allowHome: true });
+    validateFilePath(fullPath, { allowHome: true });
+  } catch (error) {
+    throw new FileSystemError(
+      `Invalid destination path: ${error.message}`,
+      'buildPath',
+      fullPath
+    );
+  }
+  
+  // Security: Resolve the base path to its real path (handles symlinks)
+  const { fs } = modules;
+  let realBasePath = basePath;
+  try {
+    if (fs.existsSync(basePath)) {
+      realBasePath = fs.realpathSync(basePath);
+    }
+  } catch {
+    // If we can't resolve, use the original path
+  }
+  
+  // Security: Ensure destination is within the base path
+  // This check catches symlink attacks where a folder might point outside the intended directory
+  if (!isPathWithinBase(fullPath, basePath) && !isPathWithinBase(fullPath, realBasePath)) {
+    throw new FileSystemError(
+      'Destination path escapes base directory',
+      'buildPath',
+      fullPath
+    );
+  }
   
   return {
     basePath,

@@ -10,7 +10,7 @@
  * - Managing drive configurations in the database
  */
 
-import { validateFilePath } from '../utils/validation.js';
+import { validateFilePath, isPathWithinBase } from '../utils/validation.js';
 import { CloudDriveError } from '../utils/errors.js';
 import {
   getCloudDrives,
@@ -441,12 +441,34 @@ export async function addCustomDrive(drive) {
   
   // Validate path is safe
   validateFilePath(drive.path, { allowHome: true });
+  const expandedBasePath = expandPath(drive.path);
+  
+  // Security: Validate jdRootPath if provided
+  let validatedJdRootPath = null;
+  if (drive.jdRootPath) {
+    // Sanitize and validate the jdRootPath
+    validateFilePath(drive.jdRootPath, { allowHome: true, allowRelative: true });
+    
+    // Build full path and ensure it's within the base path
+    const fullJdPath = drive.jdRootPath.startsWith('/')
+      ? drive.jdRootPath
+      : `${expandedBasePath}/${drive.jdRootPath}`;
+    
+    if (!isPathWithinBase(fullJdPath, expandedBasePath)) {
+      throw new CloudDriveError(
+        'JD root path must be within the drive base path',
+        drive.name,
+        'connect'
+      );
+    }
+    validatedJdRootPath = drive.jdRootPath;
+  }
   
   return createCloudDrive({
     id: drive.id,
     name: drive.name,
-    base_path: expandPath(drive.path),
-    jd_root_path: drive.jdRootPath || null,
+    base_path: expandedBasePath,
+    jd_root_path: validatedJdRootPath,
     drive_type: 'generic',
     is_default: drive.isDefault || false,
   });
@@ -464,10 +486,22 @@ export async function setDriveJDRoot(driveId, jdRootPath) {
     throw new CloudDriveError(`Drive not found: ${driveId}`, driveId, 'connect');
   }
   
+  // Security: Validate jdRootPath before use
+  validateFilePath(jdRootPath, { allowHome: true, allowRelative: true });
+  
   // Build full path and verify it exists
   const fullPath = jdRootPath.startsWith('/')
     ? jdRootPath
     : `${drive.base_path}/${jdRootPath}`;
+  
+  // Security: Ensure the full path is within the drive's base path
+  if (!isPathWithinBase(fullPath, drive.base_path)) {
+    throw new CloudDriveError(
+      'JD root path must be within the drive base path',
+      drive.name,
+      'connect'
+    );
+  }
   
   const exists = await directoryExists(fullPath);
   if (!exists) {

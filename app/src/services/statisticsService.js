@@ -3,9 +3,28 @@
  * ==================
  * Provides aggregated statistics from the JDex database for the Statistics Dashboard.
  * All queries are read-only and optimized for dashboard display.
+ * 
+ * Security: All numeric parameters are validated before use in queries.
  */
 
 import { getDB } from '../db.js';
+
+/**
+ * Validate and sanitize a numeric parameter for SQL queries.
+ * Prevents SQL injection by ensuring the value is a positive integer.
+ * 
+ * @param {unknown} value - The value to validate
+ * @param {number} defaultValue - Default if invalid
+ * @param {number} maxValue - Maximum allowed value
+ * @returns {number} Safe integer value
+ */
+function validateNumericParam(value, defaultValue, maxValue = 1000) {
+  const num = parseInt(value, 10);
+  if (isNaN(num) || num < 1) {
+    return defaultValue;
+  }
+  return Math.min(num, maxValue);
+}
 
 /**
  * Get total count of organized files
@@ -80,12 +99,15 @@ export function getFilesOrganizedByDay(days = 30) {
   const db = getDB();
   if (!db) return [];
   
+  // Security: Validate numeric parameter to prevent SQL injection
+  const safeDays = validateNumericParam(days, 30, 365);
+  
   try {
     const result = db.exec(`
       SELECT DATE(organized_at) as date, COUNT(*) as count 
       FROM organized_files 
       WHERE status = 'moved' 
-      AND organized_at >= date('now', '-${days} days')
+      AND organized_at >= date('now', '-${safeDays} days')
       GROUP BY DATE(organized_at)
       ORDER BY date ASC
     `);
@@ -128,6 +150,9 @@ export function getFilesByType(limit = 8) {
   const db = getDB();
   if (!db) return [];
   
+  // Security: Validate numeric parameter to prevent SQL injection
+  const safeLimit = validateNumericParam(limit, 8, 100);
+  
   try {
     const result = db.exec(`
       SELECT 
@@ -137,7 +162,7 @@ export function getFilesByType(limit = 8) {
       WHERE status = 'moved'
       GROUP BY file_type
       ORDER BY count DESC
-      LIMIT ${limit}
+      LIMIT ${safeLimit}
     `);
     
     if (!result[0]) return [];
@@ -161,13 +186,16 @@ export function getTopRules(limit = 5) {
   const db = getDB();
   if (!db) return [];
   
+  // Security: Validate numeric parameter to prevent SQL injection
+  const safeLimit = validateNumericParam(limit, 5, 100);
+  
   try {
     const result = db.exec(`
       SELECT name, rule_type, match_count 
       FROM organization_rules 
       WHERE is_active = 1 AND match_count > 0
       ORDER BY match_count DESC
-      LIMIT ${limit}
+      LIMIT ${safeLimit}
     `);
     
     if (!result[0]) return [];
@@ -242,12 +270,15 @@ export function getMostCommonCategory() {
     
     const categoryPrefix = result[0].values[0][0];
     
+    // Security: Validate category number before using in query
+    const safeCategoryNum = validateNumericParam(categoryPrefix, 0, 99);
+    
     // Look up category name
     const catResult = db.exec(`
-      SELECT name FROM categories WHERE number = ${parseInt(categoryPrefix)}
+      SELECT name FROM categories WHERE number = ${safeCategoryNum}
     `);
     
-    return catResult[0]?.values[0]?.[0] || `Category ${categoryPrefix}`;
+    return catResult[0]?.values[0]?.[0] || `Category ${safeCategoryNum}`;
   } catch (error) {
     console.error('[StatisticsService] Error getting most common category:', error);
     return 'None';
