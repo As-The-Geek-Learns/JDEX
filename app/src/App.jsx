@@ -35,11 +35,13 @@ import {
   HardDrive,
   FolderOpen,
   BarChart3,
+  FileEdit,
 } from 'lucide-react';
 import CloudDriveSettings from './components/Settings/CloudDriveSettings.jsx';
 import LicenseSettings from './components/Settings/LicenseSettings.jsx';
 import FileOrganizer from './components/FileOrganizer/FileOrganizer.jsx';
 import StatsDashboard from './components/Stats/StatsDashboard.jsx';
+import BatchRenameModal from './components/BatchRename/BatchRenameModal.jsx';
 import DropZone from './components/DragDrop/DropZone.jsx';
 import { LicenseProvider } from './context/LicenseContext.jsx';
 import { DragDropProvider, useDragDrop } from './context/DragDropContext.jsx';
@@ -1897,6 +1899,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showFileOrganizer, setShowFileOrganizer] = useState(false);
   const [showStatsDashboard, setShowStatsDashboard] = useState(false);
+  const [showBatchRename, setShowBatchRename] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Initialize database
@@ -2157,6 +2160,13 @@ export default function App() {
             >
               <BarChart3 size={18} />
               Statistics
+            </button>
+            <button
+              onClick={() => setShowBatchRename(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-600/80 to-orange-600/80 text-white hover:from-amber-500/80 hover:to-orange-500/80 transition-all"
+            >
+              <FileEdit size={18} />
+              Batch Rename
             </button>
             <button
               onClick={() => setShowSettings(true)}
@@ -2425,6 +2435,11 @@ export default function App() {
       {/* Statistics Dashboard (premium feature) */}
       {showStatsDashboard && (
         <StatsDashboard onClose={() => setShowStatsDashboard(false)} />
+      )}
+
+      {/* Batch Rename Modal (premium feature) */}
+      {showBatchRename && (
+        <BatchRenameModal onClose={() => setShowBatchRename(false)} />
       )}
     </div>
     </DragDropProvider>
