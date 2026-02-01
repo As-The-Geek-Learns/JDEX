@@ -52,3 +52,5 @@ rules/
 
 # Husky
 .husky/_
+# Editor-specific files
+.cursor/
