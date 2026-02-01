@@ -298,6 +298,141 @@ npm run electron:dev
 
 ---
 
+## Development Workflow: Ironclad 4-Phase Process
+
+This project uses a structured workflow with mandatory quality gates and AI-powered code review.
+
+### Workflow Phases
+
+#### Phase 1: PLAN
+Before writing any code, create or update a plan document.
+
+**Required:**
+- Create `.workflow/sessions/SESSION-YYYY-MM-DD-[slug]/plan.md` using the template
+- Define problem statement and success criteria
+- Complete security considerations section
+- Break down tasks with dependencies
+- Get human approval before proceeding
+
+**Gate:** Human must approve the plan before EXECUTE phase begins.
+
+#### Phase 2: EXECUTE
+Implement the planned tasks systematically.
+
+**Required:**
+- Work through tasks in dependency order
+- Create feature branch for the work
+- Update session documentation as you go
+- Mark tasks complete in plan.md as finished
+- Run linting and fix issues before proceeding
+
+**Gate:** All planned tasks must be marked complete before VERIFY phase.
+
+#### Phase 3: VERIFY
+Validate the implementation thoroughly.
+
+**Required:**
+- Run `node scripts/verify.js` to:
+  - Generate file hashes
+  - Run automated tests
+  - Run linter
+  - Run security audit (npm audit)
+  - **Run AI code review (Gemini)**
+- Complete verification checklist
+- Address any AI review findings
+- Perform visual verification (capture screenshots if UI)
+- Get human approval of verification results
+
+**AI Code Review:**
+The verification includes automated AI review using Google Gemini that checks for:
+- Security vulnerabilities (injection, auth issues, data exposure)
+- Code quality issues (clarity, error handling, edge cases)
+- Best practices violations
+
+If AI review finds issues:
+1. Review the findings in `.workflow/state/ai-review.json`
+2. Address CRITICAL and HIGH severity issues before shipping
+3. Document any accepted risks in the session notes
+
+**Gate:** Human must approve verification before SHIP phase.
+
+#### Phase 4: SHIP
+Merge the verified code.
+
+**Required:**
+- Run `node scripts/ship.js` to validate file integrity
+- File hashes must match verification state
+- Create PR with evidence
+- Include AI review summary in PR
+- **Get human approval for merge**
+
+**Gate:** File integrity must pass before PR creation.
+
+### Human Checkpoints
+
+The workflow has mandatory human checkpoints:
+1. **Plan Approval** - Before any code is written
+2. **Verification Approval** - After testing and AI review, before shipping
+3. **Ship Approval** - Final merge decision
+
+Never auto-proceed past these checkpoints. Always ask for explicit approval.
+
+### Security Requirements
+
+For every change:
+- Review `.workflow/checklists/security-review.md`
+- Validate all user inputs
+- Sanitize data before storage/display
+- Use parameterized queries for database operations
+- Never expose sensitive data in errors or logs
+- Run `npm audit` before shipping
+- **Review AI security findings and address issues**
+
+### AI Review Configuration
+
+The AI review requires a Gemini API key:
+```bash
+export GEMINI_API_KEY="your-api-key"
+```
+
+To run AI review standalone:
+```bash
+node scripts/ai-review.js           # Full review
+node scripts/ai-review.js --diff    # Review git changes only
+node scripts/ai-review.js --security-focus  # Security only
+```
+
+### Session Management
+
+Each development session should:
+1. Reference or create a plan document
+2. Create session documentation using the template
+3. Track all changes made
+4. Document any issues encountered
+5. Update verification status
+6. **Document AI review findings and resolutions**
+
+### Workflow Commands
+
+- `node scripts/verify.js` - Full verification with AI review
+- `node scripts/verify.js --skip-ai-review` - Skip AI review
+- `node scripts/ai-review.js` - Run AI review only
+- `node scripts/ship.js` - Validate and prepare for shipping
+
+### Enforcing the Workflow
+
+When the user requests changes:
+1. Check if a plan exists for this work
+2. If no plan, switch to PLAN phase first
+3. If plan exists but not approved, request approval
+4. If executing, ensure you're following the task order
+5. If verifying, run all checks including AI review before proceeding
+6. If shipping, validate integrity first
+
+Always be explicit about which phase you're in and what gates need to be satisfied.
+
+---
+
 ## Session Documentation
 
 Development sessions are documented in `.workflow/sessions/`. When completing significant work:

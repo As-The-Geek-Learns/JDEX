@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, AlertTriangle, Check, X } from 'lucide-react';
+import { ArrowRight, TriangleAlert, Check, X } from 'lucide-react';
 
 /**
  * RenamePreview Component
@@ -33,7 +33,7 @@ export default function RenamePreview({ preview, maxDisplay = 50 }) {
         </span>
         {stats.conflicts > 0 && (
           <span className="text-amber-400">
-            <AlertTriangle size={14} className="inline mr-1" />
+            <TriangleAlert size={14} className="inline mr-1" />
             {stats.conflicts} conflicts
           </span>
         )}
@@ -80,7 +80,7 @@ export default function RenamePreview({ preview, maxDisplay = 50 }) {
                   <td className="px-3 py-2">
                     {item.conflict === 'duplicate' && (
                       <span className="text-amber-400" title="Duplicate name in batch">
-                        <AlertTriangle size={16} />
+                        <TriangleAlert size={16} />
                       </span>
                     )}
                     {item.conflict === 'exists' && (

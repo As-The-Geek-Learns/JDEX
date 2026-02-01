@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  BarChart3, 
+  ChartColumn,
   TrendingUp, 
   Zap, 
   FolderOpen, 
@@ -8,7 +8,10 @@ import {
   Calendar,
   X,
   Crown,
-  Lock
+  Lock,
+  Sparkles,
+  ChevronDown,
+  RefreshCw
 } from 'lucide-react';
 import { useLicense } from '../../context/LicenseContext.jsx';
 import { getDashboardStats, hasStatisticsData } from '../../services/statisticsService.js';
@@ -19,18 +22,20 @@ import TopRulesCard from './TopRulesCard.jsx';
 
 /**
  * StatsDashboard - Premium feature showing organization statistics
+ * Modern design with animations and rich visual feedback
  */
 export default function StatsDashboard({ onClose }) {
   const { isPremium, showUpgradePrompt } = useLicense();
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('30days');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadStats();
   }, []);
 
-  const loadStats = () => {
+  const loadStats = async () => {
     setIsLoading(true);
     try {
       const data = getDashboardStats();
@@ -42,62 +47,88 @@ export default function StatsDashboard({ onClose }) {
     }
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadStats();
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
+
   // Premium gate - show upgrade prompt for free users
   if (!isPremium) {
     return (
       <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50 p-4">
-        <div className="glass-card w-full max-w-lg animate-fade-in">
-          <div className="flex items-center justify-between p-6 border-b border-slate-700">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <BarChart3 className="text-purple-400" />
-              Statistics Dashboard
-            </h2>
-            <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg">
-              <X size={20} />
+        <div className="glass-card w-full max-w-lg animate-fade-in-up overflow-hidden">
+          {/* Decorative gradient header */}
+          <div className="relative h-32 bg-gradient-to-br from-purple-600/30 via-fuchsia-600/20 to-teal-600/30 overflow-hidden">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 
+                  flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.4)]">
+                  <Lock size={36} className="text-white" />
+                </div>
+                {/* Animated rings */}
+                <div className="absolute inset-0 -m-4 rounded-3xl border-2 border-purple-400/20 animate-ping" 
+                  style={{ animationDuration: '3s' }} />
+              </div>
+            </div>
+            {/* Close button */}
+            <button 
+              onClick={onClose} 
+              className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <X size={20} className="text-white/70" />
             </button>
           </div>
           
           <div className="p-8 text-center">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500/20 to-purple-600/30 flex items-center justify-center">
-              <Lock size={32} className="text-purple-400" />
-            </div>
-            
-            <h3 className="text-xl font-semibold text-white mb-2">
+            <h3 className="text-2xl font-bold text-white mb-2">
               Premium Feature
             </h3>
             <p className="text-slate-400 mb-6">
-              The Statistics Dashboard is available to premium users. 
-              Upgrade to see your organization patterns, track your progress, 
-              and optimize your file management.
+              Unlock the Statistics Dashboard to see your organization patterns, 
+              track progress, and optimize your workflow.
             </p>
             
-            <div className="glass-card p-4 mb-6 text-left">
-              <h4 className="font-medium text-white mb-2 flex items-center gap-2">
-                <Crown size={16} className="text-amber-400" />
-                What you'll get:
+            {/* Features list */}
+            <div className="glass-card p-5 mb-6 text-left space-y-3">
+              <h4 className="font-semibold text-white flex items-center gap-2">
+                <Crown size={18} className="text-amber-400" />
+                What's included:
               </h4>
-              <ul className="text-sm text-slate-400 space-y-1">
-                <li>• Total files organized over time</li>
-                <li>• File type distribution charts</li>
-                <li>• Most effective rules analysis</li>
-                <li>• Watch folder activity tracking</li>
-                <li>• Monthly organization trends</li>
-              </ul>
+              <div className="grid gap-2">
+                {[
+                  'Total files organized over time',
+                  'File type distribution charts',
+                  'Most effective rules analysis',
+                  'Watch folder activity tracking',
+                  'Monthly organization trends'
+                ].map((feature, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm text-slate-400">
+                    <Sparkles size={14} className="text-purple-400" />
+                    {feature}
+                  </div>
+                ))}
+              </div>
             </div>
             
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-600 text-slate-300 
+                  hover:bg-slate-700/50 hover:border-slate-500 transition-all"
               >
                 Maybe Later
               </button>
               <button
                 onClick={() => showUpgradePrompt('Statistics Dashboard')}
-                className="px-6 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-500 text-white hover:from-purple-500 hover:to-purple-400 transition-all flex items-center gap-2"
+                className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200
+                  bg-gradient-to-r from-purple-600 to-purple-500 text-white
+                  shadow-[0_2px_10px_rgba(139,92,246,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
+                  hover:from-purple-500 hover:to-purple-400 hover:shadow-[0_4px_20px_rgba(139,92,246,0.4)]
+                  hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
               >
                 <Crown size={16} />
-                Upgrade to Premium
+                Upgrade
               </button>
             </div>
           </div>
@@ -106,14 +137,30 @@ export default function StatsDashboard({ onClose }) {
     );
   }
 
-  // Loading state
+  // Loading state with skeleton
   if (isLoading) {
     return (
       <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50 p-4">
-        <div className="glass-card w-full max-w-5xl h-[85vh] flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-pulse text-6xl mb-4">📊</div>
-            <div className="text-xl text-slate-400">Loading statistics...</div>
+        <div className="glass-card w-full max-w-5xl h-[85vh] flex flex-col">
+          {/* Skeleton header */}
+          <div className="p-6 border-b border-slate-700/50">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl skeleton" />
+              <div className="space-y-2">
+                <div className="h-6 w-48 skeleton" />
+                <div className="h-4 w-32 skeleton" />
+              </div>
+            </div>
+          </div>
+          {/* Skeleton content */}
+          <div className="flex-1 p-6 space-y-6">
+            <div className="grid grid-cols-4 gap-4">
+              {[1,2,3,4].map(i => <div key={i} className="h-24 skeleton rounded-xl" />)}
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="h-64 skeleton rounded-xl" />
+              <div className="h-64 skeleton rounded-xl" />
+            </div>
           </div>
         </div>
       </div>
@@ -125,33 +172,61 @@ export default function StatsDashboard({ onClose }) {
 
   return (
     <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50 p-4">
-      <div className="glass-card w-full max-w-5xl h-[85vh] flex flex-col animate-fade-in">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
-              <BarChart3 size={20} className="text-white" />
+      <div className="glass-card w-full max-w-5xl h-[85vh] flex flex-col animate-fade-in-up overflow-hidden">
+        {/* Header with gradient accent */}
+        <div className="relative flex items-center justify-between p-6 border-b border-slate-700/50">
+          {/* Background gradient */}
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-fuchsia-600/5 to-teal-600/10" />
+          
+          <div className="relative flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 
+              flex items-center justify-center shadow-[0_0_25px_rgba(139,92,246,0.3)]">
+              <ChartColumn size={24} className="text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Statistics Dashboard</h2>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                Statistics Dashboard
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 font-medium">
+                  PRO
+                </span>
+              </h2>
               <p className="text-sm text-slate-400">Your organization activity at a glance</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="relative flex items-center gap-3">
             {/* Period selector */}
-            <select
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white"
-            >
-              <option value="7days">Last 7 days</option>
-              <option value="30days">Last 30 days</option>
-              <option value="90days">Last 90 days</option>
-            </select>
+            <div className="relative">
+              <select
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                className="appearance-none bg-slate-800/50 border border-slate-600/50 rounded-xl 
+                  px-4 py-2 pr-10 text-sm text-white cursor-pointer
+                  hover:border-slate-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50
+                  transition-all"
+              >
+                <option value="7days">Last 7 days</option>
+                <option value="30days">Last 30 days</option>
+                <option value="90days">Last 90 days</option>
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
             
-            <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg">
-              <X size={20} />
+            {/* Refresh button */}
+            <button 
+              onClick={handleRefresh}
+              className="p-2.5 hover:bg-slate-700/50 rounded-xl transition-all group"
+              title="Refresh statistics"
+            >
+              <RefreshCw size={18} className={`text-slate-400 group-hover:text-white transition-colors
+                ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            
+            <button 
+              onClick={onClose} 
+              className="p-2.5 hover:bg-slate-700/50 rounded-xl transition-all group"
+            >
+              <X size={18} className="text-slate-400 group-hover:text-white transition-colors" />
             </button>
           </div>
         </div>
@@ -159,28 +234,43 @@ export default function StatsDashboard({ onClose }) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {!hasData ? (
-            /* Empty State */
+            /* Empty State - Modern Design */
             <div className="h-full flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <div className="text-6xl mb-4">📈</div>
-                <h3 className="text-xl font-semibold text-white mb-2">
+              <div className="text-center max-w-md animate-fade-in">
+                {/* Animated icon */}
+                <div className="relative w-28 h-28 mx-auto mb-6">
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/20 to-teal-500/20
+                    flex items-center justify-center">
+                    <ChartColumn size={48} className="text-purple-400" />
+                  </div>
+                  {/* Decorative elements */}
+                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-teal-500/30 animate-pulse" />
+                  <div className="absolute -bottom-2 -left-2 w-4 h-4 rounded-full bg-purple-500/30 animate-pulse" 
+                    style={{ animationDelay: '0.5s' }} />
+                </div>
+                
+                <h3 className="text-2xl font-bold text-white mb-3">
                   No Statistics Yet
                 </h3>
-                <p className="text-slate-400 mb-6">
+                <p className="text-slate-400 mb-8">
                   Start organizing files with the File Organizer to see your 
                   statistics here. Track your progress, see patterns, and 
                   optimize your workflow.
                 </p>
                 <button
                   onClick={onClose}
-                  className="px-6 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors"
+                  className="px-8 py-3 rounded-xl font-medium transition-all duration-200
+                    bg-gradient-to-r from-purple-600 to-purple-500 text-white
+                    shadow-[0_2px_10px_rgba(139,92,246,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
+                    hover:from-purple-500 hover:to-purple-400 hover:shadow-[0_4px_20px_rgba(139,92,246,0.4)]
+                    hover:-translate-y-0.5 active:translate-y-0"
                 >
                   Start Organizing
                 </button>
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-6 animate-stagger">
               {/* Top Stats Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard
@@ -232,39 +322,50 @@ export default function StatsDashboard({ onClose }) {
                   title="Top Organization Rules"
                 />
                 
-                {/* Watch Activity Card */}
-                <div className="glass-card p-6">
+                {/* Watch Activity Card - Enhanced */}
+                <div className="glass-card p-6 relative overflow-hidden group">
+                  {/* Decorative gradient */}
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-500 opacity-80" />
+                  
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <Eye size={18} className="text-blue-400" />
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-600/10
+                      flex items-center justify-center">
+                      <Eye size={16} className="text-blue-400" />
+                    </div>
                     Watch Folder Activity
                   </h3>
                   
                   {stats.watchActivity.folders > 0 ? (
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center p-4 bg-slate-800/50 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-400">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="stat-card stat-card-blue p-4 text-center">
+                        <div className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-300 
+                          bg-clip-text text-transparent">
                           {stats.watchActivity.folders}
                         </div>
-                        <div className="text-xs text-slate-400">Active Folders</div>
+                        <div className="text-xs text-slate-400 mt-1">Active Folders</div>
                       </div>
-                      <div className="text-center p-4 bg-slate-800/50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-400">
+                      <div className="stat-card stat-card-green p-4 text-center">
+                        <div className="text-2xl font-bold bg-gradient-to-r from-green-400 to-green-300 
+                          bg-clip-text text-transparent">
                           {stats.watchActivity.today}
                         </div>
-                        <div className="text-xs text-slate-400">Today</div>
+                        <div className="text-xs text-slate-400 mt-1">Today</div>
                       </div>
-                      <div className="text-center p-4 bg-slate-800/50 rounded-lg">
+                      <div className="stat-card p-4 text-center">
                         <div className="text-2xl font-bold text-white">
                           {stats.watchActivity.total}
                         </div>
-                        <div className="text-xs text-slate-400">Total Events</div>
+                        <div className="text-xs text-slate-400 mt-1">Total Events</div>
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-slate-500">
-                      <Eye size={32} className="mx-auto mb-2 opacity-50" />
-                      <p>No watch folders configured</p>
-                      <p className="text-sm">Set up watch folders to auto-organize files</p>
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 mx-auto mb-3 rounded-xl bg-slate-800/50 
+                        flex items-center justify-center">
+                        <Eye size={28} className="text-slate-600" />
+                      </div>
+                      <p className="text-slate-400">No watch folders configured</p>
+                      <p className="text-sm text-slate-500 mt-1">Set up watch folders to auto-organize files</p>
                     </div>
                   )}
                 </div>

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Download, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { Download, CircleAlert, CheckCircle, X } from 'lucide-react';
 import { useDragDrop } from '../../context/DragDropContext.jsx';
 import { useLicense } from '../../context/LicenseContext.jsx';
 import {
@@ -282,8 +282,8 @@ export default function DropZone({
           `}>
             <div className="bg-slate-900/90 px-4 py-2 rounded-lg flex items-center gap-2">
               {dropStatus === 'success' && <CheckCircle className="text-green-400" size={20} />}
-              {dropStatus === 'error' && <AlertCircle className="text-red-400" size={20} />}
-              {dropStatus === 'warning' && <AlertCircle className="text-amber-400" size={20} />}
+              {dropStatus === 'error' && <CircleAlert className="text-red-400" size={20} />}
+              {dropStatus === 'warning' && <CircleAlert className="text-amber-400" size={20} />}
               <span className={`font-medium ${
                 dropStatus === 'success' ? 'text-green-300' : 
                 dropStatus === 'error' ? 'text-red-300' : 'text-amber-300'
@@ -301,7 +301,7 @@ export default function DropZone({
           <div className="glass-card w-full max-w-md animate-fade-in">
             <div className="flex items-center justify-between p-4 border-b border-slate-700">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <AlertCircle className="text-amber-400" size={20} />
+                <CircleAlert className="text-amber-400" size={20} />
                 File Already Exists
               </h3>
               <button 

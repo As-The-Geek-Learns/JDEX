@@ -16,7 +16,7 @@ import {
   Trash2,
   X,
   Check,
-  AlertCircle,
+  CircleAlert,
   Home,
   FileText,
   Briefcase,
@@ -34,11 +34,13 @@ import {
   RefreshCw,
   HardDrive,
   FolderOpen,
-  BarChart3,
+  ChartColumn,
   FileEdit,
+  MessageSquare,
 } from 'lucide-react';
 import CloudDriveSettings from './components/Settings/CloudDriveSettings.jsx';
 import LicenseSettings from './components/Settings/LicenseSettings.jsx';
+import FeedbackSettings from './components/Settings/FeedbackSettings.jsx';
 import FileOrganizer from './components/FileOrganizer/FileOrganizer.jsx';
 import StatsDashboard from './components/Stats/StatsDashboard.jsx';
 import BatchRenameModal from './components/BatchRename/BatchRenameModal.jsx';
@@ -94,20 +96,36 @@ const areaIcons = {
   Archive: Archive,
 };
 
-// Sensitivity badge component
+// Sensitivity badge component - Modern design with gradients
 function SensitivityBadge({ sensitivity, isInherited = false }) {
   const config = {
-    standard: { label: 'Standard', class: 'bg-slate-600 text-slate-200', icon: Cloud },
-    sensitive: { label: 'Sensitive', class: 'bg-red-900/50 text-red-300', icon: Lock },
-    work: { label: 'Work', class: 'bg-blue-900/50 text-blue-300', icon: Briefcase },
-    inherit: { label: 'Inherit', class: 'bg-purple-900/50 text-purple-300', icon: FolderTree },
+    standard: { 
+      label: 'Standard', 
+      class: 'bg-gradient-to-r from-slate-600/30 to-slate-700/20 text-slate-300 border-slate-500/30', 
+      icon: Cloud 
+    },
+    sensitive: { 
+      label: 'Sensitive', 
+      class: 'bg-gradient-to-r from-red-500/20 to-red-600/10 text-red-400 border-red-500/30', 
+      icon: Lock 
+    },
+    work: { 
+      label: 'Work', 
+      class: 'bg-gradient-to-r from-blue-500/20 to-blue-600/10 text-blue-400 border-blue-500/30', 
+      icon: Briefcase 
+    },
+    inherit: { 
+      label: 'Inherit', 
+      class: 'bg-gradient-to-r from-purple-500/20 to-purple-600/10 text-purple-400 border-purple-500/30', 
+      icon: FolderTree 
+    },
   };
 
   const { label, class: className, icon: Icon } = config[sensitivity] || config.standard;
 
   return (
     <span
-      className={`${className} px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1`}
+      className={`${className} px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1 border`}
     >
       <Icon size={10} />
       {isInherited ? `(${label})` : label}
@@ -144,52 +162,63 @@ function Breadcrumb({ path, onNavigate }) {
   );
 }
 
-// Folder Card Component
+// Folder Card Component - Modern design with enhanced interactions
 function FolderCard({ folder, onEdit, onDelete, onOpen }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div
-      className="glass-card p-4 hover-lift cursor-pointer border-l-4 animate-fade-in"
+      className="group relative glass-card p-4 hover-lift cursor-pointer border-l-4 animate-fade-in 
+        hover:border-l-[5px] transition-all duration-200"
       style={{ borderLeftColor: folder.area_color }}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex-1" onClick={() => onOpen(folder)}>
-          <div className="flex items-center gap-3 mb-1">
-            <FolderOpen size={18} className="text-amber-400" />
-            <span className="jd-number text-lg text-teal-400">{folder.folder_number}</span>
+      {/* Subtle gradient overlay on hover */}
+      <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-r from-white/[0.02] to-transparent 
+        opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      
+      <div className="relative flex items-start justify-between">
+        <div className="flex-1 min-w-0" onClick={() => onOpen(folder)}>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500/20 to-amber-600/10 
+              flex items-center justify-center group-hover:scale-105 transition-transform">
+              <FolderOpen size={16} className="text-amber-400" />
+            </div>
+            <span className="jd-number text-lg bg-gradient-to-r from-teal-400 to-teal-300 
+              bg-clip-text text-transparent font-bold">{folder.folder_number}</span>
             <SensitivityBadge sensitivity={folder.sensitivity} />
           </div>
-          <h3 className="font-semibold text-white">{folder.name}</h3>
-          <p className="text-sm text-slate-400">
+          <h3 className="font-semibold text-white group-hover:text-teal-50 transition-colors truncate">
+            {folder.name}
+          </h3>
+          <p className="text-sm text-slate-400 truncate">
             {folder.category_name} • {folder.area_name}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setExpanded(!expanded);
             }}
-            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
           >
-            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            <ChevronDown size={16} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onEdit(folder);
             }}
-            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
           >
-            <Edit2 size={16} className="text-slate-400" />
+            <Edit2 size={16} className="text-slate-400 hover:text-teal-400" />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onDelete(folder);
             }}
-            className="p-2 hover:bg-red-900/50 rounded-lg transition-colors"
+            className="p-2 hover:bg-red-900/30 rounded-lg transition-colors"
           >
             <Trash2 size={16} className="text-slate-400 hover:text-red-400" />
           </button>
@@ -197,33 +226,41 @@ function FolderCard({ folder, onEdit, onDelete, onOpen }) {
       </div>
 
       {expanded && (
-        <div className="mt-4 pt-4 border-t border-slate-700 animate-fade-in">
+        <div className="mt-4 pt-4 border-t border-slate-700/50 animate-fade-in space-y-3">
           {folder.description && (
-            <p className="text-sm text-slate-300 mb-3">{folder.description}</p>
+            <p className="text-sm text-slate-300">{folder.description}</p>
           )}
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-2 gap-3 text-sm">
             {folder.location && (
-              <div>
-                <span className="text-slate-500">Location:</span>
-                <span className="ml-2 text-slate-300">{folder.location}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 text-xs uppercase tracking-wide">Location</span>
+                <span className="text-slate-300">{folder.location}</span>
               </div>
             )}
             {folder.storage_path && (
               <div className="col-span-2">
-                <span className="text-slate-500">Path:</span>
-                <span className="ml-2 text-slate-300 font-mono text-xs">{folder.storage_path}</span>
+                <span className="text-slate-500 text-xs uppercase tracking-wide block mb-1">Path</span>
+                <code className="text-slate-300 font-mono text-xs bg-slate-800/50 px-2 py-1 rounded block truncate">
+                  {folder.storage_path}
+                </code>
               </div>
             )}
             {folder.keywords && (
               <div className="col-span-2">
-                <span className="text-slate-500">Keywords:</span>
-                <span className="ml-2 text-slate-300">{folder.keywords}</span>
+                <span className="text-slate-500 text-xs uppercase tracking-wide block mb-1">Keywords</span>
+                <div className="flex flex-wrap gap-1">
+                  {folder.keywords.split(',').map((keyword, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-slate-700/50 rounded text-xs text-slate-300">
+                      {keyword.trim()}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
           {folder.notes && (
-            <div className="mt-3 p-3 bg-slate-800/50 rounded-lg">
-              <span className="text-slate-500 text-sm">Notes:</span>
+            <div className="p-3 bg-slate-800/30 rounded-lg border border-slate-700/30">
+              <span className="text-slate-500 text-xs uppercase tracking-wide">Notes</span>
               <p className="text-slate-300 text-sm mt-1">{folder.notes}</p>
             </div>
           )}
@@ -1407,11 +1444,18 @@ function SettingsModal({ isOpen, onClose, areas, categories, onDataChange }) {
             <Database size={16} className="inline mr-2" />
             Database
           </button>
+          <button
+            onClick={() => setActiveTab('feedback')}
+            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'feedback' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
+          >
+            <MessageSquare size={16} className="inline mr-2" />
+            Feedback
+          </button>
         </div>
 
         {error && (
           <div className="mx-6 mt-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 flex items-center gap-2">
-            <AlertCircle size={16} />
+            <CircleAlert size={16} />
             {error}
             <button onClick={() => setError('')} className="ml-auto">
               <X size={16} />
@@ -1826,44 +1870,88 @@ function SettingsModal({ isOpen, onClose, areas, categories, onDataChange }) {
               </div>
             </div>
           )}
+
+          {activeTab === 'feedback' && (
+            <FeedbackSettings />
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// Quick Stats Overview - Summary cards on home view
+// Quick Stats Overview - Summary cards on home view with modern design
 function QuickStatsOverview({ stats }) {
+  const statItems = [
+    {
+      value: stats.totalFolders,
+      label: 'Folders (XX.XX)',
+      icon: FolderOpen,
+      color: 'amber',
+      gradient: 'from-amber-400 to-amber-300',
+      iconBg: 'from-amber-500/20 to-amber-600/10',
+      iconColor: 'text-amber-400',
+    },
+    {
+      value: stats.totalItems,
+      label: 'Items (XX.XX.XX)',
+      icon: File,
+      color: 'teal',
+      gradient: 'from-teal-400 to-teal-300',
+      iconBg: 'from-teal-500/20 to-teal-600/10',
+      iconColor: 'text-teal-400',
+    },
+    {
+      value: stats.sensitiveFolders + stats.sensitiveItems,
+      label: 'Sensitive',
+      icon: Lock,
+      color: 'red',
+      gradient: 'from-red-400 to-red-300',
+      iconBg: 'from-red-500/20 to-red-600/10',
+      iconColor: 'text-red-400',
+    },
+    {
+      value: stats.workFolders + stats.workItems,
+      label: 'Work',
+      icon: Briefcase,
+      color: 'blue',
+      gradient: 'from-blue-400 to-blue-300',
+      iconBg: 'from-blue-500/20 to-blue-600/10',
+      iconColor: 'text-blue-400',
+    },
+  ];
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <div className="glass-card p-4">
-        <div className="text-3xl font-bold text-amber-400">{stats.totalFolders}</div>
-        <div className="text-sm text-slate-400 flex items-center gap-1">
-          <FolderOpen size={14} /> Folders (XX.XX)
-        </div>
-      </div>
-      <div className="glass-card p-4">
-        <div className="text-3xl font-bold text-white">{stats.totalItems}</div>
-        <div className="text-sm text-slate-400 flex items-center gap-1">
-          <File size={14} /> Items (XX.XX.XX)
-        </div>
-      </div>
-      <div className="glass-card p-4">
-        <div className="text-3xl font-bold text-red-400">
-          {stats.sensitiveFolders + stats.sensitiveItems}
-        </div>
-        <div className="text-sm text-slate-400 flex items-center gap-1">
-          <Lock size={14} /> Sensitive
-        </div>
-      </div>
-      <div className="glass-card p-4">
-        <div className="text-3xl font-bold text-blue-400">
-          {stats.workFolders + stats.workItems}
-        </div>
-        <div className="text-sm text-slate-400 flex items-center gap-1">
-          <Briefcase size={14} /> Work
-        </div>
-      </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 animate-stagger">
+      {statItems.map((item, index) => {
+        const Icon = item.icon;
+        return (
+          <div 
+            key={index}
+            className="stat-card group relative overflow-hidden"
+          >
+            {/* Gradient top border */}
+            <div className={`absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r ${item.gradient} opacity-80`} />
+            
+            {/* Content */}
+            <div className="relative flex items-start gap-3">
+              <div className={`
+                w-10 h-10 rounded-xl bg-gradient-to-br ${item.iconBg}
+                flex items-center justify-center flex-shrink-0
+                group-hover:scale-105 transition-transform duration-300
+              `}>
+                <Icon size={20} className={item.iconColor} />
+              </div>
+              <div>
+                <div className={`text-2xl font-bold bg-gradient-to-r ${item.gradient} bg-clip-text text-transparent`}>
+                  {item.value}
+                </div>
+                <div className="text-sm text-slate-400">{item.label}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -2098,10 +2186,34 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0f1a]">
         <div className="text-center">
-          <div className="animate-pulse-subtle text-6xl mb-4">📁</div>
-          <div className="text-xl text-slate-400">Loading JDex v2.0...</div>
+          {/* Animated logo */}
+          <div className="relative mb-6">
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 
+              flex items-center justify-center shadow-[0_0_40px_rgba(20,184,166,0.3)]
+              animate-pulse">
+              <span className="text-3xl font-bold text-white">JD</span>
+            </div>
+            {/* Glow ring */}
+            <div className="absolute inset-0 -m-2 rounded-3xl border-2 border-teal-500/20 animate-ping" 
+              style={{ animationDuration: '2s' }} />
+          </div>
+          
+          {/* Loading text with shimmer */}
+          <div className="text-xl font-semibold text-transparent bg-clip-text 
+            bg-gradient-to-r from-teal-400 via-white to-teal-400 
+            animate-[shimmer_2s_linear_infinite] bg-[length:200%_auto]">
+            Loading JDex v2.0
+          </div>
+          <div className="text-sm text-slate-500 mt-2">Preparing your workspace...</div>
+          
+          {/* Loading bar */}
+          <div className="w-48 h-1 mx-auto mt-4 bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full
+              animate-[shimmer_1s_ease-in-out_infinite]" 
+              style={{ width: '60%' }} />
+          </div>
         </div>
       </div>
     );
@@ -2115,62 +2227,94 @@ export default function App() {
       <aside
         className={`${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 overflow-hidden`}
       >
-        <div className="w-80 h-screen glass-card border-r border-slate-700 flex flex-col">
-          {/* Logo */}
-          <div className="p-6 border-b border-slate-700">
+        <div className="w-80 h-screen glass-card border-r border-slate-700/50 flex flex-col">
+          {/* Logo - Enhanced with glow */}
+          <div className="p-6 border-b border-slate-700/50">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center">
-                <span className="text-xl font-bold text-white">JD</span>
+              <div className="relative">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 
+                  flex items-center justify-center shadow-[0_0_20px_rgba(20,184,166,0.3)]">
+                  <span className="text-xl font-bold text-white">JD</span>
+                </div>
+                {/* Subtle glow effect */}
+                <div className="absolute inset-0 rounded-xl bg-teal-500/20 blur-md -z-10" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">
-                  JDex <span className="text-xs text-teal-400">v2.0</span>
+                <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                  JDex 
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-400 font-medium">
+                    v2.0
+                  </span>
                 </h1>
                 <p className="text-xs text-slate-400">4-Level Johnny Decimal</p>
               </div>
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="p-4 border-b border-slate-700 space-y-2">
+          {/* Quick Actions - Modern Button Styles */}
+          <div className="p-4 border-b border-slate-700/50 space-y-2">
             <button
               onClick={() => setShowNewFolderModal(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-500 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                bg-gradient-to-r from-amber-600 to-amber-500 text-white font-medium
+                shadow-[0_2px_10px_rgba(245,158,11,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
+                hover:from-amber-500 hover:to-amber-400 hover:shadow-[0_4px_20px_rgba(245,158,11,0.4)]
+                hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
             >
               <FolderOpen size={18} />
               New Folder (XX.XX)
             </button>
             <button
               onClick={() => setShowNewItemModal(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                bg-gradient-to-r from-teal-600 to-teal-500 text-white font-medium
+                shadow-[0_2px_10px_rgba(20,184,166,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
+                hover:from-teal-500 hover:to-teal-400 hover:shadow-[0_4px_20px_rgba(20,184,166,0.4)]
+                hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
             >
               <Plus size={18} />
               New Item (XX.XX.XX)
             </button>
             <button
               onClick={() => setShowFileOrganizer(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                bg-gradient-to-r from-purple-600 to-purple-500 text-white font-medium
+                shadow-[0_2px_10px_rgba(139,92,246,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
+                hover:from-purple-500 hover:to-purple-400 hover:shadow-[0_4px_20px_rgba(139,92,246,0.4)]
+                hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
             >
               <HardDrive size={18} />
               File Organizer
             </button>
             <button
               onClick={() => setShowStatsDashboard(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600/80 to-teal-600/80 text-white hover:from-purple-500/80 hover:to-teal-500/80 transition-all"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                bg-gradient-to-r from-purple-600/90 via-fuchsia-600/90 to-teal-600/90 text-white font-medium
+                shadow-[0_2px_10px_rgba(139,92,246,0.25),inset_0_1px_0_rgba(255,255,255,0.15)]
+                hover:from-purple-500/90 hover:via-fuchsia-500/90 hover:to-teal-500/90 
+                hover:shadow-[0_4px_20px_rgba(139,92,246,0.35)]
+                hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
             >
-              <BarChart3 size={18} />
+              <ChartColumn size={18} />
               Statistics
             </button>
             <button
               onClick={() => setShowBatchRename(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-600/80 to-orange-600/80 text-white hover:from-amber-500/80 hover:to-orange-500/80 transition-all"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                bg-gradient-to-r from-amber-600/90 to-orange-600/90 text-white font-medium
+                shadow-[0_2px_10px_rgba(234,88,12,0.25),inset_0_1px_0_rgba(255,255,255,0.15)]
+                hover:from-amber-500/90 hover:to-orange-500/90 hover:shadow-[0_4px_20px_rgba(234,88,12,0.35)]
+                hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
             >
               <FileEdit size={18} />
               Batch Rename
             </button>
             <button
               onClick={() => setShowSettings(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                bg-slate-800/50 border border-slate-600/50 text-slate-300 font-medium
+                hover:bg-slate-700/50 hover:border-slate-500/50 hover:text-white
+                transition-all duration-200"
             >
               <Settings size={18} />
               Settings
@@ -2344,22 +2488,52 @@ export default function App() {
             </div>
           )}
 
-          {/* Empty States */}
+          {/* Empty States - Modern & Engaging */}
           {displayFolders.length === 0 && displayItems.length === 0 && (
-            <div className="glass-card p-12 text-center">
-              <div className="text-5xl mb-4">{searchQuery ? '🔍' : '📂'}</div>
-              <h3 className="text-xl font-semibold text-white mb-2">
+            <div className="glass-card p-12 text-center animate-fade-in-up">
+              {/* Animated icon container */}
+              <div className="relative w-24 h-24 mx-auto mb-6">
+                <div className={`
+                  absolute inset-0 rounded-2xl 
+                  ${searchQuery 
+                    ? 'bg-gradient-to-br from-purple-500/20 to-purple-600/10' 
+                    : 'bg-gradient-to-br from-amber-500/20 to-amber-600/10'
+                  }
+                  flex items-center justify-center
+                `}>
+                  {searchQuery ? (
+                    <Search size={40} className="text-purple-400" />
+                  ) : (
+                    <FolderOpen size={40} className="text-amber-400" />
+                  )}
+                </div>
+                {/* Decorative rings */}
+                <div className={`
+                  absolute inset-0 -m-2 rounded-3xl border-2 
+                  ${searchQuery ? 'border-purple-500/10' : 'border-amber-500/10'}
+                `} />
+                <div className={`
+                  absolute inset-0 -m-4 rounded-3xl border 
+                  ${searchQuery ? 'border-purple-500/5' : 'border-amber-500/5'}
+                `} />
+              </div>
+              
+              <h3 className="text-xl font-bold text-white mb-2">
                 {searchQuery ? 'No results found' : 'No folders yet'}
               </h3>
-              <p className="text-slate-400 mb-4">
+              <p className="text-slate-400 mb-6 max-w-sm mx-auto">
                 {searchQuery
-                  ? 'Try a different search term'
-                  : 'Create your first folder to start organizing'}
+                  ? `We couldn't find anything matching "${searchQuery}". Try a different search term.`
+                  : 'Create your first folder to start organizing your digital life with Johnny Decimal.'}
               </p>
               {!searchQuery && (
                 <button
                   onClick={() => setShowNewFolderModal(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-500 transition-colors"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl
+                    bg-gradient-to-r from-amber-600 to-amber-500 text-white font-medium
+                    shadow-[0_2px_10px_rgba(245,158,11,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
+                    hover:from-amber-500 hover:to-amber-400 hover:shadow-[0_4px_20px_rgba(245,158,11,0.4)]
+                    hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
                 >
                   <FolderOpen size={18} />
                   Create First Folder

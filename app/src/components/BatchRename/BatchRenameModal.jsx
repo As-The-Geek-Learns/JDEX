@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  X, FileEdit, Play, Undo2, AlertTriangle, CheckCircle, 
-  Loader2, Lock, Sparkles 
+  X, FileEdit, Play, Undo2, TriangleAlert, CheckCircle,
+  LoaderCircle, Lock, Sparkles
 } from 'lucide-react';
 import { useLicense } from '../../context/LicenseContext.jsx';
 import FileSelector from './FileSelector.jsx';
@@ -347,7 +347,7 @@ export default function BatchRenameModal({ onClose }) {
               {result.success ? (
                 <CheckCircle className="text-green-400 flex-shrink-0" size={20} />
               ) : (
-                <AlertTriangle className="text-red-400 flex-shrink-0" size={20} />
+                <TriangleAlert className="text-red-400 flex-shrink-0" size={20} />
               )}
               <div>
                 <p className={result.success ? 'text-green-300' : 'text-red-300'}>
@@ -406,7 +406,7 @@ export default function BatchRenameModal({ onClose }) {
             >
               {isExecuting ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" />
+                  <LoaderCircle size={16} className="animate-spin" />
                   {progress.current} / {progress.total}
                 </>
               ) : (
@@ -423,7 +423,7 @@ export default function BatchRenameModal({ onClose }) {
         {hasConflicts && !isExecuting && (
           <div className="px-4 pb-4">
             <div className="flex items-center gap-2 text-amber-400 text-sm">
-              <AlertTriangle size={16} />
+              <TriangleAlert size={16} />
               Some files have conflicts and will be skipped
             </div>
           </div>
