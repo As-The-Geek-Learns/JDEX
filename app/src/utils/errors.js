@@ -2,7 +2,7 @@
  * Error Handling Utilities for JDex
  * ==================================
  * Custom error classes and sanitization for safe error handling.
- * 
+ *
  * Security: Never expose raw error messages to users. They can contain
  * sensitive information like file paths, database queries, or system details.
  * Always use sanitizeErrorForUser() before displaying errors in the UI.
@@ -160,32 +160,32 @@ export class OrganizationError extends AppError {
  */
 const SENSITIVE_PATTERNS = [
   // File paths
-  /\/Users\/[^/\s]+/gi,           // macOS user paths
-  /C:\\Users\\[^\\\s]+/gi,        // Windows user paths
-  /\/home\/[^/\s]+/gi,            // Linux user paths
-  
+  /\/Users\/[^/\s]+/gi, // macOS user paths
+  /C:\\Users\\[^\\\s]+/gi, // Windows user paths
+  /\/home\/[^/\s]+/gi, // Linux user paths
+
   // Database details
   /sqlite/gi,
   /sql syntax/gi,
   /query failed/gi,
   /constraint/gi,
-  
+
   // System details
-  /ENOENT/gi,                     // Node.js file not found
-  /EACCES/gi,                     // Node.js permission denied
-  /EPERM/gi,                      // Node.js operation not permitted
+  /ENOENT/gi, // Node.js file not found
+  /EACCES/gi, // Node.js permission denied
+  /EPERM/gi, // Node.js operation not permitted
   /errno/gi,
   /syscall/gi,
-  
+
   // Stack traces
-  /at\s+\S+\s+\([^)]+\)/g,        // Stack trace lines
-  /\s+at\s+.+:\d+:\d+/g,          // More stack traces
+  /at\s+\S+\s+\([^)]+\)/g, // Stack trace lines
+  /\s+at\s+.+:\d+:\d+/g, // More stack traces
 ];
 
 /**
  * Sanitize an error for safe display to users.
  * Removes sensitive information like paths, system details, and stack traces.
- * 
+ *
  * @param {Error|string} error - The error to sanitize
  * @returns {string} A safe, user-friendly error message
  */
@@ -253,14 +253,14 @@ export const LogLevel = {
 /**
  * Log an error for debugging purposes.
  * In development, logs full details. In production, logs sanitized version.
- * 
+ *
  * @param {Error} error - The error to log
  * @param {string} context - Where the error occurred (e.g., 'FileScanner.scan')
  * @param {string} level - Log level (default 'error')
  */
 export function logError(error, context = 'unknown', level = LogLevel.ERROR) {
   const isDev = process.env.NODE_ENV === 'development';
-  
+
   const logEntry = {
     timestamp: new Date().toISOString(),
     level,
@@ -287,11 +287,11 @@ export function logError(error, context = 'unknown', level = LogLevel.ERROR) {
 
 /**
  * Wrap an async function to catch and handle errors consistently.
- * 
+ *
  * @param {Function} fn - The async function to wrap
  * @param {string} context - Context for error logging
  * @returns {Function} Wrapped function that handles errors
- * 
+ *
  * @example
  * const safeScan = withErrorHandling(scanDirectory, 'FileScanner.scan');
  * const result = await safeScan('/some/path');
@@ -310,7 +310,7 @@ export function withErrorHandling(fn, context) {
 /**
  * Create a result object for operations that may fail.
  * Use this pattern instead of throwing errors for expected failures.
- * 
+ *
  * @example
  * function tryParseFile(path) {
  *   try {
@@ -320,7 +320,7 @@ export function withErrorHandling(fn, context) {
  *     return Result.error(e);
  *   }
  * }
- * 
+ *
  * const result = tryParseFile('/path/to/file');
  * if (result.success) {
  *   console.log(result.data);

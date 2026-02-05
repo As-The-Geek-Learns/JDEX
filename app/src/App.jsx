@@ -2363,7 +2363,6 @@ export default function App() {
         categories={categories}
         onDataChange={triggerRefresh}
       />
-
     </div>
   );
 }
