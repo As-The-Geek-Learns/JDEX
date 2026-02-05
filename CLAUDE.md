@@ -1,6 +1,6 @@
 # CLAUDE.md - JDex Project Context
 # Location: /jdex-complete-package/CLAUDE.md
-# Last Updated: January 2026
+# Last Updated: February 2026
 # Purpose: Project-specific context for Claude Code sessions
 
 ## Project Overview
@@ -19,13 +19,13 @@
 
 | Layer | Technology | Notes |
 |-------|-----------|-------|
-| Desktop Framework | Electron 28 | Main process in `app/electron/main.js` |
+| Desktop Framework | Electron 35.7 | Main process in `app/electron/main.js` |
 | Frontend | React 18.2 (JSX, no TypeScript) | Single-page app in `app/src/` |
 | Styling | Tailwind CSS 3.4 | Custom JD theme (navy/teal/orange), glass morphism |
 | Database | SQLite via sql.js (WebAssembly) | Loaded from CDN, stored in localStorage |
-| Build Tool | Vite 6.4 | Config in `app/vite.config.js` |
-| Packaging | electron-builder 26.4 | macOS (DMG/ZIP), Windows (NSIS/portable), Linux (AppImage/deb) |
-| Icons | Lucide React 0.263 | Consistent icon system throughout UI |
+| Build Tool | Vite 7.3 | Config in `app/vite.config.js` |
+| Packaging | electron-builder 26.7 | macOS (DMG/ZIP), Windows (NSIS/portable), Linux (AppImage/deb) |
+| Icons | Lucide React 0.563 | Consistent icon system throughout UI |
 | Charts | Recharts 2.12 | Statistics dashboard visualizations |
 | Dates | date-fns 2.30 | Date formatting and manipulation |
 
@@ -210,7 +210,6 @@ The project uses a dark theme with custom design tokens in `tailwind.config.js`:
 - No secrets in codebase; `.gitignore` covers `.env`, `*.db`, `*.sqlite`
 
 ### Known Technical Debt
-- **Electron 28 is outdated** (current: 35.x). Upgrade blocked by ESM refactoring needs.
 - **sql.js loaded from CDN** at runtime rather than bundled (external dependency risk)
 - **localStorage for database storage** has a ~5-10MB limit depending on browser/Electron
 
