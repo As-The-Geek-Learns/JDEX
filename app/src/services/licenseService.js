@@ -2,13 +2,13 @@
  * License Service
  * ===============
  * Handles premium license validation and feature gating.
- * 
+ *
  * Features:
  * - Gumroad license key validation
  * - Local license caching
  * - Offline grace period
  * - Usage tracking for free tier limits
- * 
+ *
  * Security:
  * - License keys are stored locally (not in plain text for production)
  * - Validation happens server-side via Gumroad API
@@ -156,7 +156,7 @@ function removeStoredData(key) {
 
 /**
  * Validates a Gumroad license key.
- * 
+ *
  * @param {string} licenseKey - The license key to validate
  * @returns {Promise<Object>} Validation result
  */
@@ -189,7 +189,7 @@ export async function validateLicenseKey(licenseKey) {
 
     if (data.success) {
       const purchase = data.purchase;
-      
+
       return {
         valid: true,
         license: {
@@ -216,7 +216,7 @@ export async function validateLicenseKey(licenseKey) {
       // Allow offline grace period (7 days)
       const lastValidated = new Date(cached.validatedAt);
       const daysSinceValidation = (Date.now() - lastValidated.getTime()) / (1000 * 60 * 60 * 24);
-      
+
       if (daysSinceValidation < 7) {
         return {
           valid: true,
@@ -236,7 +236,7 @@ export async function validateLicenseKey(licenseKey) {
 
 /**
  * Activates a license key and stores it locally.
- * 
+ *
  * @param {string} licenseKey - The license key to activate
  * @returns {Promise<Object>} Activation result
  */
@@ -248,7 +248,11 @@ export async function activateLicense(licenseKey) {
   }
 
   // Check for refunded/disputed
-  if (validation.license.refunded || validation.license.disputed || validation.license.chargebacked) {
+  if (
+    validation.license.refunded ||
+    validation.license.disputed ||
+    validation.license.chargebacked
+  ) {
     return {
       valid: false,
       error: 'This license has been refunded or disputed',
@@ -291,16 +295,16 @@ export function getStoredLicense() {
 export function isPremium() {
   const license = getStoredLicense();
   if (!license) return false;
-  
+
   // Check if license is still valid (not too old)
   const validatedAt = new Date(license.validatedAt);
   const daysSinceValidation = (Date.now() - validatedAt.getTime()) / (1000 * 60 * 60 * 24);
-  
+
   // Require re-validation every 30 days
   if (daysSinceValidation > 30) {
     return false;
   }
-  
+
   return license.tier === 'premium';
 }
 
@@ -321,7 +325,7 @@ export function getCurrentTier() {
 export function getUsage() {
   const usage = getStoredData(USAGE_KEY) || {};
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-  
+
   if (usage.month !== currentMonth) {
     // Reset for new month
     return {
@@ -331,7 +335,7 @@ export function getUsage() {
       rulesCreated: 0,
     };
   }
-  
+
   return usage;
 }
 
@@ -351,15 +355,15 @@ export function incrementUsage(metric, amount = 1) {
 export function isLimitReached(metric) {
   const tier = getCurrentTier();
   const usage = getUsage();
-  
+
   const limitMap = {
     filesOrganized: tier.limits.filesPerMonth,
     rulesCreated: tier.limits.rulesCount,
   };
-  
+
   const limit = limitMap[metric];
   const current = usage[metric] || 0;
-  
+
   return limit !== Infinity && current >= limit;
 }
 
@@ -369,15 +373,15 @@ export function isLimitReached(metric) {
 export function getRemainingQuota(metric) {
   const tier = getCurrentTier();
   const usage = getUsage();
-  
+
   const limitMap = {
     filesOrganized: tier.limits.filesPerMonth,
     rulesCreated: tier.limits.rulesCount,
   };
-  
+
   const limit = limitMap[metric];
   const current = usage[metric] || 0;
-  
+
   if (limit === Infinity) return Infinity;
   return Math.max(0, limit - current);
 }
@@ -399,20 +403,20 @@ export function hasFeature(featureId) {
  */
 export function canPerformAction(action, count = 1) {
   const tier = getCurrentTier();
-  
+
   switch (action) {
     case 'organizeFiles':
       if (!tier.features.fileOrganizer) return { allowed: false, reason: 'Feature not available' };
-      
+
       // Check batch limit for free tier
       if (!tier.features.batchOperations && count > 10) {
-        return { 
-          allowed: false, 
+        return {
+          allowed: false,
           reason: 'Free tier limited to 10 files at a time',
           limit: 10,
         };
       }
-      
+
       // Check monthly limit
       {
         const remaining = getRemainingQuota('filesOrganized');
@@ -423,10 +427,10 @@ export function canPerformAction(action, count = 1) {
             remaining,
           };
         }
-        
+
         return { allowed: true };
       }
-    
+
     case 'createRule': {
       const rulesRemaining = getRemainingQuota('rulesCreated');
       if (rulesRemaining < 1) {
@@ -438,17 +442,17 @@ export function canPerformAction(action, count = 1) {
       }
       return { allowed: true };
     }
-    
+
     case 'addCloudDrive':
       // Would need to check current count from DB
       return { allowed: tier.features.cloudSync };
-    
+
     case 'rollback':
-      return { 
+      return {
         allowed: tier.features.rollback,
         reason: tier.features.rollback ? null : 'Rollback requires Premium',
       };
-    
+
     default:
       return { allowed: true };
   }
@@ -465,7 +469,7 @@ export function getLicenseState() {
   const license = getStoredLicense();
   const tier = getCurrentTier();
   const usage = getUsage();
-  
+
   return {
     isPremium: isPremium(),
     tier,

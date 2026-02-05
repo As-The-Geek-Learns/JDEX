@@ -26,8 +26,14 @@ const BLOCKED_PATHS = [
 
 // File extensions to warn about
 const SENSITIVE_EXTENSIONS = [
-  '.app', '.exe', '.dll', '.sys', '.kext',
-  '.plist', '.dylib', '.framework',
+  '.app',
+  '.exe',
+  '.dll',
+  '.sys',
+  '.kext',
+  '.plist',
+  '.dylib',
+  '.framework',
 ];
 
 /**
@@ -44,9 +50,9 @@ export function validateDroppedFile(filePath) {
   const normalizedPath = filePath.toLowerCase();
   for (const blocked of BLOCKED_PATHS) {
     if (normalizedPath.startsWith(blocked.toLowerCase())) {
-      return { 
-        valid: false, 
-        error: 'System files cannot be organized for safety reasons' 
+      return {
+        valid: false,
+        error: 'System files cannot be organized for safety reasons',
       };
     }
   }
@@ -61,9 +67,9 @@ export function validateDroppedFile(filePath) {
   // Check for sensitive extensions (warning, not blocking)
   const ext = filePath.substring(filePath.lastIndexOf('.')).toLowerCase();
   if (SENSITIVE_EXTENSIONS.includes(ext)) {
-    return { 
-      valid: true, 
-      warning: 'This appears to be an application or system file. Are you sure?' 
+    return {
+      valid: true,
+      warning: 'This appears to be an application or system file. Are you sure?',
     };
   }
 
@@ -80,11 +86,11 @@ export function extractFileInfo(file) {
   const name = file.name || '';
   const size = file.size || 0;
   const type = file.type || '';
-  
+
   // Extract extension
   const lastDot = name.lastIndexOf('.');
   const extension = lastDot > 0 ? name.substring(lastDot + 1).toLowerCase() : '';
-  
+
   // Determine file type category
   const fileType = categorizeFileType(extension);
 
@@ -132,7 +138,7 @@ function categorizeFileType(extension) {
 export function buildDestinationPath(folder, fileName, jdRootPath) {
   const fs = window.require ? window.require('fs') : null;
   const path = window.require ? window.require('path') : null;
-  
+
   if (!path) {
     throw new Error('Path module not available');
   }
@@ -146,7 +152,7 @@ export function buildDestinationPath(folder, fileName, jdRootPath) {
   // Format: jdRoot/XX-XX Area/XX Category/XX.XX Folder/
   const folderNumber = folder.folder_number; // e.g., "12.01"
   const [categoryNum] = folderNumber.split('.');
-  
+
   // Build the path structure
   const areaRange = `${Math.floor(parseInt(categoryNum) / 10) * 10}-${Math.floor(parseInt(categoryNum) / 10) * 10 + 9}`;
   const areaFolder = `${areaRange} ${folder.area_name || 'Area'}`;
@@ -179,10 +185,10 @@ export async function moveFileToFolder(sourcePath, destPath) {
 
     // Check if destination file already exists
     if (fs.existsSync(destPath)) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: 'conflict',
-        existingPath: destPath 
+        existingPath: destPath,
       };
     }
 
@@ -202,9 +208,9 @@ export async function moveFileToFolder(sourcePath, destPath) {
     return { success: true };
   } catch (error) {
     console.error('[DragDropService] Move failed:', error);
-    return { 
-      success: false, 
-      error: error.message || 'Failed to move file' 
+    return {
+      success: false,
+      error: error.message || 'Failed to move file',
     };
   }
 }
@@ -226,21 +232,24 @@ export function logOrganizedFile({
   if (!db) return;
 
   try {
-    db.run(`
+    db.run(
+      `
       INSERT INTO organized_files (
         filename, original_path, current_path, jd_folder_number,
         file_type, file_size, organized_at, status, rule_id
       ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'), 'moved', ?)
-    `, [
-      sanitizeText(filename),
-      originalPath,
-      currentPath,
-      jdFolderNumber,
-      fileType,
-      fileSize,
-      ruleId,
-    ]);
-    
+    `,
+      [
+        sanitizeText(filename),
+        originalPath,
+        currentPath,
+        jdFolderNumber,
+        fileType,
+        fileSize,
+        ruleId,
+      ]
+    );
+
     saveDatabase();
   } catch (error) {
     console.error('[DragDropService] Failed to log organized file:', error);
@@ -268,11 +277,11 @@ export function checkForConflict(destPath) {
   const dir = path.dirname(destPath);
   const ext = path.extname(destPath);
   const base = path.basename(destPath, ext);
-  
+
   let counter = 1;
   let newName = `${base} (${counter})${ext}`;
   let newPath = path.join(dir, newName);
-  
+
   while (fs.existsSync(newPath) && counter < 100) {
     counter++;
     newName = `${base} (${counter})${ext}`;
@@ -297,7 +306,7 @@ export function getDragDropUsageThisMonth() {
   try {
     const { month, count } = JSON.parse(usageData);
     const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
-    
+
     if (month === currentMonth) {
       return count;
     }
@@ -313,11 +322,14 @@ export function getDragDropUsageThisMonth() {
 export function incrementDragDropUsage() {
   const currentMonth = new Date().toISOString().substring(0, 7);
   const currentCount = getDragDropUsageThisMonth();
-  
-  localStorage.setItem('jdex_dragdrop_usage', JSON.stringify({
-    month: currentMonth,
-    count: currentCount + 1,
-  }));
+
+  localStorage.setItem(
+    'jdex_dragdrop_usage',
+    JSON.stringify({
+      month: currentMonth,
+      count: currentCount + 1,
+    })
+  );
 }
 
 /**

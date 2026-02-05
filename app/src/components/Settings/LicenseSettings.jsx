@@ -24,8 +24,12 @@ const Icons = {
   ),
   Key: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+      />
     </svg>
   ),
   X: () => (
@@ -90,29 +94,34 @@ export default function LicenseSettings() {
           <Icons.Key />
           License
         </h2>
-        <p className="text-gray-400">
-          Manage your JDex license and view usage
-        </p>
+        <p className="text-gray-400">Manage your JDex license and view usage</p>
       </div>
 
       {/* Current Status */}
-      <div className={`
+      <div
+        className={`
         rounded-lg p-4 mb-6
-        ${isPremium 
-          ? 'bg-gradient-to-r from-purple-900/50 to-teal-900/50 border border-purple-700' 
-          : 'bg-slate-800'
+        ${
+          isPremium
+            ? 'bg-gradient-to-r from-purple-900/50 to-teal-900/50 border border-purple-700'
+            : 'bg-slate-800'
         }
-      `}>
+      `}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {isPremium ? (
-              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-teal-500 
-                flex items-center justify-center text-white">
+              <div
+                className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-teal-500 
+                flex items-center justify-center text-white"
+              >
                 <Icons.Star />
               </div>
             ) : (
-              <div className="w-10 h-10 rounded-full bg-slate-700 
-                flex items-center justify-center text-gray-400">
+              <div
+                className="w-10 h-10 rounded-full bg-slate-700 
+                flex items-center justify-center text-gray-400"
+              >
                 <Icons.Key />
               </div>
             )}
@@ -170,7 +179,7 @@ export default function LicenseSettings() {
       {!isPremium && (
         <div className="bg-slate-800 rounded-lg p-4 mb-6">
           <h4 className="font-medium text-white mb-3">Activate License</h4>
-          
+
           <div className="flex gap-2">
             <input
               type="text"
@@ -192,9 +201,7 @@ export default function LicenseSettings() {
             </button>
           </div>
 
-          {activationError && (
-            <p className="text-red-400 text-sm mt-2">{activationError}</p>
-          )}
+          {activationError && <p className="text-red-400 text-sm mt-2">{activationError}</p>}
 
           <p className="text-xs text-gray-500 mt-3">
             Enter your license key from your Gumroad purchase email.
@@ -217,8 +224,8 @@ export default function LicenseSettings() {
       {/* Usage Stats */}
       <div className="bg-slate-800 rounded-lg p-4 mb-6">
         <h4 className="font-medium text-white mb-4">This Month's Usage</h4>
-        
-        <UsageLimitWarning 
+
+        <UsageLimitWarning
           metric="filesOrganized"
           current={usage?.filesOrganized || 0}
           limit={tier.limits.filesPerMonth}
@@ -228,12 +235,12 @@ export default function LicenseSettings() {
       {/* Feature Comparison */}
       <div className="bg-slate-800 rounded-lg p-4">
         <h4 className="font-medium text-white mb-4">Features</h4>
-        
+
         <div className="space-y-3">
           {Object.entries(FEATURE_INFO).map(([key, info]) => {
             const hasIt = tier.features[key];
             return (
-              <div 
+              <div
                 key={key}
                 className="flex items-center justify-between py-2 border-b border-slate-700 last:border-0"
               >
@@ -242,9 +249,7 @@ export default function LicenseSettings() {
                     {hasIt ? <Icons.Check /> : <Icons.X />}
                   </span>
                   <div>
-                    <span className={hasIt ? 'text-white' : 'text-gray-500'}>
-                      {info.name}
-                    </span>
+                    <span className={hasIt ? 'text-white' : 'text-gray-500'}>{info.name}</span>
                     <p className="text-xs text-gray-500">{info.description}</p>
                   </div>
                 </div>

@@ -8,11 +8,7 @@ import { validateFilePath, sanitizeText } from '../../utils/validation.js';
  * =======================
  * Allows users to select a folder and choose files for batch renaming.
  */
-export default function FileSelector({ 
-  selectedFiles, 
-  onFilesChange,
-  maxFiles = null,
-}) {
+export default function FileSelector({ selectedFiles, onFilesChange, maxFiles = null }) {
   const [folderPath, setFolderPath] = useState('');
   const [availableFiles, setAvailableFiles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -26,28 +22,31 @@ export default function FileSelector({
   }, []);
 
   // Validate and sanitize a user-provided path
-  const validateUserPath = useCallback((inputPath) => {
-    if (!inputPath) return null;
-    
-    try {
-      // Sanitize text first (remove HTML tags, control chars)
-      const sanitized = sanitizeText(inputPath);
-      if (!sanitized) return null;
-      
-      // Validate as a file path (checks for path traversal, etc.)
-      const validated = validateFilePath(sanitized, { allowHome: true });
-      return validated;
-    } catch (err) {
-      setSafeError('Invalid path: ' + (err.message || 'validation failed'));
-      return null;
-    }
-  }, [setSafeError]);
+  const validateUserPath = useCallback(
+    (inputPath) => {
+      if (!inputPath) return null;
+
+      try {
+        // Sanitize text first (remove HTML tags, control chars)
+        const sanitized = sanitizeText(inputPath);
+        if (!sanitized) return null;
+
+        // Validate as a file path (checks for path traversal, etc.)
+        const validated = validateFilePath(sanitized, { allowHome: true });
+        return validated;
+      } catch (err) {
+        setSafeError('Invalid path: ' + (err.message || 'validation failed'));
+        return null;
+      }
+    },
+    [setSafeError]
+  );
 
   // Handle folder selection via Electron dialog
   const handleSelectFolder = useCallback(async () => {
     try {
       const { dialog } = window.require('@electron/remote') || {};
-      
+
       if (!dialog) {
         // Fallback: prompt for path
         const inputPath = window.prompt('Enter folder path:');
@@ -77,54 +76,58 @@ export default function FileSelector({
   }, [validateUserPath]);
 
   // Load files from a folder
-  const loadFolder = useCallback((path) => {
-    setLoading(true);
-    setError('');
-    setFolderPath(path);
-    
-    try {
-      const files = readDirectoryFiles(path);
-      
-      if (files.length === 0) {
-        setError('No files found in this folder');
+  const loadFolder = useCallback(
+    (path) => {
+      setLoading(true);
+      setError('');
+      setFolderPath(path);
+
+      try {
+        const files = readDirectoryFiles(path);
+
+        if (files.length === 0) {
+          setError('No files found in this folder');
+          setAvailableFiles([]);
+          onFilesChange([]);
+        } else {
+          setAvailableFiles(files);
+          // Auto-select all files
+          onFilesChange(files);
+        }
+      } catch (err) {
+        // Security: Sanitize error message before display
+        setSafeError(err.message || 'Failed to read folder');
         setAvailableFiles([]);
-        onFilesChange([]);
-      } else {
-        setAvailableFiles(files);
-        // Auto-select all files
-        onFilesChange(files);
       }
-    } catch (err) {
-      // Security: Sanitize error message before display
-      setSafeError(err.message || 'Failed to read folder');
-      setAvailableFiles([]);
-    }
-    
-    setLoading(false);
-  }, [onFilesChange, setSafeError]);
+
+      setLoading(false);
+    },
+    [onFilesChange, setSafeError]
+  );
 
   // Toggle file selection
-  const toggleFile = useCallback((file) => {
-    const isSelected = selectedFiles.some(f => f.path === file.path);
-    
-    if (isSelected) {
-      onFilesChange(selectedFiles.filter(f => f.path !== file.path));
-    } else {
-      if (maxFiles && selectedFiles.length >= maxFiles) {
-        return; // At limit
+  const toggleFile = useCallback(
+    (file) => {
+      const isSelected = selectedFiles.some((f) => f.path === file.path);
+
+      if (isSelected) {
+        onFilesChange(selectedFiles.filter((f) => f.path !== file.path));
+      } else {
+        if (maxFiles && selectedFiles.length >= maxFiles) {
+          return; // At limit
+        }
+        onFilesChange([...selectedFiles, file]);
       }
-      onFilesChange([...selectedFiles, file]);
-    }
-  }, [selectedFiles, onFilesChange, maxFiles]);
+    },
+    [selectedFiles, onFilesChange, maxFiles]
+  );
 
   // Select/deselect all
   const toggleAll = useCallback(() => {
     if (selectedFiles.length === availableFiles.length) {
       onFilesChange([]);
     } else {
-      const toSelect = maxFiles 
-        ? availableFiles.slice(0, maxFiles) 
-        : availableFiles;
+      const toSelect = maxFiles ? availableFiles.slice(0, maxFiles) : availableFiles;
       onFilesChange(toSelect);
     }
   }, [selectedFiles, availableFiles, onFilesChange, maxFiles]);
@@ -147,10 +150,12 @@ export default function FileSelector({
           <Folder size={18} />
           Choose Folder
         </button>
-        
+
         {folderPath && (
           <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-lg text-sm text-slate-400 truncate">
-            <span className="truncate" title={folderPath}>{folderPath}</span>
+            <span className="truncate" title={folderPath}>
+              {folderPath}
+            </span>
             <button
               onClick={() => loadFolder(folderPath)}
               className="p-1 hover:bg-slate-700 rounded"
@@ -170,21 +175,14 @@ export default function FileSelector({
       )}
 
       {/* Loading State */}
-      {loading && (
-        <div className="text-center py-4 text-slate-400">
-          Loading files...
-        </div>
-      )}
+      {loading && <div className="text-center py-4 text-slate-400">Loading files...</div>}
 
       {/* File List */}
       {availableFiles.length > 0 && (
         <div className="space-y-2">
           {/* Selection Controls */}
           <div className="flex items-center justify-between text-sm">
-            <button
-              onClick={toggleAll}
-              className="text-teal-400 hover:text-teal-300"
-            >
+            <button onClick={toggleAll} className="text-teal-400 hover:text-teal-300">
               {selectedFiles.length === availableFiles.length ? 'Deselect All' : 'Select All'}
             </button>
             <span className="text-slate-400">
@@ -198,9 +196,9 @@ export default function FileSelector({
           {/* File List */}
           <div className="bg-slate-800/50 rounded-lg border border-slate-700 max-h-48 overflow-y-auto">
             {availableFiles.map((file) => {
-              const isSelected = selectedFiles.some(f => f.path === file.path);
+              const isSelected = selectedFiles.some((f) => f.path === file.path);
               const isDisabled = !isSelected && maxFiles && selectedFiles.length >= maxFiles;
-              
+
               return (
                 <div
                   key={file.path}
@@ -212,25 +210,22 @@ export default function FileSelector({
                     ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}
                   `}
                 >
-                  <div className={`
+                  <div
+                    className={`
                     w-5 h-5 rounded border flex items-center justify-center
-                    ${isSelected 
-                      ? 'bg-teal-500 border-teal-500' 
-                      : 'border-slate-500'
-                    }
-                  `}>
+                    ${isSelected ? 'bg-teal-500 border-teal-500' : 'border-slate-500'}
+                  `}
+                  >
                     {isSelected && <Check size={14} className="text-white" />}
                   </div>
-                  
+
                   <File size={16} className="text-slate-400 flex-shrink-0" />
-                  
+
                   <span className="flex-1 truncate text-sm" title={file.name}>
                     {file.name}
                   </span>
-                  
-                  <span className="text-xs text-slate-500">
-                    {formatSize(file.size)}
-                  </span>
+
+                  <span className="text-xs text-slate-500">{formatSize(file.size)}</span>
                 </div>
               );
             })}

@@ -2,7 +2,7 @@
  * File Organizer - Main View
  * ==========================
  * The central hub for organizing files into JD folders.
- * 
+ *
  * Features:
  * - Tab-based navigation (Scan, Organize, Rules)
  * - Scanned files with suggested destinations
@@ -23,11 +23,7 @@ import {
   CONFLICT_STRATEGY,
   OP_STATUS,
 } from '../../services/fileOperations.js';
-import {
-  getScannedFiles,
-  updateScannedFileDecision,
-  getFolders,
-} from '../../db.js';
+import { getScannedFiles, updateScannedFileDecision, getFolders } from '../../db.js';
 import { sanitizeErrorForUser } from '../../utils/errors.js';
 
 // =============================================================================
@@ -37,28 +33,48 @@ import { sanitizeErrorForUser } from '../../utils/errors.js';
 const Icons = {
   Scan: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+      />
     </svg>
   ),
   Organize: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+      />
     </svg>
   ),
   Rules: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+      />
     </svg>
   ),
   Eye: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+      />
     </svg>
   ),
   Check: () => (
@@ -78,16 +94,28 @@ const Icons = {
   ),
   Folder: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+      />
     </svg>
   ),
   Play: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
     </svg>
   ),
 };
@@ -116,15 +144,15 @@ function ConfidenceBadge({ confidence }) {
 // File Row Component
 // =============================================================================
 
-function FileRow({ 
-  file, 
-  suggestion, 
-  folders, 
-  isSelected, 
-  onSelect, 
-  onAccept, 
-  onSkip, 
-  onChangeFolder 
+function FileRow({
+  file,
+  suggestion,
+  folders,
+  isSelected,
+  onSelect,
+  onAccept,
+  onSkip,
+  onChangeFolder,
 }) {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState(suggestion?.folder?.folder_number || '');
@@ -139,12 +167,14 @@ function FileRow({
   const decision = file.user_decision;
 
   return (
-    <div className={`
+    <div
+      className={`
       border-b border-slate-700 last:border-0 py-3 px-4
       ${isSelected ? 'bg-teal-900/20' : 'hover:bg-slate-800/50'}
       ${decision === 'accepted' ? 'opacity-50' : ''}
       ${decision === 'skipped' ? 'opacity-30' : ''}
-    `}>
+    `}
+    >
       <div className="flex items-center gap-4">
         {/* Checkbox */}
         <input
@@ -162,9 +192,7 @@ function FileRow({
             <span className="font-medium text-white truncate" title={file.filename}>
               {file.filename}
             </span>
-            <span className="text-xs text-gray-500">
-              {formatFileSize(file.file_size || 0)}
-            </span>
+            <span className="text-xs text-gray-500">{formatFileSize(file.file_size || 0)}</span>
           </div>
           <div className="text-sm text-gray-500 truncate" title={file.path}>
             {file.path}
@@ -176,7 +204,7 @@ function FileRow({
           {suggestion ? (
             <>
               <ConfidenceBadge confidence={suggestion.confidence} />
-              
+
               {/* Folder selector */}
               <div className="relative">
                 <button
@@ -190,16 +218,20 @@ function FileRow({
                     {selectedFolder || targetFolder?.folder_number || '—'}
                   </span>
                   <span className="text-white truncate max-w-32">
-                    {folders.find(f => f.folder_number === (selectedFolder || targetFolder?.folder_number))?.name || 'Select...'}
+                    {folders.find(
+                      (f) => f.folder_number === (selectedFolder || targetFolder?.folder_number)
+                    )?.name || 'Select...'}
                   </span>
                   <Icons.ChevronDown />
                 </button>
 
                 {/* Dropdown */}
                 {showFolderPicker && (
-                  <div className="absolute right-0 top-full mt-1 z-20 w-72 max-h-64 overflow-y-auto 
-                    bg-slate-800 border border-slate-600 rounded-lg shadow-xl">
-                    {folders.map(folder => (
+                  <div
+                    className="absolute right-0 top-full mt-1 z-20 w-72 max-h-64 overflow-y-auto 
+                    bg-slate-800 border border-slate-600 rounded-lg shadow-xl"
+                  >
+                    {folders.map((folder) => (
                       <button
                         key={folder.id}
                         onClick={() => handleFolderChange(folder.folder_number)}
@@ -215,8 +247,10 @@ function FileRow({
               </div>
 
               {/* Reason */}
-              <span className="text-xs text-gray-500 hidden lg:inline max-w-40 truncate" 
-                title={suggestion.reason}>
+              <span
+                className="text-xs text-gray-500 hidden lg:inline max-w-40 truncate"
+                title={suggestion.reason}
+              >
                 {suggestion.reason}
               </span>
             </>
@@ -250,14 +284,10 @@ function FileRow({
 
         {/* Status badge */}
         {decision === 'accepted' && (
-          <span className="px-2 py-1 bg-green-900/30 text-green-400 rounded text-xs">
-            Ready
-          </span>
+          <span className="px-2 py-1 bg-green-900/30 text-green-400 rounded text-xs">Ready</span>
         )}
         {decision === 'skipped' && (
-          <span className="px-2 py-1 bg-gray-700 text-gray-400 rounded text-xs">
-            Skipped
-          </span>
+          <span className="px-2 py-1 bg-gray-700 text-gray-400 rounded text-xs">Skipped</span>
         )}
       </div>
     </div>
@@ -294,7 +324,7 @@ function OrganizePanel({ sessionId, onOrganize }) {
       // Get suggestions from matching engine
       const engine = getMatchingEngine();
       const matched = engine.batchMatch(scannedFiles);
-      
+
       const suggestionsMap = {};
       matched.forEach(({ file, suggestions: fileSuggestions }) => {
         if (fileSuggestions.length > 0) {
@@ -312,7 +342,7 @@ function OrganizePanel({ sessionId, onOrganize }) {
 
   // Handlers
   const handleSelect = useCallback((fileId, selected) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       if (selected) {
         next.add(fileId);
@@ -323,23 +353,28 @@ function OrganizePanel({ sessionId, onOrganize }) {
     });
   }, []);
 
-  const handleSelectAll = useCallback((selected) => {
-    if (selected) {
-      const pending = files.filter(f => f.user_decision === 'pending').map(f => f.id);
-      setSelectedIds(new Set(pending));
-    } else {
-      setSelectedIds(new Set());
-    }
-  }, [files]);
+  const handleSelectAll = useCallback(
+    (selected) => {
+      if (selected) {
+        const pending = files.filter((f) => f.user_decision === 'pending').map((f) => f.id);
+        setSelectedIds(new Set(pending));
+      } else {
+        setSelectedIds(new Set());
+      }
+    },
+    [files]
+  );
 
   const handleAccept = useCallback((fileId, folderNumber) => {
     try {
       updateScannedFileDecision(fileId, 'accepted', folderNumber);
-      setFiles(prev => prev.map(f => 
-        f.id === fileId 
-          ? { ...f, user_decision: 'accepted', user_target_folder: folderNumber }
-          : f
-      ));
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId
+            ? { ...f, user_decision: 'accepted', user_target_folder: folderNumber }
+            : f
+        )
+      );
     } catch (e) {
       setError(sanitizeErrorForUser(e));
     }
@@ -348,9 +383,9 @@ function OrganizePanel({ sessionId, onOrganize }) {
   const handleSkip = useCallback((fileId) => {
     try {
       updateScannedFileDecision(fileId, 'skipped');
-      setFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, user_decision: 'skipped' } : f
-      ));
+      setFiles((prev) =>
+        prev.map((f) => (f.id === fileId ? { ...f, user_decision: 'skipped' } : f))
+      );
     } catch (e) {
       setError(sanitizeErrorForUser(e));
     }
@@ -359,17 +394,19 @@ function OrganizePanel({ sessionId, onOrganize }) {
   const handleChangeFolder = useCallback((fileId, folderNumber) => {
     try {
       updateScannedFileDecision(fileId, 'changed', folderNumber);
-      setFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, user_target_folder: folderNumber, user_decision: 'changed' } : f
-      ));
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { ...f, user_target_folder: folderNumber, user_decision: 'changed' } : f
+        )
+      );
     } catch (e) {
       setError(sanitizeErrorForUser(e));
     }
   }, []);
 
   const handleAcceptSelected = useCallback(() => {
-    selectedIds.forEach(fileId => {
-      const file = files.find(f => f.id === fileId);
+    selectedIds.forEach((fileId) => {
+      const file = files.find((f) => f.id === fileId);
       const suggestion = suggestions[fileId];
       const folder = file?.user_target_folder || suggestion?.folder?.folder_number;
       if (folder) {
@@ -380,12 +417,12 @@ function OrganizePanel({ sessionId, onOrganize }) {
   }, [selectedIds, files, suggestions, handleAccept]);
 
   const handleSkipSelected = useCallback(() => {
-    selectedIds.forEach(fileId => handleSkip(fileId));
+    selectedIds.forEach((fileId) => handleSkip(fileId));
     setSelectedIds(new Set());
   }, [selectedIds, handleSkip]);
 
   const handleOrganize = useCallback(() => {
-    const accepted = files.filter(f => f.user_decision === 'accepted');
+    const accepted = files.filter((f) => f.user_decision === 'accepted');
     if (accepted.length === 0) {
       setError('No files accepted for organization');
       return;
@@ -394,7 +431,7 @@ function OrganizePanel({ sessionId, onOrganize }) {
   }, [files, onOrganize]);
 
   // Filter files
-  const filteredFiles = files.filter(f => {
+  const filteredFiles = files.filter((f) => {
     if (filterType === 'all') return true;
     if (filterType === 'pending') return f.user_decision === 'pending';
     if (filterType === 'accepted') return f.user_decision === 'accepted';
@@ -405,9 +442,9 @@ function OrganizePanel({ sessionId, onOrganize }) {
   // Stats
   const stats = {
     total: files.length,
-    pending: files.filter(f => f.user_decision === 'pending').length,
-    accepted: files.filter(f => f.user_decision === 'accepted').length,
-    skipped: files.filter(f => f.user_decision === 'skipped').length,
+    pending: files.filter((f) => f.user_decision === 'pending').length,
+    accepted: files.filter((f) => f.user_decision === 'accepted').length,
+    skipped: files.filter((f) => f.user_decision === 'skipped').length,
   };
 
   // No session
@@ -416,9 +453,7 @@ function OrganizePanel({ sessionId, onOrganize }) {
       <div className="p-8 text-center">
         <div className="text-5xl mb-4">📂</div>
         <h3 className="text-xl font-semibold text-white mb-2">No Files to Organize</h3>
-        <p className="text-gray-400">
-          Scan a folder first to discover files for organization.
-        </p>
+        <p className="text-gray-400">Scan a folder first to discover files for organization.</p>
       </div>
     );
   }
@@ -428,7 +463,7 @@ function OrganizePanel({ sessionId, onOrganize }) {
       <div className="p-6 animate-pulse">
         <div className="h-8 bg-slate-700 rounded w-48 mb-4"></div>
         <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map(i => (
+          {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="h-16 bg-slate-700 rounded"></div>
           ))}
         </div>
@@ -442,7 +477,9 @@ function OrganizePanel({ sessionId, onOrganize }) {
       {error && (
         <div className="p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-400">
           {error}
-          <button onClick={() => setError('')} className="ml-2 underline">Dismiss</button>
+          <button onClick={() => setError('')} className="ml-2 underline">
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -482,7 +519,7 @@ function OrganizePanel({ sessionId, onOrganize }) {
       {/* Filter & bulk actions */}
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
-          {['pending', 'accepted', 'skipped', 'all'].map(type => (
+          {['pending', 'accepted', 'skipped', 'all'].map((type) => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
@@ -499,9 +536,7 @@ function OrganizePanel({ sessionId, onOrganize }) {
 
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">
-              {selectedIds.size} selected
-            </span>
+            <span className="text-sm text-gray-400">{selectedIds.size} selected</span>
             <button
               onClick={handleAcceptSelected}
               className="px-3 py-1.5 bg-green-900/50 hover:bg-green-900 text-green-400 
@@ -536,7 +571,7 @@ function OrganizePanel({ sessionId, onOrganize }) {
       {/* File list */}
       <div className="bg-slate-800 rounded-lg overflow-hidden">
         {filteredFiles.length > 0 ? (
-          filteredFiles.map(file => (
+          filteredFiles.map((file) => (
             <FileRow
               key={file.id}
               file={file}
@@ -550,9 +585,7 @@ function OrganizePanel({ sessionId, onOrganize }) {
             />
           ))
         ) : (
-          <div className="p-8 text-center text-gray-400">
-            No files match the current filter
-          </div>
+          <div className="p-8 text-center text-gray-400">No files match the current filter</div>
         )}
       </div>
     </div>
@@ -584,13 +617,15 @@ function ProgressModal({ isOpen, progress, result, onClose }) {
             // Progress view
             <div className="space-y-4">
               <div className="flex justify-between text-sm text-gray-400">
-                <span>Processing file {progress?.current} of {progress?.total}</span>
+                <span>
+                  Processing file {progress?.current} of {progress?.total}
+                </span>
                 <span>{progress?.percent}%</span>
               </div>
-              
+
               {/* Progress bar */}
               <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-teal-500 transition-all duration-200"
                   style={{ width: `${progress?.percent || 0}%` }}
                 />
@@ -640,16 +675,16 @@ function ProgressModal({ isOpen, progress, result, onClose }) {
                   </summary>
                   <div className="mt-2 max-h-48 overflow-y-auto space-y-1 bg-slate-900 rounded p-2">
                     {result.operations.slice(0, 50).map((op, idx) => (
-                      <div 
+                      <div
                         key={idx}
                         className={`text-xs py-1 px-2 rounded ${
-                          op.success 
-                            ? 'text-green-400' 
-                            : 'text-red-400 bg-red-900/20'
+                          op.success ? 'text-green-400' : 'text-red-400 bg-red-900/20'
                         }`}
                       >
                         {op.success ? '✓' : '✗'} {op.sourcePath?.split('/').pop()}
-                        {op.error && <span className="text-red-300 ml-2">({op.error.message})</span>}
+                        {op.error && (
+                          <span className="text-red-300 ml-2">({op.error.message})</span>
+                        )}
                       </div>
                     ))}
                     {result.operations.length > 50 && (
@@ -702,10 +737,12 @@ export default function FileOrganizer({ onClose }) {
   // Handle organization - ACTUAL FILE MOVES
   const handleOrganize = useCallback(async (files) => {
     // Build operations list
-    const operations = files.map(file => ({
-      sourcePath: file.path,
-      folderNumber: file.user_target_folder || file.suggested_jd_folder,
-    })).filter(op => op.sourcePath && op.folderNumber);
+    const operations = files
+      .map((file) => ({
+        sourcePath: file.path,
+        folderNumber: file.user_target_folder || file.suggested_jd_folder,
+      }))
+      .filter((op) => op.sourcePath && op.folderNumber);
 
     if (operations.length === 0) {
       alert('No valid operations to perform');
@@ -753,17 +790,14 @@ export default function FileOrganizer({ onClose }) {
               Scan, organize, and manage your files with Johnny Decimal
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
             <Icons.X />
           </button>
         </div>
 
         {/* Tabs */}
         <div className="flex gap-1 mt-4">
-          {tabs.map(tab => {
+          {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
@@ -777,9 +811,7 @@ export default function FileOrganizer({ onClose }) {
               >
                 <Icon />
                 {tab.label}
-                {tab.badge && (
-                  <span className="w-2 h-2 bg-teal-400 rounded-full"></span>
-                )}
+                {tab.badge && <span className="w-2 h-2 bg-teal-400 rounded-full"></span>}
               </button>
             );
           })}
@@ -789,24 +821,15 @@ export default function FileOrganizer({ onClose }) {
       {/* Content */}
       <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">
-          {activeTab === 'scan' && (
-            <ScannerPanel onScanComplete={handleScanComplete} />
-          )}
+          {activeTab === 'scan' && <ScannerPanel onScanComplete={handleScanComplete} />}
 
           {activeTab === 'organize' && (
-            <OrganizePanel 
-              sessionId={scanSessionId} 
-              onOrganize={handleOrganize}
-            />
+            <OrganizePanel sessionId={scanSessionId} onOrganize={handleOrganize} />
           )}
 
-          {activeTab === 'rules' && (
-            <RulesManager />
-          )}
+          {activeTab === 'rules' && <RulesManager />}
 
-          {activeTab === 'watch' && (
-            <WatchFolders />
-          )}
+          {activeTab === 'watch' && <WatchFolders />}
         </div>
       </main>
 

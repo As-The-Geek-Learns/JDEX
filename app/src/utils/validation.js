@@ -2,7 +2,7 @@
  * Input Validation Utilities for JDex
  * ====================================
  * Centralized validation to ensure consistent, secure input handling.
- * 
+ *
  * Security: All user input should pass through these functions before
  * being used in database queries, file operations, or displayed in UI.
  */
@@ -30,9 +30,24 @@ export class ValidationError extends Error {
 // =============================================================================
 
 /**
+ * Remove HTML angle bracket characters from a string.
+ * Rather than trying to match complete HTML tags (which regex can't fully
+ * handle and static analysis flags as incomplete sanitization), we remove
+ * the individual `<` and `>` characters. This eliminates any possibility
+ * of HTML injection — including malformed tags like `<script` without a
+ * closing bracket — without the complexity of a tag-matching loop.
+ *
+ * @param {string} str - The string to sanitize
+ * @returns {string} String with all angle brackets removed
+ */
+function stripHtmlChars(str) {
+  return str.replace(/[<>]/g, '');
+}
+
+/**
  * Sanitize text input by removing potentially dangerous characters.
  * Use for short text fields like names and titles.
- * 
+ *
  * @param {string|null|undefined} input - The text to sanitize
  * @returns {string} Sanitized text
  */
@@ -45,21 +60,20 @@ export function sanitizeText(input) {
     return '';
   }
 
-  return input
-    .trim()
-    // Remove HTML tags (prevents XSS if displayed)
-    .replace(/<[^>]*>/g, '')
-    // Remove control characters except newlines and tabs
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    // Normalize multiple spaces to single space
-    .replace(/\s+/g, ' ');
+  return (
+    stripHtmlChars(input.trim())
+      // Remove control characters except newlines and tabs
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      // Normalize multiple spaces to single space
+      .replace(/\s+/g, ' ')
+  );
 }
 
 /**
  * Sanitize longer text that may contain line breaks.
  * Use for descriptions, notes, and multi-line content.
- * 
+ *
  * @param {string|null|undefined} input - The text to sanitize
  * @returns {string} Sanitized text with preserved line breaks
  */
@@ -72,17 +86,16 @@ export function sanitizeDescription(input) {
     return '';
   }
 
-  return input
-    .trim()
-    // Remove HTML tags
-    .replace(/<[^>]*>/g, '')
-    // Remove control characters except newlines, tabs, carriage returns
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    // Normalize multiple newlines to max 2
-    .replace(/\n{3,}/g, '\n\n')
-    // Normalize multiple spaces (but not newlines) to single space
-    .replace(/[^\S\n]+/g, ' ');
+  return (
+    stripHtmlChars(input.trim())
+      // Remove control characters except newlines, tabs, carriage returns
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      // Normalize multiple newlines to max 2
+      .replace(/\n{3,}/g, '\n\n')
+      // Normalize multiple spaces (but not newlines) to single space
+      .replace(/[^\S\n]+/g, ' ')
+  );
 }
 
 // =============================================================================
@@ -92,7 +105,7 @@ export function sanitizeDescription(input) {
 /**
  * Validate a required string field.
  * Throws ValidationError if invalid.
- * 
+ *
  * @param {unknown} value - The value to validate
  * @param {string} fieldName - Name of the field (for error messages)
  * @param {number} maxLength - Maximum allowed length (default 500)
@@ -128,7 +141,7 @@ export function validateRequiredString(value, fieldName, maxLength = 500) {
 /**
  * Validate an optional string field.
  * Returns null if empty/undefined, validated string otherwise.
- * 
+ *
  * @param {unknown} value - The value to validate
  * @param {string} fieldName - Name of the field (for error messages)
  * @param {number} maxLength - Maximum allowed length (default 500)
@@ -169,22 +182,22 @@ export function validateOptionalString(value, fieldName, maxLength = 500) {
  * Dangerous path patterns that could indicate path traversal attacks.
  */
 const DANGEROUS_PATH_PATTERNS = [
-  /\.\./,           // Parent directory traversal
-  /^~/,             // Home directory (we'll expand this separately)
-  /\0/,             // Null byte injection
-  /^\/etc\//i,      // System config
-  /^\/var\//i,      // System var
-  /^\/usr\//i,      // System usr
-  /^\/bin\//i,      // System bin
-  /^\/sbin\//i,     // System sbin
-  /^\/root\//i,     // Root home
-  /^\/private\//i,  // macOS private
+  /\.\./, // Parent directory traversal
+  /^~/, // Home directory (we'll expand this separately)
+  /\0/, // Null byte injection
+  /^\/etc\//i, // System config
+  /^\/var\//i, // System var
+  /^\/usr\//i, // System usr
+  /^\/bin\//i, // System bin
+  /^\/sbin\//i, // System sbin
+  /^\/root\//i, // Root home
+  /^\/private\//i, // macOS private
 ];
 
 /**
  * Validate a file path is safe to use.
  * Checks for path traversal attacks and dangerous patterns.
- * 
+ *
  * @param {string} path - The path to validate
  * @param {Object} options - Validation options
  * @param {boolean} options.allowHome - Allow ~ home directory paths (default false)
@@ -211,7 +224,7 @@ export function validateFilePath(path, options = {}) {
     if (pattern.source === '^~' && allowHome) {
       continue;
     }
-    
+
     if (pattern.test(trimmedPath)) {
       throw new ValidationError(
         'Path contains potentially dangerous characters or patterns',
@@ -223,16 +236,12 @@ export function validateFilePath(path, options = {}) {
 
   // If allowed roots specified, verify path starts with one of them
   if (allowedRoots.length > 0) {
-    const isAllowed = allowedRoots.some(root => 
-      trimmedPath.startsWith(root) || trimmedPath === root
+    const isAllowed = allowedRoots.some(
+      (root) => trimmedPath.startsWith(root) || trimmedPath === root
     );
-    
+
     if (!isAllowed) {
-      throw new ValidationError(
-        'Path is not within an allowed directory',
-        'path',
-        path
-      );
+      throw new ValidationError('Path is not within an allowed directory', 'path', path);
     }
   }
 
@@ -242,7 +251,7 @@ export function validateFilePath(path, options = {}) {
 /**
  * Validate that a path is within a given base directory.
  * Prevents escaping from intended directory scope.
- * 
+ *
  * @param {string} path - The path to validate
  * @param {string} basePath - The base directory the path must be within
  * @returns {boolean} True if path is within basePath
@@ -257,8 +266,7 @@ export function isPathWithinBase(path, basePath) {
   const normalizedBase = basePath.replace(/\/+$/, '');
 
   // Path must start with base path
-  return normalizedPath.startsWith(normalizedBase + '/') || 
-         normalizedPath === normalizedBase;
+  return normalizedPath.startsWith(normalizedBase + '/') || normalizedPath === normalizedBase;
 }
 
 // =============================================================================
@@ -267,7 +275,7 @@ export function isPathWithinBase(path, basePath) {
 
 /**
  * Validate a number within bounds.
- * 
+ *
  * @param {unknown} value - The value to validate
  * @param {string} fieldName - Name of the field
  * @param {number} min - Minimum value (default 0)
@@ -299,7 +307,7 @@ export function validateNumber(value, fieldName, min = 0, max = Number.MAX_SAFE_
 
 /**
  * Validate an optional number within bounds.
- * 
+ *
  * @param {unknown} value - The value to validate
  * @param {string} fieldName - Name of the field
  * @param {number} min - Minimum value
@@ -316,7 +324,7 @@ export function validateOptionalNumber(value, fieldName, min = 0, max = Number.M
 
 /**
  * Validate a positive integer (for IDs, counts, etc.)
- * 
+ *
  * @param {unknown} value - The value to validate
  * @param {string} fieldName - Name of the field
  * @returns {number} The validated positive integer
@@ -338,7 +346,7 @@ export function validatePositiveInteger(value, fieldName) {
 
 /**
  * Validate a JD folder number (XX.XX format)
- * 
+ *
  * @param {string} folderNumber - The folder number to validate
  * @returns {string} The validated folder number
  * @throws {ValidationError} If invalid format
@@ -349,10 +357,10 @@ export function validateJDFolderNumber(folderNumber) {
   }
 
   const trimmed = folderNumber.trim();
-  
+
   // XX.XX format - two digits, dot, two digits
   const pattern = /^\d{2}\.\d{2}$/;
-  
+
   if (!pattern.test(trimmed)) {
     throw new ValidationError(
       'Folder number must be in XX.XX format (e.g., 11.01)',
@@ -366,7 +374,7 @@ export function validateJDFolderNumber(folderNumber) {
 
 /**
  * Validate a JD item number (XX.XX.XX format)
- * 
+ *
  * @param {string} itemNumber - The item number to validate
  * @returns {string} The validated item number
  * @throws {ValidationError} If invalid format
@@ -377,10 +385,10 @@ export function validateJDItemNumber(itemNumber) {
   }
 
   const trimmed = itemNumber.trim();
-  
+
   // XX.XX.XX format
   const pattern = /^\d{2}\.\d{2}\.\d{2}$/;
-  
+
   if (!pattern.test(trimmed)) {
     throw new ValidationError(
       'Item number must be in XX.XX.XX format (e.g., 11.01.01)',
@@ -394,14 +402,14 @@ export function validateJDItemNumber(itemNumber) {
 
 /**
  * Validate a JD category number (0-99)
- * 
+ *
  * @param {unknown} categoryNumber - The category number to validate
  * @returns {number} The validated category number
  * @throws {ValidationError} If invalid
  */
 export function validateJDCategoryNumber(categoryNumber) {
   const num = validateNumber(categoryNumber, 'Category number', 0, 99);
-  
+
   if (!Number.isInteger(num)) {
     throw new ValidationError(
       'Category number must be a whole number',
@@ -419,7 +427,7 @@ export function validateJDCategoryNumber(categoryNumber) {
 
 /**
  * Validate and normalize a file extension.
- * 
+ *
  * @param {string} extension - The extension to validate (with or without dot)
  * @returns {string} Normalized extension (lowercase, with leading dot)
  */
@@ -429,7 +437,7 @@ export function validateFileExtension(extension) {
   }
 
   let ext = extension.trim().toLowerCase();
-  
+
   // Add leading dot if missing
   if (!ext.startsWith('.')) {
     ext = '.' + ext;
@@ -446,11 +454,7 @@ export function validateFileExtension(extension) {
 
   // Reasonable max length for extensions
   if (ext.length > 10) {
-    throw new ValidationError(
-      'Extension is too long',
-      'extension',
-      extension
-    );
+    throw new ValidationError('Extension is too long', 'extension', extension);
   }
 
   return ext;

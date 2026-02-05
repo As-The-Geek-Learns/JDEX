@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   ChartColumn,
-  TrendingUp, 
-  Zap, 
-  FolderOpen, 
+  TrendingUp,
+  Zap,
+  FolderOpen,
   Eye,
   Calendar,
   X,
@@ -11,7 +11,7 @@ import {
   Lock,
   Sparkles,
   ChevronDown,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
 import { useLicense } from '../../context/LicenseContext.jsx';
 import { getDashboardStats, hasStatisticsData } from '../../services/statisticsService.js';
@@ -62,33 +62,35 @@ export default function StatsDashboard({ onClose }) {
           <div className="relative h-32 bg-gradient-to-br from-purple-600/30 via-fuchsia-600/20 to-teal-600/30 overflow-hidden">
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 
-                  flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.4)]">
+                <div
+                  className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 
+                  flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.4)]"
+                >
                   <Lock size={36} className="text-white" />
                 </div>
                 {/* Animated rings */}
-                <div className="absolute inset-0 -m-4 rounded-3xl border-2 border-purple-400/20 animate-ping" 
-                  style={{ animationDuration: '3s' }} />
+                <div
+                  className="absolute inset-0 -m-4 rounded-3xl border-2 border-purple-400/20 animate-ping"
+                  style={{ animationDuration: '3s' }}
+                />
               </div>
             </div>
             {/* Close button */}
-            <button 
-              onClick={onClose} 
+            <button
+              onClick={onClose}
               className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
               <X size={20} className="text-white/70" />
             </button>
           </div>
-          
+
           <div className="p-8 text-center">
-            <h3 className="text-2xl font-bold text-white mb-2">
-              Premium Feature
-            </h3>
+            <h3 className="text-2xl font-bold text-white mb-2">Premium Feature</h3>
             <p className="text-slate-400 mb-6">
-              Unlock the Statistics Dashboard to see your organization patterns, 
-              track progress, and optimize your workflow.
+              Unlock the Statistics Dashboard to see your organization patterns, track progress, and
+              optimize your workflow.
             </p>
-            
+
             {/* Features list */}
             <div className="glass-card p-5 mb-6 text-left space-y-3">
               <h4 className="font-semibold text-white flex items-center gap-2">
@@ -101,7 +103,7 @@ export default function StatsDashboard({ onClose }) {
                   'File type distribution charts',
                   'Most effective rules analysis',
                   'Watch folder activity tracking',
-                  'Monthly organization trends'
+                  'Monthly organization trends',
                 ].map((feature, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm text-slate-400">
                     <Sparkles size={14} className="text-purple-400" />
@@ -110,7 +112,7 @@ export default function StatsDashboard({ onClose }) {
                 ))}
               </div>
             </div>
-            
+
             <div className="flex gap-3">
               <button
                 onClick={onClose}
@@ -155,7 +157,9 @@ export default function StatsDashboard({ onClose }) {
           {/* Skeleton content */}
           <div className="flex-1 p-6 space-y-6">
             <div className="grid grid-cols-4 gap-4">
-              {[1,2,3,4].map(i => <div key={i} className="h-24 skeleton rounded-xl" />)}
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-24 skeleton rounded-xl" />
+              ))}
             </div>
             <div className="grid grid-cols-2 gap-6">
               <div className="h-64 skeleton rounded-xl" />
@@ -177,10 +181,12 @@ export default function StatsDashboard({ onClose }) {
         <div className="relative flex items-center justify-between p-6 border-b border-slate-700/50">
           {/* Background gradient */}
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-fuchsia-600/5 to-teal-600/10" />
-          
+
           <div className="relative flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 
-              flex items-center justify-center shadow-[0_0_25px_rgba(139,92,246,0.3)]">
+            <div
+              className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 
+              flex items-center justify-center shadow-[0_0_25px_rgba(139,92,246,0.3)]"
+            >
               <ChartColumn size={24} className="text-white" />
             </div>
             <div>
@@ -193,7 +199,7 @@ export default function StatsDashboard({ onClose }) {
               <p className="text-sm text-slate-400">Your organization activity at a glance</p>
             </div>
           </div>
-          
+
           <div className="relative flex items-center gap-3">
             {/* Period selector */}
             <div className="relative">
@@ -209,21 +215,27 @@ export default function StatsDashboard({ onClose }) {
                 <option value="30days">Last 30 days</option>
                 <option value="90days">Last 90 days</option>
               </select>
-              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <ChevronDown
+                size={16}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              />
             </div>
-            
+
             {/* Refresh button */}
-            <button 
+            <button
               onClick={handleRefresh}
               className="p-2.5 hover:bg-slate-700/50 rounded-xl transition-all group"
               title="Refresh statistics"
             >
-              <RefreshCw size={18} className={`text-slate-400 group-hover:text-white transition-colors
-                ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                size={18}
+                className={`text-slate-400 group-hover:text-white transition-colors
+                ${isRefreshing ? 'animate-spin' : ''}`}
+              />
             </button>
-            
-            <button 
-              onClick={onClose} 
+
+            <button
+              onClick={onClose}
               className="p-2.5 hover:bg-slate-700/50 rounded-xl transition-all group"
             >
               <X size={18} className="text-slate-400 group-hover:text-white transition-colors" />
@@ -239,23 +251,24 @@ export default function StatsDashboard({ onClose }) {
               <div className="text-center max-w-md animate-fade-in">
                 {/* Animated icon */}
                 <div className="relative w-28 h-28 mx-auto mb-6">
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/20 to-teal-500/20
-                    flex items-center justify-center">
+                  <div
+                    className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/20 to-teal-500/20
+                    flex items-center justify-center"
+                  >
                     <ChartColumn size={48} className="text-purple-400" />
                   </div>
                   {/* Decorative elements */}
                   <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-teal-500/30 animate-pulse" />
-                  <div className="absolute -bottom-2 -left-2 w-4 h-4 rounded-full bg-purple-500/30 animate-pulse" 
-                    style={{ animationDelay: '0.5s' }} />
+                  <div
+                    className="absolute -bottom-2 -left-2 w-4 h-4 rounded-full bg-purple-500/30 animate-pulse"
+                    style={{ animationDelay: '0.5s' }}
+                  />
                 </div>
-                
-                <h3 className="text-2xl font-bold text-white mb-3">
-                  No Statistics Yet
-                </h3>
+
+                <h3 className="text-2xl font-bold text-white mb-3">No Statistics Yet</h3>
                 <p className="text-slate-400 mb-8">
-                  Start organizing files with the File Organizer to see your 
-                  statistics here. Track your progress, see patterns, and 
-                  optimize your workflow.
+                  Start organizing files with the File Organizer to see your statistics here. Track
+                  your progress, see patterns, and optimize your workflow.
                 </p>
                 <button
                   onClick={onClose}
@@ -305,48 +318,45 @@ export default function StatsDashboard({ onClose }) {
 
               {/* Charts Row */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ActivityChart 
-                  data={stats.activityByDay} 
-                  title="Files Organized Over Time"
-                />
-                <FileTypeChart 
-                  data={stats.filesByType} 
-                  title="Files by Type"
-                />
+                <ActivityChart data={stats.activityByDay} title="Files Organized Over Time" />
+                <FileTypeChart data={stats.filesByType} title="Files by Type" />
               </div>
 
               {/* Bottom Row */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <TopRulesCard 
-                  rules={stats.topRules} 
-                  title="Top Organization Rules"
-                />
-                
+                <TopRulesCard rules={stats.topRules} title="Top Organization Rules" />
+
                 {/* Watch Activity Card - Enhanced */}
                 <div className="glass-card p-6 relative overflow-hidden group">
                   {/* Decorative gradient */}
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-500 opacity-80" />
-                  
+
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-600/10
-                      flex items-center justify-center">
+                    <div
+                      className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-600/10
+                      flex items-center justify-center"
+                    >
                       <Eye size={16} className="text-blue-400" />
                     </div>
                     Watch Folder Activity
                   </h3>
-                  
+
                   {stats.watchActivity.folders > 0 ? (
                     <div className="grid grid-cols-3 gap-3">
                       <div className="stat-card stat-card-blue p-4 text-center">
-                        <div className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-300 
-                          bg-clip-text text-transparent">
+                        <div
+                          className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-300 
+                          bg-clip-text text-transparent"
+                        >
                           {stats.watchActivity.folders}
                         </div>
                         <div className="text-xs text-slate-400 mt-1">Active Folders</div>
                       </div>
                       <div className="stat-card stat-card-green p-4 text-center">
-                        <div className="text-2xl font-bold bg-gradient-to-r from-green-400 to-green-300 
-                          bg-clip-text text-transparent">
+                        <div
+                          className="text-2xl font-bold bg-gradient-to-r from-green-400 to-green-300 
+                          bg-clip-text text-transparent"
+                        >
                           {stats.watchActivity.today}
                         </div>
                         <div className="text-xs text-slate-400 mt-1">Today</div>
@@ -360,12 +370,16 @@ export default function StatsDashboard({ onClose }) {
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-3 rounded-xl bg-slate-800/50 
-                        flex items-center justify-center">
+                      <div
+                        className="w-16 h-16 mx-auto mb-3 rounded-xl bg-slate-800/50 
+                        flex items-center justify-center"
+                      >
                         <Eye size={28} className="text-slate-600" />
                       </div>
                       <p className="text-slate-400">No watch folders configured</p>
-                      <p className="text-sm text-slate-500 mt-1">Set up watch folders to auto-organize files</p>
+                      <p className="text-sm text-slate-500 mt-1">
+                        Set up watch folders to auto-organize files
+                      </p>
                     </div>
                   )}
                 </div>

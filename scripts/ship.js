@@ -18,6 +18,7 @@
 
 const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { execSync } = require('child_process');
 
@@ -181,21 +182,33 @@ All ${integrityResults.verified} files match their verified hashes.
 - [ ] Human review completed
 `;
 
-  // Create the PR
-  const prTitle = `[Verified] ${branch}`;
-  const createCmd = `gh pr create --title "${prTitle}" --body "${prBody.replace(/"/g, '\\"')}" --base ${defaultBranch}`;
-  
-  const result = runCommand(createCmd, options.dryRun);
-  
-  if (result.success) {
-    console.log('Pull request created successfully!');
-    if (result.output) {
-      console.log(`PR URL: ${result.output}`);
+  // Write PR body to a temp file to avoid shell escaping issues entirely.
+  // Using --body-file is safer than inline --body with string escaping.
+  const tmpFile = path.join(os.tmpdir(), `jdex-pr-body-${Date.now()}.md`);
+
+  try {
+    if (!options.dryRun) {
+      fs.writeFileSync(tmpFile, prBody, 'utf-8');
     }
-    return true;
-  } else {
-    console.error('Failed to create pull request:', result.error);
-    return false;
+
+    const prTitle = `[Verified] ${branch}`;
+    const createCmd = `gh pr create --title "${prTitle}" --body-file "${tmpFile}" --base ${defaultBranch}`;
+
+    const result = runCommand(createCmd, options.dryRun);
+
+    if (result.success) {
+      console.log('Pull request created successfully!');
+      if (result.output) {
+        console.log(`PR URL: ${result.output}`);
+      }
+      return true;
+    } else {
+      console.error('Failed to create pull request:', result.error);
+      return false;
+    }
+  } finally {
+    // Clean up temp file
+    try { fs.unlinkSync(tmpFile); } catch (e) { /* ignore */ }
   }
 }
 

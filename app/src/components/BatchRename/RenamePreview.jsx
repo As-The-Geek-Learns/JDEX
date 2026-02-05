@@ -17,11 +17,11 @@ export default function RenamePreview({ preview, maxDisplay = 50 }) {
 
   const displayItems = preview.slice(0, maxDisplay);
   const hasMore = preview.length > maxDisplay;
-  
+
   const stats = {
-    willChange: preview.filter(p => p.willChange).length,
-    conflicts: preview.filter(p => p.conflict).length,
-    unchanged: preview.filter(p => !p.willChange).length,
+    willChange: preview.filter((p) => p.willChange).length,
+    conflicts: preview.filter((p) => p.conflict).length,
+    unchanged: preview.filter((p) => !p.willChange).length,
   };
 
   return (
@@ -37,11 +37,7 @@ export default function RenamePreview({ preview, maxDisplay = 50 }) {
             {stats.conflicts} conflicts
           </span>
         )}
-        {stats.unchanged > 0 && (
-          <span className="text-slate-500">
-            {stats.unchanged} unchanged
-          </span>
-        )}
+        {stats.unchanged > 0 && <span className="text-slate-500">{stats.unchanged} unchanged</span>}
       </div>
 
       {/* Preview Table */}
@@ -58,7 +54,7 @@ export default function RenamePreview({ preview, maxDisplay = 50 }) {
             </thead>
             <tbody>
               {displayItems.map((item, index) => (
-                <tr 
+                <tr
                   key={index}
                   className={`
                     border-t border-slate-700/50
@@ -66,15 +62,21 @@ export default function RenamePreview({ preview, maxDisplay = 50 }) {
                     ${!item.willChange ? 'opacity-50' : ''}
                   `}
                 >
-                  <td className="px-3 py-2 text-slate-400 truncate max-w-[200px]" title={item.original}>
+                  <td
+                    className="px-3 py-2 text-slate-400 truncate max-w-[200px]"
+                    title={item.original}
+                  >
                     {item.original}
                   </td>
                   <td className="px-2 py-2 text-slate-500">
                     <ArrowRight size={14} />
                   </td>
-                  <td className={`px-3 py-2 truncate max-w-[200px] ${
-                    item.willChange ? 'text-teal-400' : 'text-slate-500'
-                  }`} title={item.newName}>
+                  <td
+                    className={`px-3 py-2 truncate max-w-[200px] ${
+                      item.willChange ? 'text-teal-400' : 'text-slate-500'
+                    }`}
+                    title={item.newName}
+                  >
                     {item.newName}
                   </td>
                   <td className="px-3 py-2">
@@ -99,7 +101,7 @@ export default function RenamePreview({ preview, maxDisplay = 50 }) {
             </tbody>
           </table>
         </div>
-        
+
         {hasMore && (
           <div className="px-3 py-2 bg-slate-700/30 text-center text-sm text-slate-400">
             ... and {preview.length - maxDisplay} more files

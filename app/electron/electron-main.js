@@ -114,14 +114,14 @@ app.whenReady().then(() => {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self';" +
-          "script-src 'self' 'unsafe-inline';" +
-          "style-src 'self' 'unsafe-inline';" +
-          "img-src 'self' data: blob:;" +
-          "font-src 'self';" +
-          "connect-src 'self';" +
-          "frame-ancestors 'none';"
-        ]
-      }
+            "script-src 'self' 'unsafe-inline';" +
+            "style-src 'self' 'unsafe-inline';" +
+            "img-src 'self' data: blob:;" +
+            "font-src 'self';" +
+            "connect-src 'self';" +
+            "frame-ancestors 'none';",
+        ],
+      },
     });
   });
 

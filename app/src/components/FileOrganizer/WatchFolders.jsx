@@ -1,11 +1,11 @@
 /**
  * Watch Folders Component
  * =======================
- * 
+ *
  * Manages watched folders for automatic file organization.
  * Users can add folders to monitor, configure auto-organize settings,
  * and view activity logs.
- * 
+ *
  * @component
  */
 
@@ -67,17 +67,17 @@ export default function WatchFolders() {
   const [watcherAvailable, setWatcherAvailable] = useState(false);
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(null);
-  
+
   // Calculate remaining slots
   const remainingSlots = MAX_WATCH_FOLDERS - watchedFolders.length;
   const canAddMore = remainingSlots > 0;
-  
+
   // Initialize
   useEffect(() => {
     const available = initWatcherService();
     setWatcherAvailable(available);
     loadData();
-    
+
     // Subscribe to watcher events
     const unsubscribes = [
       onWatchEvent('file_organized', (data) => {
@@ -94,10 +94,10 @@ export default function WatchFolders() {
         loadData();
       }),
     ];
-    
-    return () => unsubscribes.forEach(unsub => unsub());
+
+    return () => unsubscribes.forEach((unsub) => unsub());
   }, []);
-  
+
   const loadData = useCallback(() => {
     try {
       const folders = watcherAvailable ? getWatcherStatus() : getWatchedFolders();
@@ -108,94 +108,106 @@ export default function WatchFolders() {
       setError(sanitizeErrorForUser(e));
     }
   }, [watcherAvailable]);
-  
+
   // Handlers
-  const handleAddFolder = useCallback(async (folderData) => {
-    if (!hasFeature('watchFolders')) return;
-    
-    // Check limit
-    if (watchedFolders.length >= MAX_WATCH_FOLDERS) {
-      setError(`Maximum ${MAX_WATCH_FOLDERS} watch folders allowed`);
-      return;
-    }
-    
-    try {
-      const id = createWatchedFolder(folderData);
-      if (watcherAvailable && folderData.is_active) {
-        startWatcher(id);
+  const handleAddFolder = useCallback(
+    async (folderData) => {
+      if (!hasFeature('watchFolders')) return;
+
+      // Check limit
+      if (watchedFolders.length >= MAX_WATCH_FOLDERS) {
+        setError(`Maximum ${MAX_WATCH_FOLDERS} watch folders allowed`);
+        return;
       }
-      setShowAddModal(false);
-      loadData();
-    } catch (e) {
-      setError(sanitizeErrorForUser(e));
-    }
-  }, [hasFeature, loadData, watcherAvailable, watchedFolders.length]);
-  
-  const handleUpdateFolder = useCallback(async (id, updates) => {
-    try {
-      updateWatchedFolder(id, updates);
-      
-      // Handle watcher state changes
-      if (watcherAvailable) {
-        if (updates.is_active === true) {
+
+      try {
+        const id = createWatchedFolder(folderData);
+        if (watcherAvailable && folderData.is_active) {
           startWatcher(id);
-        } else if (updates.is_active === false) {
+        }
+        setShowAddModal(false);
+        loadData();
+      } catch (e) {
+        setError(sanitizeErrorForUser(e));
+      }
+    },
+    [hasFeature, loadData, watcherAvailable, watchedFolders.length]
+  );
+
+  const handleUpdateFolder = useCallback(
+    async (id, updates) => {
+      try {
+        updateWatchedFolder(id, updates);
+
+        // Handle watcher state changes
+        if (watcherAvailable) {
+          if (updates.is_active === true) {
+            startWatcher(id);
+          } else if (updates.is_active === false) {
+            stopWatcher(id);
+          }
+        }
+
+        setEditingFolder(null);
+        loadData();
+      } catch (e) {
+        setError(sanitizeErrorForUser(e));
+      }
+    },
+    [loadData, watcherAvailable]
+  );
+
+  const handleDeleteFolder = useCallback(
+    async (id) => {
+      if (!confirm('Are you sure you want to remove this watched folder?')) return;
+
+      try {
+        if (watcherAvailable) {
           stopWatcher(id);
         }
-      }
-      
-      setEditingFolder(null);
-      loadData();
-    } catch (e) {
-      setError(sanitizeErrorForUser(e));
-    }
-  }, [loadData, watcherAvailable]);
-  
-  const handleDeleteFolder = useCallback(async (id) => {
-    if (!confirm('Are you sure you want to remove this watched folder?')) return;
-    
-    try {
-      if (watcherAvailable) {
-        stopWatcher(id);
-      }
-      deleteWatchedFolder(id);
-      loadData();
-    } catch (e) {
-      setError(sanitizeErrorForUser(e));
-    }
-  }, [loadData, watcherAvailable]);
-  
-  const handleProcessExisting = useCallback(async (id) => {
-    if (!watcherAvailable) return;
-    
-    setProcessing(id);
-    try {
-      const result = await processExistingFiles(id);
-      if (result.success) {
-        setError(null);
+        deleteWatchedFolder(id);
         loadData();
-      } else {
-        setError(result.error);
+      } catch (e) {
+        setError(sanitizeErrorForUser(e));
       }
-    } catch (e) {
-      setError(sanitizeErrorForUser(e));
-    } finally {
-      setProcessing(null);
-    }
-  }, [loadData, watcherAvailable]);
-  
+    },
+    [loadData, watcherAvailable]
+  );
+
+  const handleProcessExisting = useCallback(
+    async (id) => {
+      if (!watcherAvailable) return;
+
+      setProcessing(id);
+      try {
+        const result = await processExistingFiles(id);
+        if (result.success) {
+          setError(null);
+          loadData();
+        } else {
+          setError(result.error);
+        }
+      } catch (e) {
+        setError(sanitizeErrorForUser(e));
+      } finally {
+        setProcessing(null);
+      }
+    },
+    [loadData, watcherAvailable]
+  );
+
   // Premium check
   if (!isPremium) {
     return (
       <div className="p-6">
-        <UpgradePrompt 
+        <UpgradePrompt
           feature="Watch Folders"
           description="Automatically organize files as they arrive in your monitored folders."
         />
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -220,13 +232,15 @@ export default function WatchFolders() {
               ? 'bg-teal-600 hover:bg-teal-700 text-white'
               : 'bg-slate-700 text-gray-500 cursor-not-allowed'
           }`}
-          title={canAddMore ? 'Add a new watch folder' : `Maximum ${MAX_WATCH_FOLDERS} folders reached`}
+          title={
+            canAddMore ? 'Add a new watch folder' : `Maximum ${MAX_WATCH_FOLDERS} folders reached`
+          }
         >
           <span>➕</span>
           {canAddMore ? 'Add Watch Folder' : 'Limit Reached'}
         </button>
       </div>
-      
+
       {/* Status Banner */}
       {!watcherAvailable && (
         <div className="bg-amber-900/30 border border-amber-700 rounded-lg p-4">
@@ -235,38 +249,34 @@ export default function WatchFolders() {
             <div>
               <h3 className="font-medium text-amber-300">Desktop App Required</h3>
               <p className="text-sm text-amber-200/70 mt-1">
-                File watching requires the JDex desktop app. In the browser, you can 
-                configure watch folders, but monitoring won't start until you open 
-                the desktop version.
+                File watching requires the JDex desktop app. In the browser, you can configure watch
+                folders, but monitoring won't start until you open the desktop version.
               </p>
             </div>
           </div>
         </div>
       )}
-      
+
       {/* Error */}
       {error && (
         <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 flex items-center justify-between">
           <p className="text-red-300">{error}</p>
-          <button 
-            onClick={() => setError(null)}
-            className="text-red-400 hover:text-red-300"
-          >
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300">
             ✕
           </button>
         </div>
       )}
-      
+
       {/* Watched Folders List */}
       <div className="space-y-4">
         {watchedFolders.length === 0 ? (
           <EmptyState onAdd={() => setShowAddModal(true)} />
         ) : (
-          watchedFolders.map(folder => (
+          watchedFolders.map((folder) => (
             <WatchedFolderCard
               key={folder.id}
               folder={folder}
-              queuedCount={queuedCounts.find(q => q.id === folder.id)?.queued_count || 0}
+              queuedCount={queuedCounts.find((q) => q.id === folder.id)?.queued_count || 0}
               onToggleActive={(active) => handleUpdateFolder(folder.id, { is_active: active })}
               onEdit={() => setEditingFolder(folder)}
               onDelete={() => handleDeleteFolder(folder.id)}
@@ -277,7 +287,7 @@ export default function WatchFolders() {
           ))
         )}
       </div>
-      
+
       {/* Recent Activity */}
       {activity.length > 0 && (
         <div className="mt-8">
@@ -285,14 +295,13 @@ export default function WatchFolders() {
           <ActivityLog activity={activity} />
         </div>
       )}
-      
+
       {/* Add/Edit Modal */}
       {(showAddModal || editingFolder) && (
         <WatchFolderModal
           folder={editingFolder}
-          onSave={editingFolder 
-            ? (data) => handleUpdateFolder(editingFolder.id, data)
-            : handleAddFolder
+          onSave={
+            editingFolder ? (data) => handleUpdateFolder(editingFolder.id, data) : handleAddFolder
           }
           onClose={() => {
             setShowAddModal(false);
@@ -314,8 +323,8 @@ function EmptyState({ onAdd }) {
       <div className="text-4xl mb-4">👁️</div>
       <h3 className="text-lg font-medium text-white mb-2">No Watch Folders Yet</h3>
       <p className="text-gray-400 max-w-md mx-auto mb-6">
-        Add a folder to monitor for new files. JDex will automatically organize 
-        them based on your rules, or queue them for your review.
+        Add a folder to monitor for new files. JDex will automatically organize them based on your
+        rules, or queue them for your review.
       </p>
       <button
         onClick={onAdd}
@@ -327,33 +336,37 @@ function EmptyState({ onAdd }) {
   );
 }
 
-function WatchedFolderCard({ 
-  folder, 
-  queuedCount, 
-  onToggleActive, 
-  onEdit, 
-  onDelete, 
+function WatchedFolderCard({
+  folder,
+  queuedCount,
+  onToggleActive,
+  onEdit,
+  onDelete,
   onProcessExisting,
   processing,
-  watcherAvailable 
+  watcherAvailable,
 }) {
   const isRunning = folder.is_running;
   const canRun = folder.can_run;
-  
+
   return (
-    <div className={`bg-slate-800 rounded-lg border p-4 transition-colors ${
-      folder.is_active ? 'border-teal-600' : 'border-slate-700'
-    }`}>
+    <div
+      className={`bg-slate-800 rounded-lg border p-4 transition-colors ${
+        folder.is_active ? 'border-teal-600' : 'border-slate-700'
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h3 className="font-medium text-white">{folder.name}</h3>
-            
+
             {/* Status badges */}
             <div className="flex items-center gap-2">
               {isRunning && (
-                <span className="px-2 py-0.5 bg-green-900/50 text-green-400 text-xs rounded-full 
-                  flex items-center gap-1">
+                <span
+                  className="px-2 py-0.5 bg-green-900/50 text-green-400 text-xs rounded-full 
+                  flex items-center gap-1"
+                >
                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
                   Watching
                 </span>
@@ -379,11 +392,11 @@ function WatchedFolderCard({
               )}
             </div>
           </div>
-          
+
           <p className="text-sm text-gray-400 mt-1 font-mono truncate" title={folder.path}>
             {folder.path}
           </p>
-          
+
           {/* Stats */}
           <div className="flex items-center gap-6 mt-3 text-sm">
             <div className="text-gray-400">
@@ -407,7 +420,7 @@ function WatchedFolderCard({
             )}
           </div>
         </div>
-        
+
         {/* Actions */}
         <div className="flex items-center gap-2 ml-4">
           {watcherAvailable && (
@@ -421,7 +434,7 @@ function WatchedFolderCard({
               {processing ? '⏳ Processing...' : '🔄 Scan Now'}
             </button>
           )}
-          
+
           <button
             onClick={() => onToggleActive(!folder.is_active)}
             className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
@@ -432,7 +445,7 @@ function WatchedFolderCard({
           >
             {folder.is_active ? '⏸️ Pause' : '▶️ Start'}
           </button>
-          
+
           <button
             onClick={onEdit}
             className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-700 rounded"
@@ -440,7 +453,7 @@ function WatchedFolderCard({
           >
             ⚙️
           </button>
-          
+
           <button
             onClick={onDelete}
             className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-slate-700 rounded"
@@ -457,51 +470,55 @@ function WatchedFolderCard({
 function ActivityLog({ activity }) {
   const getActionIcon = (action) => {
     switch (action) {
-      case 'detected': return '👀';
-      case 'queued': return '📥';
-      case 'auto_organized': return '✅';
-      case 'skipped': return '⏭️';
-      case 'error': return '❌';
-      default: return '•';
+      case 'detected':
+        return '👀';
+      case 'queued':
+        return '📥';
+      case 'auto_organized':
+        return '✅';
+      case 'skipped':
+        return '⏭️';
+      case 'error':
+        return '❌';
+      default:
+        return '•';
     }
   };
-  
+
   const getActionColor = (action) => {
     switch (action) {
-      case 'detected': return 'text-gray-400';
-      case 'queued': return 'text-amber-400';
-      case 'auto_organized': return 'text-green-400';
-      case 'skipped': return 'text-gray-500';
-      case 'error': return 'text-red-400';
-      default: return 'text-gray-400';
+      case 'detected':
+        return 'text-gray-400';
+      case 'queued':
+        return 'text-amber-400';
+      case 'auto_organized':
+        return 'text-green-400';
+      case 'skipped':
+        return 'text-gray-500';
+      case 'error':
+        return 'text-red-400';
+      default:
+        return 'text-gray-400';
     }
   };
-  
+
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden">
       <div className="max-h-64 overflow-y-auto">
         {activity.map((item, index) => (
-          <div 
+          <div
             key={item.id || index}
             className="flex items-center gap-3 px-4 py-2 border-b border-slate-700/50 
               last:border-b-0 hover:bg-slate-700/30"
           >
-            <span className={getActionColor(item.action)}>
-              {getActionIcon(item.action)}
-            </span>
+            <span className={getActionColor(item.action)}>{getActionIcon(item.action)}</span>
             <span className="flex-1 text-sm text-gray-300 truncate" title={item.filename}>
               {item.filename}
             </span>
             {item.target_folder && (
-              <span className="text-xs text-teal-400">
-                → {item.target_folder}
-              </span>
+              <span className="text-xs text-teal-400">→ {item.target_folder}</span>
             )}
-            {item.rule_name && (
-              <span className="text-xs text-gray-500">
-                ({item.rule_name})
-              </span>
-            )}
+            {item.rule_name && <span className="text-xs text-gray-500">({item.rule_name})</span>}
             <span className="text-xs text-gray-500">
               {new Date(item.created_at).toLocaleTimeString()}
             </span>
@@ -527,49 +544,45 @@ function WatchFolderModal({ folder, onSave, onClose }) {
     file_types: folder?.file_types || [],
     notify_on_organize: folder?.notify_on_organize ?? true,
   });
-  
+
   const [showAdvanced, setShowAdvanced] = useState(false);
-  
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave(formData);
   };
-  
+
   const toggleFileType = (typeId) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       file_types: prev.file_types.includes(typeId)
-        ? prev.file_types.filter(t => t !== typeId)
-        : [...prev.file_types, typeId]
+        ? prev.file_types.filter((t) => t !== typeId)
+        : [...prev.file_types, typeId],
     }));
   };
-  
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-lg 
-        max-h-[90vh] overflow-y-auto shadow-xl">
+      <div
+        className="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-lg 
+        max-h-[90vh] overflow-y-auto shadow-xl"
+      >
         <form onSubmit={handleSubmit}>
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
             <h2 className="text-lg font-semibold text-white">
               {folder ? 'Edit Watch Folder' : 'Add Watch Folder'}
             </h2>
-            <button 
-              type="button" 
-              onClick={onClose}
-              className="text-gray-400 hover:text-white"
-            >
+            <button type="button" onClick={onClose} className="text-gray-400 hover:text-white">
               ✕
             </button>
           </div>
-          
+
           {/* Form Body */}
           <div className="px-6 py-4 space-y-5">
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
-                Name *
-              </label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Name *</label>
               <input
                 type="text"
                 value={formData.name}
@@ -581,12 +594,10 @@ function WatchFolderModal({ folder, onSave, onClose }) {
                 required
               />
             </div>
-            
+
             {/* Path */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
-                Folder Path *
-              </label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Folder Path *</label>
               <input
                 type="text"
                 value={formData.path}
@@ -601,7 +612,7 @@ function WatchFolderModal({ folder, onSave, onClose }) {
                 💡 Tip: In Finder, drag a folder here to paste its path
               </p>
             </div>
-            
+
             {/* Auto-organize toggle */}
             <div className="bg-slate-900/50 rounded-lg p-4">
               <div className="flex items-center justify-between">
@@ -613,24 +624,28 @@ function WatchFolderModal({ folder, onSave, onClose }) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, auto_organize: !formData.auto_organize })}
+                  onClick={() =>
+                    setFormData({ ...formData, auto_organize: !formData.auto_organize })
+                  }
                   className={`w-12 h-6 rounded-full transition-colors relative ${
                     formData.auto_organize ? 'bg-teal-600' : 'bg-slate-600'
                   }`}
                 >
-                  <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                    formData.auto_organize ? 'left-7' : 'left-1'
-                  }`}></span>
+                  <span
+                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                      formData.auto_organize ? 'left-7' : 'left-1'
+                    }`}
+                  ></span>
                 </button>
               </div>
-              
+
               {formData.auto_organize && (
                 <div className="mt-4 pt-4 border-t border-slate-700">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Confidence Threshold
                   </label>
                   <div className="grid grid-cols-3 gap-2">
-                    {CONFIDENCE_OPTIONS.map(opt => (
+                    {CONFIDENCE_OPTIONS.map((opt) => (
                       <button
                         key={opt.id}
                         type="button"
@@ -649,7 +664,7 @@ function WatchFolderModal({ folder, onSave, onClose }) {
                 </div>
               )}
             </div>
-            
+
             {/* Advanced Settings */}
             <div>
               <button
@@ -660,7 +675,7 @@ function WatchFolderModal({ folder, onSave, onClose }) {
                 <span>{showAdvanced ? '▼' : '▶'}</span>
                 Advanced Settings
               </button>
-              
+
               {showAdvanced && (
                 <div className="mt-3 space-y-4 bg-slate-900/50 rounded-lg p-4">
                   {/* Include subdirectories */}
@@ -668,22 +683,28 @@ function WatchFolderModal({ folder, onSave, onClose }) {
                     <input
                       type="checkbox"
                       checked={formData.include_subdirs}
-                      onChange={(e) => setFormData({ ...formData, include_subdirs: e.target.checked })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, include_subdirs: e.target.checked })
+                      }
                       className="w-4 h-4 rounded border-slate-600 bg-slate-900 
                         text-teal-500 focus:ring-teal-500"
                     />
                     <div>
                       <span className="text-white">Include subdirectories</span>
-                      <p className="text-xs text-gray-500">Monitor all folders within this folder</p>
+                      <p className="text-xs text-gray-500">
+                        Monitor all folders within this folder
+                      </p>
                     </div>
                   </label>
-                  
+
                   {/* Notifications */}
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={formData.notify_on_organize}
-                      onChange={(e) => setFormData({ ...formData, notify_on_organize: e.target.checked })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, notify_on_organize: e.target.checked })
+                      }
                       className="w-4 h-4 rounded border-slate-600 bg-slate-900 
                         text-teal-500 focus:ring-teal-500"
                     />
@@ -692,7 +713,7 @@ function WatchFolderModal({ folder, onSave, onClose }) {
                       <p className="text-xs text-gray-500">Get notified when files are organized</p>
                     </div>
                   </label>
-                  
+
                   {/* File type filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -702,7 +723,7 @@ function WatchFolderModal({ folder, onSave, onClose }) {
                       Leave empty to watch all files, or select specific types:
                     </p>
                     <div className="grid grid-cols-2 gap-2">
-                      {FILE_TYPE_OPTIONS.map(type => (
+                      {FILE_TYPE_OPTIONS.map((type) => (
                         <button
                           key={type.id}
                           type="button"
@@ -722,7 +743,7 @@ function WatchFolderModal({ folder, onSave, onClose }) {
               )}
             </div>
           </div>
-          
+
           {/* Footer */}
           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/80">
             <button

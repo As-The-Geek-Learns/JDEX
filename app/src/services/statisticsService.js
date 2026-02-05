@@ -3,7 +3,7 @@
  * ==================
  * Provides aggregated statistics from the JDex database for the Statistics Dashboard.
  * All queries are read-only and optimized for dashboard display.
- * 
+ *
  * Security: All numeric parameters are validated before use in queries.
  */
 
@@ -12,7 +12,7 @@ import { getDB } from '../db.js';
 /**
  * Validate and sanitize a numeric parameter for SQL queries.
  * Prevents SQL injection by ensuring the value is a positive integer.
- * 
+ *
  * @param {unknown} value - The value to validate
  * @param {number} defaultValue - Default if invalid
  * @param {number} maxValue - Maximum allowed value
@@ -33,7 +33,7 @@ function validateNumericParam(value, defaultValue, maxValue = 1000) {
 export function getTotalOrganizedFiles() {
   const db = getDB();
   if (!db) return 0;
-  
+
   try {
     const result = db.exec(`
       SELECT COUNT(*) as count 
@@ -54,7 +54,7 @@ export function getTotalOrganizedFiles() {
 export function getFilesOrganizedThisMonth() {
   const db = getDB();
   if (!db) return 0;
-  
+
   try {
     const result = db.exec(`
       SELECT COUNT(*) as count 
@@ -76,7 +76,7 @@ export function getFilesOrganizedThisMonth() {
 export function getActiveRulesCount() {
   const db = getDB();
   if (!db) return 0;
-  
+
   try {
     const result = db.exec(`
       SELECT COUNT(*) as count 
@@ -98,10 +98,10 @@ export function getActiveRulesCount() {
 export function getFilesOrganizedByDay(days = 30) {
   const db = getDB();
   if (!db) return [];
-  
+
   // Security: Validate numeric parameter to prevent SQL injection
   const safeDays = validateNumericParam(days, 30, 365);
-  
+
   try {
     const result = db.exec(`
       SELECT DATE(organized_at) as date, COUNT(*) as count 
@@ -111,15 +111,15 @@ export function getFilesOrganizedByDay(days = 30) {
       GROUP BY DATE(organized_at)
       ORDER BY date ASC
     `);
-    
+
     if (!result[0]) return [];
-    
+
     // Convert to array of objects
-    const data = result[0].values.map(row => ({
+    const data = result[0].values.map((row) => ({
       date: row[0],
-      count: row[1]
+      count: row[1],
     }));
-    
+
     // Fill in missing days with 0
     const filledData = [];
     const today = new Date();
@@ -127,13 +127,13 @@ export function getFilesOrganizedByDay(days = 30) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
-      const existing = data.find(item => item.date === dateStr);
+      const existing = data.find((item) => item.date === dateStr);
       filledData.push({
         date: dateStr,
-        count: existing ? existing.count : 0
+        count: existing ? existing.count : 0,
       });
     }
-    
+
     return filledData;
   } catch (error) {
     console.error('[StatisticsService] Error getting files by day:', error);
@@ -149,10 +149,10 @@ export function getFilesOrganizedByDay(days = 30) {
 export function getFilesByType(limit = 8) {
   const db = getDB();
   if (!db) return [];
-  
+
   // Security: Validate numeric parameter to prevent SQL injection
   const safeLimit = validateNumericParam(limit, 8, 100);
-  
+
   try {
     const result = db.exec(`
       SELECT 
@@ -164,12 +164,12 @@ export function getFilesByType(limit = 8) {
       ORDER BY count DESC
       LIMIT ${safeLimit}
     `);
-    
+
     if (!result[0]) return [];
-    
-    return result[0].values.map(row => ({
+
+    return result[0].values.map((row) => ({
       type: row[0] || 'Unknown',
-      count: row[1]
+      count: row[1],
     }));
   } catch (error) {
     console.error('[StatisticsService] Error getting files by type:', error);
@@ -185,10 +185,10 @@ export function getFilesByType(limit = 8) {
 export function getTopRules(limit = 5) {
   const db = getDB();
   if (!db) return [];
-  
+
   // Security: Validate numeric parameter to prevent SQL injection
   const safeLimit = validateNumericParam(limit, 5, 100);
-  
+
   try {
     const result = db.exec(`
       SELECT name, rule_type, match_count 
@@ -197,13 +197,13 @@ export function getTopRules(limit = 5) {
       ORDER BY match_count DESC
       LIMIT ${safeLimit}
     `);
-    
+
     if (!result[0]) return [];
-    
-    return result[0].values.map(row => ({
+
+    return result[0].values.map((row) => ({
       name: row[0],
       type: row[1],
-      matchCount: row[2]
+      matchCount: row[2],
     }));
   } catch (error) {
     console.error('[StatisticsService] Error getting top rules:', error);
@@ -218,27 +218,27 @@ export function getTopRules(limit = 5) {
 export function getWatchActivitySummary() {
   const db = getDB();
   if (!db) return { total: 0, today: 0, folders: 0 };
-  
+
   try {
     // Total watch activity
     const totalResult = db.exec(`
       SELECT COUNT(*) FROM watch_activity
     `);
     const total = totalResult[0]?.values[0]?.[0] || 0;
-    
+
     // Today's activity
     const todayResult = db.exec(`
       SELECT COUNT(*) FROM watch_activity 
       WHERE DATE(created_at) = DATE('now')
     `);
     const today = todayResult[0]?.values[0]?.[0] || 0;
-    
+
     // Active watch folders
     const foldersResult = db.exec(`
       SELECT COUNT(*) FROM watched_folders WHERE is_active = 1
     `);
     const folders = foldersResult[0]?.values[0]?.[0] || 0;
-    
+
     return { total, today, folders };
   } catch (error) {
     console.error('[StatisticsService] Error getting watch activity:', error);
@@ -253,7 +253,7 @@ export function getWatchActivitySummary() {
 export function getMostCommonCategory() {
   const db = getDB();
   if (!db) return 'None';
-  
+
   try {
     const result = db.exec(`
       SELECT 
@@ -265,19 +265,19 @@ export function getMostCommonCategory() {
       ORDER BY count DESC
       LIMIT 1
     `);
-    
+
     if (!result[0]?.values[0]) return 'None';
-    
+
     const categoryPrefix = result[0].values[0][0];
-    
+
     // Security: Validate category number before using in query
     const safeCategoryNum = validateNumericParam(categoryPrefix, 0, 99);
-    
+
     // Look up category name
     const catResult = db.exec(`
       SELECT name FROM categories WHERE number = ${safeCategoryNum}
     `);
-    
+
     return catResult[0]?.values[0]?.[0] || `Category ${safeCategoryNum}`;
   } catch (error) {
     console.error('[StatisticsService] Error getting most common category:', error);
@@ -298,7 +298,7 @@ export function getDashboardStats() {
     activityByDay: getFilesOrganizedByDay(30),
     filesByType: getFilesByType(8),
     topRules: getTopRules(5),
-    watchActivity: getWatchActivitySummary()
+    watchActivity: getWatchActivitySummary(),
   };
 }
 

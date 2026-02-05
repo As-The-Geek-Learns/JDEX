@@ -3,13 +3,13 @@ import React from 'react';
 /**
  * StatCard - Reusable card component for displaying a single statistic
  */
-export default function StatCard({ 
-  title, 
-  value, 
-  subtitle, 
-  icon: Icon, 
+export default function StatCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
   color = 'teal',
-  trend = null // { value: number, isPositive: boolean }
+  trend = null, // { value: number, isPositive: boolean }
 }) {
   const colorClasses = {
     teal: 'text-teal-400',
@@ -18,7 +18,7 @@ export default function StatCard({
     blue: 'text-blue-400',
     green: 'text-green-400',
     red: 'text-red-400',
-    white: 'text-white'
+    white: 'text-white',
   };
 
   return (
@@ -32,13 +32,13 @@ export default function StatCard({
             {Icon && <Icon size={14} />}
             {title}
           </div>
-          {subtitle && (
-            <div className="text-xs text-slate-500 mt-1">{subtitle}</div>
-          )}
+          {subtitle && <div className="text-xs text-slate-500 mt-1">{subtitle}</div>}
         </div>
-        
+
         {trend && (
-          <div className={`text-sm font-medium ${trend.isPositive ? 'text-green-400' : 'text-red-400'}`}>
+          <div
+            className={`text-sm font-medium ${trend.isPositive ? 'text-green-400' : 'text-red-400'}`}
+          >
             {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}%
           </div>
         )}

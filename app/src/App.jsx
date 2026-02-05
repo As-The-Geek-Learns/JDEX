@@ -99,25 +99,27 @@ const areaIcons = {
 // Sensitivity badge component - Modern design with gradients
 function SensitivityBadge({ sensitivity, isInherited = false }) {
   const config = {
-    standard: { 
-      label: 'Standard', 
-      class: 'bg-gradient-to-r from-slate-600/30 to-slate-700/20 text-slate-300 border-slate-500/30', 
-      icon: Cloud 
+    standard: {
+      label: 'Standard',
+      class:
+        'bg-gradient-to-r from-slate-600/30 to-slate-700/20 text-slate-300 border-slate-500/30',
+      icon: Cloud,
     },
-    sensitive: { 
-      label: 'Sensitive', 
-      class: 'bg-gradient-to-r from-red-500/20 to-red-600/10 text-red-400 border-red-500/30', 
-      icon: Lock 
+    sensitive: {
+      label: 'Sensitive',
+      class: 'bg-gradient-to-r from-red-500/20 to-red-600/10 text-red-400 border-red-500/30',
+      icon: Lock,
     },
-    work: { 
-      label: 'Work', 
-      class: 'bg-gradient-to-r from-blue-500/20 to-blue-600/10 text-blue-400 border-blue-500/30', 
-      icon: Briefcase 
+    work: {
+      label: 'Work',
+      class: 'bg-gradient-to-r from-blue-500/20 to-blue-600/10 text-blue-400 border-blue-500/30',
+      icon: Briefcase,
     },
-    inherit: { 
-      label: 'Inherit', 
-      class: 'bg-gradient-to-r from-purple-500/20 to-purple-600/10 text-purple-400 border-purple-500/30', 
-      icon: FolderTree 
+    inherit: {
+      label: 'Inherit',
+      class:
+        'bg-gradient-to-r from-purple-500/20 to-purple-600/10 text-purple-400 border-purple-500/30',
+      icon: FolderTree,
     },
   };
 
@@ -173,18 +175,26 @@ function FolderCard({ folder, onEdit, onDelete, onOpen }) {
       style={{ borderLeftColor: folder.area_color }}
     >
       {/* Subtle gradient overlay on hover */}
-      <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-r from-white/[0.02] to-transparent 
-        opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-      
+      <div
+        className="absolute inset-0 rounded-[inherit] bg-gradient-to-r from-white/[0.02] to-transparent 
+        opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+      />
+
       <div className="relative flex items-start justify-between">
         <div className="flex-1 min-w-0" onClick={() => onOpen(folder)}>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500/20 to-amber-600/10 
-              flex items-center justify-center group-hover:scale-105 transition-transform">
+            <div
+              className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500/20 to-amber-600/10 
+              flex items-center justify-center group-hover:scale-105 transition-transform"
+            >
               <FolderOpen size={16} className="text-amber-400" />
             </div>
-            <span className="jd-number text-lg bg-gradient-to-r from-teal-400 to-teal-300 
-              bg-clip-text text-transparent font-bold">{folder.folder_number}</span>
+            <span
+              className="jd-number text-lg bg-gradient-to-r from-teal-400 to-teal-300 
+              bg-clip-text text-transparent font-bold"
+            >
+              {folder.folder_number}
+            </span>
             <SensitivityBadge sensitivity={folder.sensitivity} />
           </div>
           <h3 className="font-semibold text-white group-hover:text-teal-50 transition-colors truncate">
@@ -202,7 +212,10 @@ function FolderCard({ folder, onEdit, onDelete, onOpen }) {
             }}
             className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
           >
-            <ChevronDown size={16} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              size={16}
+              className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+            />
           </button>
           <button
             onClick={(e) => {
@@ -227,9 +240,7 @@ function FolderCard({ folder, onEdit, onDelete, onOpen }) {
 
       {expanded && (
         <div className="mt-4 pt-4 border-t border-slate-700/50 animate-fade-in space-y-3">
-          {folder.description && (
-            <p className="text-sm text-slate-300">{folder.description}</p>
-          )}
+          {folder.description && <p className="text-sm text-slate-300">{folder.description}</p>}
           <div className="grid grid-cols-2 gap-3 text-sm">
             {folder.location && (
               <div className="flex items-center gap-2">
@@ -239,7 +250,9 @@ function FolderCard({ folder, onEdit, onDelete, onOpen }) {
             )}
             {folder.storage_path && (
               <div className="col-span-2">
-                <span className="text-slate-500 text-xs uppercase tracking-wide block mb-1">Path</span>
+                <span className="text-slate-500 text-xs uppercase tracking-wide block mb-1">
+                  Path
+                </span>
                 <code className="text-slate-300 font-mono text-xs bg-slate-800/50 px-2 py-1 rounded block truncate">
                   {folder.storage_path}
                 </code>
@@ -247,10 +260,15 @@ function FolderCard({ folder, onEdit, onDelete, onOpen }) {
             )}
             {folder.keywords && (
               <div className="col-span-2">
-                <span className="text-slate-500 text-xs uppercase tracking-wide block mb-1">Keywords</span>
+                <span className="text-slate-500 text-xs uppercase tracking-wide block mb-1">
+                  Keywords
+                </span>
                 <div className="flex flex-wrap gap-1">
                   {folder.keywords.split(',').map((keyword, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-slate-700/50 rounded text-xs text-slate-300">
+                    <span
+                      key={i}
+                      className="px-2 py-0.5 bg-slate-700/50 rounded text-xs text-slate-300"
+                    >
                       {keyword.trim()}
                     </span>
                   ))}
@@ -1725,13 +1743,9 @@ function SettingsModal({ isOpen, onClose, areas, categories, onDataChange }) {
             </div>
           )}
 
-          {activeTab === 'cloud' && (
-            <CloudDriveSettings />
-          )}
+          {activeTab === 'cloud' && <CloudDriveSettings />}
 
-          {activeTab === 'license' && (
-            <LicenseSettings />
-          )}
+          {activeTab === 'license' && <LicenseSettings />}
 
           {activeTab === 'database' && (
             <div className="space-y-6">
@@ -1871,9 +1885,7 @@ function SettingsModal({ isOpen, onClose, areas, categories, onDataChange }) {
             </div>
           )}
 
-          {activeTab === 'feedback' && (
-            <FeedbackSettings />
-          )}
+          {activeTab === 'feedback' && <FeedbackSettings />}
         </div>
       </div>
     </div>
@@ -1926,24 +1938,27 @@ function QuickStatsOverview({ stats }) {
       {statItems.map((item, index) => {
         const Icon = item.icon;
         return (
-          <div 
-            key={index}
-            className="stat-card group relative overflow-hidden"
-          >
+          <div key={index} className="stat-card group relative overflow-hidden">
             {/* Gradient top border */}
-            <div className={`absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r ${item.gradient} opacity-80`} />
-            
+            <div
+              className={`absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r ${item.gradient} opacity-80`}
+            />
+
             {/* Content */}
             <div className="relative flex items-start gap-3">
-              <div className={`
+              <div
+                className={`
                 w-10 h-10 rounded-xl bg-gradient-to-br ${item.iconBg}
                 flex items-center justify-center flex-shrink-0
                 group-hover:scale-105 transition-transform duration-300
-              `}>
+              `}
+              >
                 <Icon size={20} className={item.iconColor} />
               </div>
               <div>
-                <div className={`text-2xl font-bold bg-gradient-to-r ${item.gradient} bg-clip-text text-transparent`}>
+                <div
+                  className={`text-2xl font-bold bg-gradient-to-r ${item.gradient} bg-clip-text text-transparent`}
+                >
                   {item.value}
                 </div>
                 <div className="text-sm text-slate-400">{item.label}</div>
@@ -2190,29 +2205,37 @@ export default function App() {
         <div className="text-center">
           {/* Animated logo */}
           <div className="relative mb-6">
-            <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 
+            <div
+              className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 
               flex items-center justify-center shadow-[0_0_40px_rgba(20,184,166,0.3)]
-              animate-pulse">
+              animate-pulse"
+            >
               <span className="text-3xl font-bold text-white">JD</span>
             </div>
             {/* Glow ring */}
-            <div className="absolute inset-0 -m-2 rounded-3xl border-2 border-teal-500/20 animate-ping" 
-              style={{ animationDuration: '2s' }} />
+            <div
+              className="absolute inset-0 -m-2 rounded-3xl border-2 border-teal-500/20 animate-ping"
+              style={{ animationDuration: '2s' }}
+            />
           </div>
-          
+
           {/* Loading text with shimmer */}
-          <div className="text-xl font-semibold text-transparent bg-clip-text 
+          <div
+            className="text-xl font-semibold text-transparent bg-clip-text 
             bg-gradient-to-r from-teal-400 via-white to-teal-400 
-            animate-[shimmer_2s_linear_infinite] bg-[length:200%_auto]">
+            animate-[shimmer_2s_linear_infinite] bg-[length:200%_auto]"
+          >
             Loading JDex v2.0
           </div>
           <div className="text-sm text-slate-500 mt-2">Preparing your workspace...</div>
-          
+
           {/* Loading bar */}
           <div className="w-48 h-1 mx-auto mt-4 bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full
-              animate-[shimmer_1s_ease-in-out_infinite]" 
-              style={{ width: '60%' }} />
+            <div
+              className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full
+              animate-[shimmer_1s_ease-in-out_infinite]"
+              style={{ width: '60%' }}
+            />
           </div>
         </div>
       </div>
@@ -2221,402 +2244,401 @@ export default function App() {
 
   return (
     <LicenseProvider>
-    <DragDropProvider>
-    <div className="min-h-screen flex">
-      {/* Sidebar */}
-      <aside
-        className={`${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 overflow-hidden`}
-      >
-        <div className="w-80 h-screen glass-card border-r border-slate-700/50 flex flex-col">
-          {/* Logo - Enhanced with glow */}
-          <div className="p-6 border-b border-slate-700/50">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 
-                  flex items-center justify-center shadow-[0_0_20px_rgba(20,184,166,0.3)]">
-                  <span className="text-xl font-bold text-white">JD</span>
+      <DragDropProvider>
+        <div className="min-h-screen flex">
+          {/* Sidebar */}
+          <aside
+            className={`${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 overflow-hidden`}
+          >
+            <div className="w-80 h-screen glass-card border-r border-slate-700/50 flex flex-col">
+              {/* Logo - Enhanced with glow */}
+              <div className="p-6 border-b border-slate-700/50">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div
+                      className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 
+                  flex items-center justify-center shadow-[0_0_20px_rgba(20,184,166,0.3)]"
+                    >
+                      <span className="text-xl font-bold text-white">JD</span>
+                    </div>
+                    {/* Subtle glow effect */}
+                    <div className="absolute inset-0 rounded-xl bg-teal-500/20 blur-md -z-10" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                      JDex
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-400 font-medium">
+                        v2.0
+                      </span>
+                    </h1>
+                    <p className="text-xs text-slate-400">4-Level Johnny Decimal</p>
+                  </div>
                 </div>
-                {/* Subtle glow effect */}
-                <div className="absolute inset-0 rounded-xl bg-teal-500/20 blur-md -z-10" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                  JDex 
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-400 font-medium">
-                    v2.0
-                  </span>
-                </h1>
-                <p className="text-xs text-slate-400">4-Level Johnny Decimal</p>
-              </div>
-            </div>
-          </div>
 
-          {/* Quick Actions - Modern Button Styles */}
-          <div className="p-4 border-b border-slate-700/50 space-y-2">
-            <button
-              onClick={() => setShowNewFolderModal(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+              {/* Quick Actions - Modern Button Styles */}
+              <div className="p-4 border-b border-slate-700/50 space-y-2">
+                <button
+                  onClick={() => setShowNewFolderModal(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
                 bg-gradient-to-r from-amber-600 to-amber-500 text-white font-medium
                 shadow-[0_2px_10px_rgba(245,158,11,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
                 hover:from-amber-500 hover:to-amber-400 hover:shadow-[0_4px_20px_rgba(245,158,11,0.4)]
                 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
-            >
-              <FolderOpen size={18} />
-              New Folder (XX.XX)
-            </button>
-            <button
-              onClick={() => setShowNewItemModal(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                >
+                  <FolderOpen size={18} />
+                  New Folder (XX.XX)
+                </button>
+                <button
+                  onClick={() => setShowNewItemModal(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
                 bg-gradient-to-r from-teal-600 to-teal-500 text-white font-medium
                 shadow-[0_2px_10px_rgba(20,184,166,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
                 hover:from-teal-500 hover:to-teal-400 hover:shadow-[0_4px_20px_rgba(20,184,166,0.4)]
                 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
-            >
-              <Plus size={18} />
-              New Item (XX.XX.XX)
-            </button>
-            <button
-              onClick={() => setShowFileOrganizer(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                >
+                  <Plus size={18} />
+                  New Item (XX.XX.XX)
+                </button>
+                <button
+                  onClick={() => setShowFileOrganizer(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
                 bg-gradient-to-r from-purple-600 to-purple-500 text-white font-medium
                 shadow-[0_2px_10px_rgba(139,92,246,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
                 hover:from-purple-500 hover:to-purple-400 hover:shadow-[0_4px_20px_rgba(139,92,246,0.4)]
                 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
-            >
-              <HardDrive size={18} />
-              File Organizer
-            </button>
-            <button
-              onClick={() => setShowStatsDashboard(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                >
+                  <HardDrive size={18} />
+                  File Organizer
+                </button>
+                <button
+                  onClick={() => setShowStatsDashboard(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
                 bg-gradient-to-r from-purple-600/90 via-fuchsia-600/90 to-teal-600/90 text-white font-medium
                 shadow-[0_2px_10px_rgba(139,92,246,0.25),inset_0_1px_0_rgba(255,255,255,0.15)]
                 hover:from-purple-500/90 hover:via-fuchsia-500/90 hover:to-teal-500/90 
                 hover:shadow-[0_4px_20px_rgba(139,92,246,0.35)]
                 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
-            >
-              <ChartColumn size={18} />
-              Statistics
-            </button>
-            <button
-              onClick={() => setShowBatchRename(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                >
+                  <ChartColumn size={18} />
+                  Statistics
+                </button>
+                <button
+                  onClick={() => setShowBatchRename(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
                 bg-gradient-to-r from-amber-600/90 to-orange-600/90 text-white font-medium
                 shadow-[0_2px_10px_rgba(234,88,12,0.25),inset_0_1px_0_rgba(255,255,255,0.15)]
                 hover:from-amber-500/90 hover:to-orange-500/90 hover:shadow-[0_4px_20px_rgba(234,88,12,0.35)]
                 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
-            >
-              <FileEdit size={18} />
-              Batch Rename
-            </button>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                >
+                  <FileEdit size={18} />
+                  Batch Rename
+                </button>
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
                 bg-slate-800/50 border border-slate-600/50 text-slate-300 font-medium
                 hover:bg-slate-700/50 hover:border-slate-500/50 hover:text-white
                 transition-all duration-200"
-            >
-              <Settings size={18} />
-              Settings
-            </button>
-          </div>
+                >
+                  <Settings size={18} />
+                  Settings
+                </button>
+              </div>
 
-          {/* Navigation Tree */}
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="mb-4">
-              <button
-                onClick={() => navigateTo('home')}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                  currentView === 'home' && !searchQuery
-                    ? 'bg-teal-600/30 text-teal-300'
-                    : 'hover:bg-slate-700/50'
-                }`}
-              >
-                <Home size={16} />
-                <span className="font-medium">Overview</span>
-              </button>
-            </div>
-
-            <div className="text-xs text-slate-500 uppercase tracking-wider mb-2 px-3">
-              Areas & Categories
-            </div>
-            <CategoryTree
-              areas={areas}
-              categories={categories}
-              selectedCategory={selectedCategory}
-              onSelectCategory={(cat) => navigateTo('category', cat)}
-              onSelectArea={(area) => navigateTo('area', area)}
-            />
-          </div>
-
-          {/* Export/Import */}
-          <div className="p-4 border-t border-slate-700 space-y-2">
-            <div className="flex gap-2">
-              <button
-                onClick={exportDatabase}
-                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors text-sm"
-              >
-                <Download size={14} />
-                Backup
-              </button>
-              <button
-                onClick={exportToJSON}
-                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors text-sm"
-              >
-                <FileText size={14} />
-                JSON
-              </button>
-            </div>
-            <label className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors text-sm cursor-pointer">
-              <Upload size={14} />
-              Import Backup
-              <input type="file" accept=".sqlite" onChange={handleImport} className="hidden" />
-            </label>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-h-screen">
-        {/* Header */}
-        <header className="glass-card border-b border-slate-700 p-4">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-slate-700 rounded-lg"
-            >
-              <Menu size={20} />
-            </button>
-
-            <div className="flex-1 relative">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={20}
-              />
-              <input
-                type="text"
-                placeholder="Search folders and items..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-10 pr-4 py-2 text-white placeholder-slate-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
-              />
-            </div>
-
-            <div className="text-sm text-slate-400">
-              {displayFolders.length} folders, {displayItems.length} items
-            </div>
-          </div>
-        </header>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* Breadcrumb */}
-          {breadcrumbPath.length > 0 && !searchQuery && (
-            <Breadcrumb path={breadcrumbPath} onNavigate={navigateTo} />
-          )}
-
-          {/* Stats */}
-          {currentView === 'home' && !searchQuery && <QuickStatsOverview stats={stats} />}
-
-          {/* Current View Title */}
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white">
-              {searchQuery
-                ? `Search: "${searchQuery}"`
-                : currentView === 'folder'
-                  ? `${selectedFolder?.folder_number} ${selectedFolder?.name}`
-                  : currentView === 'category'
-                    ? `${selectedCategory?.number.toString().padStart(2, '0')} ${selectedCategory?.name}`
-                    : currentView === 'area'
-                      ? `${selectedArea?.range_start}-${selectedArea?.range_end} ${selectedArea?.name}`
-                      : 'All Folders'}
-            </h2>
-
-            {currentView !== 'home' && !searchQuery && (
-              <button
-                onClick={() => navigateTo('home')}
-                className="text-sm text-slate-400 hover:text-white flex items-center gap-1"
-              >
-                <ArrowLeft size={14} /> Back to Overview
-              </button>
-            )}
-          </div>
-
-          {/* Folders Section */}
-          {(currentView !== 'folder' || searchQuery) && displayFolders.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                <FolderOpen size={18} className="text-amber-400" />
-                Folders ({displayFolders.length})
-              </h3>
-              <div className="space-y-3">
-                {displayFolders.map((folder) => (
-                  <DropZone
-                    key={folder.id}
-                    folder={folder}
-                    onSuccess={() => triggerRefresh()}
+              {/* Navigation Tree */}
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="mb-4">
+                  <button
+                    onClick={() => navigateTo('home')}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                      currentView === 'home' && !searchQuery
+                        ? 'bg-teal-600/30 text-teal-300'
+                        : 'hover:bg-slate-700/50'
+                    }`}
                   >
-                    <FolderCard
-                      folder={folder}
-                      onEdit={setEditingFolder}
-                      onDelete={handleDeleteFolder}
-                      onOpen={(f) => navigateTo('folder', f)}
-                    />
-                  </DropZone>
-                ))}
+                    <Home size={16} />
+                    <span className="font-medium">Overview</span>
+                  </button>
+                </div>
+
+                <div className="text-xs text-slate-500 uppercase tracking-wider mb-2 px-3">
+                  Areas & Categories
+                </div>
+                <CategoryTree
+                  areas={areas}
+                  categories={categories}
+                  selectedCategory={selectedCategory}
+                  onSelectCategory={(cat) => navigateTo('category', cat)}
+                  onSelectArea={(area) => navigateTo('area', area)}
+                />
+              </div>
+
+              {/* Export/Import */}
+              <div className="p-4 border-t border-slate-700 space-y-2">
+                <div className="flex gap-2">
+                  <button
+                    onClick={exportDatabase}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors text-sm"
+                  >
+                    <Download size={14} />
+                    Backup
+                  </button>
+                  <button
+                    onClick={exportToJSON}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors text-sm"
+                  >
+                    <FileText size={14} />
+                    JSON
+                  </button>
+                </div>
+                <label className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors text-sm cursor-pointer">
+                  <Upload size={14} />
+                  Import Backup
+                  <input type="file" accept=".sqlite" onChange={handleImport} className="hidden" />
+                </label>
               </div>
             </div>
-          )}
+          </aside>
 
-          {/* Items Section */}
-          {(currentView === 'folder' || searchQuery) && displayItems.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                <File size={18} className="text-slate-400" />
-                Items ({displayItems.length})
-              </h3>
-              <div className="space-y-3">
-                {displayItems.map((item) => (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    onEdit={setEditingItem}
-                    onDelete={handleDeleteItem}
+          {/* Main Content */}
+          <main className="flex-1 flex flex-col min-h-screen">
+            {/* Header */}
+            <header className="glass-card border-b border-slate-700 p-4">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="p-2 hover:bg-slate-700 rounded-lg"
+                >
+                  <Menu size={20} />
+                </button>
+
+                <div className="flex-1 relative">
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    size={20}
                   />
-                ))}
-              </div>
-            </div>
-          )}
+                  <input
+                    type="text"
+                    placeholder="Search folders and items..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-10 pr-4 py-2 text-white placeholder-slate-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  />
+                </div>
 
-          {/* Empty States - Modern & Engaging */}
-          {displayFolders.length === 0 && displayItems.length === 0 && (
-            <div className="glass-card p-12 text-center animate-fade-in-up">
-              {/* Animated icon container */}
-              <div className="relative w-24 h-24 mx-auto mb-6">
-                <div className={`
+                <div className="text-sm text-slate-400">
+                  {displayFolders.length} folders, {displayItems.length} items
+                </div>
+              </div>
+            </header>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Breadcrumb */}
+              {breadcrumbPath.length > 0 && !searchQuery && (
+                <Breadcrumb path={breadcrumbPath} onNavigate={navigateTo} />
+              )}
+
+              {/* Stats */}
+              {currentView === 'home' && !searchQuery && <QuickStatsOverview stats={stats} />}
+
+              {/* Current View Title */}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-white">
+                  {searchQuery
+                    ? `Search: "${searchQuery}"`
+                    : currentView === 'folder'
+                      ? `${selectedFolder?.folder_number} ${selectedFolder?.name}`
+                      : currentView === 'category'
+                        ? `${selectedCategory?.number.toString().padStart(2, '0')} ${selectedCategory?.name}`
+                        : currentView === 'area'
+                          ? `${selectedArea?.range_start}-${selectedArea?.range_end} ${selectedArea?.name}`
+                          : 'All Folders'}
+                </h2>
+
+                {currentView !== 'home' && !searchQuery && (
+                  <button
+                    onClick={() => navigateTo('home')}
+                    className="text-sm text-slate-400 hover:text-white flex items-center gap-1"
+                  >
+                    <ArrowLeft size={14} /> Back to Overview
+                  </button>
+                )}
+              </div>
+
+              {/* Folders Section */}
+              {(currentView !== 'folder' || searchQuery) && displayFolders.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                    <FolderOpen size={18} className="text-amber-400" />
+                    Folders ({displayFolders.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {displayFolders.map((folder) => (
+                      <DropZone key={folder.id} folder={folder} onSuccess={() => triggerRefresh()}>
+                        <FolderCard
+                          folder={folder}
+                          onEdit={setEditingFolder}
+                          onDelete={handleDeleteFolder}
+                          onOpen={(f) => navigateTo('folder', f)}
+                        />
+                      </DropZone>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Items Section */}
+              {(currentView === 'folder' || searchQuery) && displayItems.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                    <File size={18} className="text-slate-400" />
+                    Items ({displayItems.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {displayItems.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        onEdit={setEditingItem}
+                        onDelete={handleDeleteItem}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty States - Modern & Engaging */}
+              {displayFolders.length === 0 && displayItems.length === 0 && (
+                <div className="glass-card p-12 text-center animate-fade-in-up">
+                  {/* Animated icon container */}
+                  <div className="relative w-24 h-24 mx-auto mb-6">
+                    <div
+                      className={`
                   absolute inset-0 rounded-2xl 
-                  ${searchQuery 
-                    ? 'bg-gradient-to-br from-purple-500/20 to-purple-600/10' 
-                    : 'bg-gradient-to-br from-amber-500/20 to-amber-600/10'
+                  ${
+                    searchQuery
+                      ? 'bg-gradient-to-br from-purple-500/20 to-purple-600/10'
+                      : 'bg-gradient-to-br from-amber-500/20 to-amber-600/10'
                   }
                   flex items-center justify-center
-                `}>
-                  {searchQuery ? (
-                    <Search size={40} className="text-purple-400" />
-                  ) : (
-                    <FolderOpen size={40} className="text-amber-400" />
-                  )}
-                </div>
-                {/* Decorative rings */}
-                <div className={`
+                `}
+                    >
+                      {searchQuery ? (
+                        <Search size={40} className="text-purple-400" />
+                      ) : (
+                        <FolderOpen size={40} className="text-amber-400" />
+                      )}
+                    </div>
+                    {/* Decorative rings */}
+                    <div
+                      className={`
                   absolute inset-0 -m-2 rounded-3xl border-2 
                   ${searchQuery ? 'border-purple-500/10' : 'border-amber-500/10'}
-                `} />
-                <div className={`
+                `}
+                    />
+                    <div
+                      className={`
                   absolute inset-0 -m-4 rounded-3xl border 
                   ${searchQuery ? 'border-purple-500/5' : 'border-amber-500/5'}
-                `} />
-              </div>
-              
-              <h3 className="text-xl font-bold text-white mb-2">
-                {searchQuery ? 'No results found' : 'No folders yet'}
-              </h3>
-              <p className="text-slate-400 mb-6 max-w-sm mx-auto">
-                {searchQuery
-                  ? `We couldn't find anything matching "${searchQuery}". Try a different search term.`
-                  : 'Create your first folder to start organizing your digital life with Johnny Decimal.'}
-              </p>
-              {!searchQuery && (
-                <button
-                  onClick={() => setShowNewFolderModal(true)}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl
+                `}
+                    />
+                  </div>
+
+                  <h3 className="text-xl font-bold text-white mb-2">
+                    {searchQuery ? 'No results found' : 'No folders yet'}
+                  </h3>
+                  <p className="text-slate-400 mb-6 max-w-sm mx-auto">
+                    {searchQuery
+                      ? `We couldn't find anything matching "${searchQuery}". Try a different search term.`
+                      : 'Create your first folder to start organizing your digital life with Johnny Decimal.'}
+                  </p>
+                  {!searchQuery && (
+                    <button
+                      onClick={() => setShowNewFolderModal(true)}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-xl
                     bg-gradient-to-r from-amber-600 to-amber-500 text-white font-medium
                     shadow-[0_2px_10px_rgba(245,158,11,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
                     hover:from-amber-500 hover:to-amber-400 hover:shadow-[0_4px_20px_rgba(245,158,11,0.4)]
                     hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
-                >
-                  <FolderOpen size={18} />
-                  Create First Folder
-                </button>
+                    >
+                      <FolderOpen size={18} />
+                      Create First Folder
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Add Item prompt when in folder view */}
+              {currentView === 'folder' && displayItems.length === 0 && !searchQuery && (
+                <div className="glass-card p-8 text-center mt-4">
+                  <div className="text-4xl mb-3">📄</div>
+                  <h3 className="text-lg font-semibold text-white mb-2">This folder is empty</h3>
+                  <p className="text-slate-400 mb-4">Add items to track files in this folder</p>
+                  <button
+                    onClick={() => setShowNewItemModal(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
+                  >
+                    <Plus size={18} />
+                    Add Item
+                  </button>
+                </div>
               )}
             </div>
-          )}
+          </main>
 
-          {/* Add Item prompt when in folder view */}
-          {currentView === 'folder' && displayItems.length === 0 && !searchQuery && (
-            <div className="glass-card p-8 text-center mt-4">
-              <div className="text-4xl mb-3">📄</div>
-              <h3 className="text-lg font-semibold text-white mb-2">This folder is empty</h3>
-              <p className="text-slate-400 mb-4">Add items to track files in this folder</p>
-              <button
-                onClick={() => setShowNewItemModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
-              >
-                <Plus size={18} />
-                Add Item
-              </button>
-            </div>
-          )}
+          {/* Modals */}
+          <NewFolderModal
+            isOpen={showNewFolderModal}
+            onClose={() => setShowNewFolderModal(false)}
+            categories={categories}
+            folders={folders}
+            onSave={handleCreateFolder}
+            preselectedCategory={selectedCategory}
+          />
+
+          <NewItemModal
+            isOpen={showNewItemModal}
+            onClose={() => setShowNewItemModal(false)}
+            folders={folders}
+            items={items}
+            onSave={handleCreateItem}
+            preselectedFolder={selectedFolder}
+          />
+
+          <EditFolderModal
+            folder={editingFolder}
+            isOpen={!!editingFolder}
+            onClose={() => setEditingFolder(null)}
+            onSave={handleUpdateFolder}
+          />
+
+          <EditItemModal
+            item={editingItem}
+            isOpen={!!editingItem}
+            onClose={() => setEditingItem(null)}
+            onSave={handleUpdateItem}
+          />
+
+          <SettingsModal
+            isOpen={showSettings}
+            onClose={() => setShowSettings(false)}
+            areas={areas}
+            categories={categories}
+            onDataChange={triggerRefresh}
+          />
+
+          {/* File Organizer (full-screen overlay) */}
+          {showFileOrganizer && <FileOrganizer onClose={() => setShowFileOrganizer(false)} />}
+
+          {/* Statistics Dashboard (premium feature) */}
+          {showStatsDashboard && <StatsDashboard onClose={() => setShowStatsDashboard(false)} />}
+
+          {/* Batch Rename Modal (premium feature) */}
+          {showBatchRename && <BatchRenameModal onClose={() => setShowBatchRename(false)} />}
         </div>
-      </main>
-
-      {/* Modals */}
-      <NewFolderModal
-        isOpen={showNewFolderModal}
-        onClose={() => setShowNewFolderModal(false)}
-        categories={categories}
-        folders={folders}
-        onSave={handleCreateFolder}
-        preselectedCategory={selectedCategory}
-      />
-
-      <NewItemModal
-        isOpen={showNewItemModal}
-        onClose={() => setShowNewItemModal(false)}
-        folders={folders}
-        items={items}
-        onSave={handleCreateItem}
-        preselectedFolder={selectedFolder}
-      />
-
-      <EditFolderModal
-        folder={editingFolder}
-        isOpen={!!editingFolder}
-        onClose={() => setEditingFolder(null)}
-        onSave={handleUpdateFolder}
-      />
-
-      <EditItemModal
-        item={editingItem}
-        isOpen={!!editingItem}
-        onClose={() => setEditingItem(null)}
-        onSave={handleUpdateItem}
-      />
-
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        areas={areas}
-        categories={categories}
-        onDataChange={triggerRefresh}
-      />
-
-      {/* File Organizer (full-screen overlay) */}
-      {showFileOrganizer && (
-        <FileOrganizer onClose={() => setShowFileOrganizer(false)} />
-      )}
-
-      {/* Statistics Dashboard (premium feature) */}
-      {showStatsDashboard && (
-        <StatsDashboard onClose={() => setShowStatsDashboard(false)} />
-      )}
-
-      {/* Batch Rename Modal (premium feature) */}
-      {showBatchRename && (
-        <BatchRenameModal onClose={() => setShowBatchRename(false)} />
-      )}
-    </div>
-    </DragDropProvider>
+      </DragDropProvider>
     </LicenseProvider>
   );
 }

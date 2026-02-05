@@ -211,7 +211,8 @@ select:focus {
 
 /* Drop zone pulse animation */
 @keyframes dropZonePulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.3;
     border-color: rgba(20, 184, 166, 0.2);
   }
@@ -236,13 +237,16 @@ select:focus {
 
 /* Error shake animation */
 @keyframes dropError {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateX(0);
   }
-  20%, 60% {
+  20%,
+  60% {
     transform: translateX(-5px);
   }
-  40%, 80% {
+  40%,
+  80% {
     transform: translateX(5px);
   }
 }

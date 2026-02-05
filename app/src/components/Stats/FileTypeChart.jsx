@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  Legend,
-} from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 /**
  * FileTypeChart - Pie/donut chart showing file type distribution
@@ -47,10 +40,7 @@ export default function FileTypeChart({ data = [], title = 'Files by Type' }) {
       <ul className="flex flex-wrap gap-2 justify-center mt-2">
         {payload.map((entry, index) => (
           <li key={`legend-${index}`} className="flex items-center gap-1 text-xs">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: entry.color }}
-            />
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
             <span className="text-slate-400">{entry.value}</span>
           </li>
         ))}
@@ -79,7 +69,7 @@ export default function FileTypeChart({ data = [], title = 'Files by Type' }) {
   return (
     <div className="glass-card p-6">
       <h3 className="text-lg font-semibold text-white mb-4">{title}</h3>
-      
+
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -94,8 +84,8 @@ export default function FileTypeChart({ data = [], title = 'Files by Type' }) {
               nameKey="type"
             >
               {data.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
+                <Cell
+                  key={`cell-${index}`}
                   fill={COLORS[index % COLORS.length]}
                   stroke="transparent"
                 />
@@ -106,9 +96,12 @@ export default function FileTypeChart({ data = [], title = 'Files by Type' }) {
           </PieChart>
         </ResponsiveContainer>
       </div>
-      
+
       {/* Center stat */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: '-10px' }}>
+      <div
+        className="absolute inset-0 flex items-center justify-center pointer-events-none"
+        style={{ top: '-10px' }}
+      >
         <div className="text-center">
           <div className="text-2xl font-bold text-white">{total}</div>
           <div className="text-xs text-slate-400">files</div>

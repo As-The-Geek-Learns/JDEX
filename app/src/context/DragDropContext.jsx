@@ -13,20 +13,20 @@ const DragDropContext = createContext(null);
 export function DragDropProvider({ children }) {
   // Track if files are being dragged over the app
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
-  
+
   // Track the current drag data
   const [dragData, setDragData] = useState(null);
-  
+
   // Track drag counter (for nested elements)
   const [dragCounter, setDragCounter] = useState(0);
 
   // Called when drag enters the app window
   const handleDragEnter = useCallback((event) => {
     event.preventDefault();
-    
+
     // Check if dragging files (not internal elements)
     if (event.dataTransfer.types.includes('Files')) {
-      setDragCounter(prev => {
+      setDragCounter((prev) => {
         const newCount = prev + 1;
         if (newCount === 1) {
           setIsDraggingFiles(true);
@@ -39,8 +39,8 @@ export function DragDropProvider({ children }) {
   // Called when drag leaves the app window
   const handleDragLeave = useCallback((event) => {
     event.preventDefault();
-    
-    setDragCounter(prev => {
+
+    setDragCounter((prev) => {
       const newCount = prev - 1;
       if (newCount === 0) {
         setIsDraggingFiles(false);
@@ -86,11 +86,7 @@ export function DragDropProvider({ children }) {
     clearHoverTarget,
   };
 
-  return (
-    <DragDropContext.Provider value={value}>
-      {children}
-    </DragDropContext.Provider>
-  );
+  return <DragDropContext.Provider value={value}>{children}</DragDropContext.Provider>;
 }
 
 export function useDragDrop() {

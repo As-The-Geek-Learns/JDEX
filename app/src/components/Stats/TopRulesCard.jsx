@@ -14,7 +14,7 @@ export default function TopRulesCard({ rules = [], title = 'Top Organization Rul
   };
 
   // Calculate max for bar sizing
-  const maxCount = rules.length > 0 ? Math.max(...rules.map(r => r.matchCount)) : 1;
+  const maxCount = rules.length > 0 ? Math.max(...rules.map((r) => r.matchCount)) : 1;
 
   if (rules.length === 0) {
     return (
@@ -40,21 +40,21 @@ export default function TopRulesCard({ rules = [], title = 'Top Organization Rul
         <Zap size={18} className="text-amber-400" />
         {title}
       </h3>
-      
+
       <div className="space-y-3">
         {rules.map((rule, index) => {
           const Icon = ruleTypeIcons[rule.type] || FileText;
           const percentage = (rule.matchCount / maxCount) * 100;
-          
+
           return (
             <div key={index} className="relative">
               {/* Background bar */}
               <div className="absolute inset-0 bg-slate-700/30 rounded-lg" />
-              <div 
+              <div
                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-teal-600/40 to-teal-500/20 rounded-lg transition-all duration-500"
                 style={{ width: `${percentage}%` }}
               />
-              
+
               {/* Content */}
               <div className="relative flex items-center justify-between px-3 py-2">
                 <div className="flex items-center gap-2">
@@ -75,7 +75,7 @@ export default function TopRulesCard({ rules = [], title = 'Top Organization Rul
           );
         })}
       </div>
-      
+
       {rules.length > 0 && (
         <div className="mt-4 pt-3 border-t border-slate-700/50 text-center">
           <span className="text-xs text-slate-500">

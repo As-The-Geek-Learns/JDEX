@@ -2,7 +2,7 @@
  * Rules Manager Component
  * =======================
  * UI for creating, editing, and managing organization rules.
- * 
+ *
  * Features:
  * - List all rules with stats
  * - Create rules (extension, keyword, path, regex)
@@ -35,14 +35,22 @@ const Icons = {
   ),
   Edit: () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+      />
     </svg>
   ),
   Trash: () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+      />
     </svg>
   ),
   X: () => (
@@ -277,13 +285,15 @@ function RegexHelper({ pattern, onSelectPattern }) {
           />
         </div>
         {testFilename && pattern && (
-          <div className={`mt-2 text-sm flex items-center gap-2 ${
-            testResult?.error 
-              ? 'text-red-400' 
-              : testResult?.matches 
-                ? 'text-green-400' 
-                : 'text-yellow-400'
-          }`}>
+          <div
+            className={`mt-2 text-sm flex items-center gap-2 ${
+              testResult?.error
+                ? 'text-red-400'
+                : testResult?.matches
+                  ? 'text-green-400'
+                  : 'text-yellow-400'
+            }`}
+          >
             {testResult?.error ? (
               <>⚠️ Invalid regex: {testResult.error}</>
             ) : testResult?.matches ? (
@@ -322,7 +332,9 @@ function RegexHelper({ pattern, onSelectPattern }) {
               {REGEX_QUICK_REFERENCE.map((item, i) => (
                 <tr key={i} className="border-t border-slate-700">
                   <td className="py-1.5 pr-3">
-                    <code className="bg-slate-800 px-1.5 py-0.5 rounded text-teal-400">{item.symbol}</code>
+                    <code className="bg-slate-800 px-1.5 py-0.5 rounded text-teal-400">
+                      {item.symbol}
+                    </code>
                   </td>
                   <td className="py-1.5 pr-3 text-gray-400">{item.meaning}</td>
                   <td className="py-1.5 text-gray-500 font-mono text-xs">{item.example}</td>
@@ -353,8 +365,8 @@ function RegexHelper({ pattern, onSelectPattern }) {
               <h5 className="text-sm font-medium text-white mb-2">{category.category}</h5>
               <div className="space-y-2">
                 {category.examples.map((ex, exIdx) => (
-                  <div 
-                    key={exIdx} 
+                  <div
+                    key={exIdx}
                     className="p-2 bg-slate-800 rounded hover:bg-slate-750 transition-colors"
                   >
                     <div className="flex items-center justify-between mb-1">
@@ -386,8 +398,9 @@ function RegexHelper({ pattern, onSelectPattern }) {
 
       {/* Tips */}
       <div className="text-xs text-gray-500 bg-slate-900/30 rounded p-2">
-        <strong className="text-gray-400">💡 Tip:</strong> Patterns are case-insensitive and match anywhere in the filename. 
-        Use <code className="text-teal-400">^</code> to match the start and <code className="text-teal-400">$</code> to match the end.
+        <strong className="text-gray-400">💡 Tip:</strong> Patterns are case-insensitive and match
+        anywhere in the filename. Use <code className="text-teal-400">^</code> to match the start
+        and <code className="text-teal-400">$</code> to match the end.
       </div>
     </div>
   );
@@ -402,13 +415,16 @@ function RegexHelper({ pattern, onSelectPattern }) {
  */
 function RuleCard({ rule, folders, onEdit, onDelete, onToggle }) {
   const typeConfig = RULE_TYPES[rule.rule_type] || RULE_TYPES.keyword;
-  const targetFolder = folders.find(f => f.folder_number === rule.target_id);
-  
+  const targetFolder = folders.find((f) => f.folder_number === rule.target_id);
+
   return (
-    <div className={`
+    <div
+      className={`
       bg-slate-800 rounded-lg p-4 border-l-4 transition-opacity
       ${rule.is_active ? 'opacity-100' : 'opacity-50'}
-    `} style={{ borderLeftColor: typeConfig.color }}>
+    `}
+      style={{ borderLeftColor: typeConfig.color }}
+    >
       <div className="flex items-start justify-between">
         <div className="flex-1">
           {/* Header */}
@@ -421,15 +437,13 @@ function RuleCard({ rule, folders, onEdit, onDelete, onToggle }) {
               </span>
             )}
           </div>
-          
+
           {/* Pattern */}
           <div className="text-sm text-gray-400 mb-2">
             <span className="text-gray-500">{typeConfig.label}:</span>{' '}
-            <code className="bg-slate-900 px-2 py-0.5 rounded text-teal-400">
-              {rule.pattern}
-            </code>
+            <code className="bg-slate-900 px-2 py-0.5 rounded text-teal-400">{rule.pattern}</code>
           </div>
-          
+
           {/* Target */}
           <div className="text-sm text-gray-400">
             <span className="text-gray-500">→</span>{' '}
@@ -443,7 +457,7 @@ function RuleCard({ rule, folders, onEdit, onDelete, onToggle }) {
               </span>
             )}
           </div>
-          
+
           {/* Stats */}
           {rule.match_count > 0 && (
             <div className="text-xs text-gray-500 mt-2">
@@ -451,13 +465,13 @@ function RuleCard({ rule, folders, onEdit, onDelete, onToggle }) {
             </div>
           )}
         </div>
-        
+
         {/* Actions */}
         <div className="flex items-center gap-1">
           <button
             onClick={() => onToggle(rule)}
             className={`p-2 rounded-md transition-colors ${
-              rule.is_active 
+              rule.is_active
                 ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50'
                 : 'bg-slate-700 text-gray-400 hover:bg-slate-600'
             }`}
@@ -490,7 +504,7 @@ function RuleCard({ rule, folders, onEdit, onDelete, onToggle }) {
  */
 function RuleModal({ isOpen, rule, folders, categories, areas, onSave, onClose }) {
   const isEditing = !!rule?.id;
-  
+
   const [formData, setFormData] = useState({
     name: '',
     rule_type: 'extension',
@@ -571,10 +585,7 @@ function RuleModal({ isOpen, rule, folders, categories, areas, onSave, onClose }
           <h2 className="text-lg font-semibold text-white">
             {isEditing ? 'Edit Rule' : 'Create Rule'}
           </h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-700 rounded-md transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-md transition-colors">
             <Icons.X />
           </button>
         </div>
@@ -583,9 +594,7 @@ function RuleModal({ isOpen, rule, folders, categories, areas, onSave, onClose }
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Rule Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Rule Name *
-            </label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Rule Name *</label>
             <input
               type="text"
               value={formData.name}
@@ -598,9 +607,7 @@ function RuleModal({ isOpen, rule, folders, categories, areas, onSave, onClose }
 
           {/* Rule Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Match By
-            </label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Match By</label>
             <div className="grid grid-cols-2 gap-2">
               {Object.entries(RULE_TYPES).map(([type, config]) => (
                 <button
@@ -625,9 +632,7 @@ function RuleModal({ isOpen, rule, folders, categories, areas, onSave, onClose }
 
           {/* Pattern */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Pattern *
-            </label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Pattern *</label>
             <input
               type="text"
               value={formData.pattern}
@@ -637,13 +642,11 @@ function RuleModal({ isOpen, rule, folders, categories, areas, onSave, onClose }
                 text-white placeholder-gray-500 focus:border-teal-500 focus:ring-1 
                 focus:ring-teal-500 font-mono"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              {typeConfig?.description}
-            </p>
-            
+            <p className="text-xs text-gray-500 mt-1">{typeConfig?.description}</p>
+
             {/* Regex Helper - only shown for regex type */}
             {formData.rule_type === 'regex' && (
-              <RegexHelper 
+              <RegexHelper
                 pattern={formData.pattern}
                 onSelectPattern={(p) => setFormData({ ...formData, pattern: p })}
               />
@@ -652,21 +655,21 @@ function RuleModal({ isOpen, rule, folders, categories, areas, onSave, onClose }
 
           {/* Target Folder */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Send to Folder *
-            </label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Send to Folder *</label>
             <select
               value={formData.target_id}
-              onChange={(e) => setFormData({ 
-                ...formData, 
-                target_id: e.target.value,
-                target_type: 'folder',
-              })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  target_id: e.target.value,
+                  target_type: 'folder',
+                })
+              }
               className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md 
                 text-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
             >
               <option value="">Select a folder...</option>
-              {folders.map(folder => (
+              {folders.map((folder) => (
                 <option key={folder.id} value={folder.folder_number}>
                   {folder.folder_number} - {folder.name}
                 </option>
@@ -702,10 +705,12 @@ function RuleModal({ isOpen, rule, folders, categories, areas, onSave, onClose }
                 formData.is_active ? 'bg-teal-600' : 'bg-slate-600'
               }`}
             >
-              <span className={`
+              <span
+                className={`
                 absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
                 ${formData.is_active ? 'left-7' : 'left-1'}
-              `} />
+              `}
+              />
             </button>
             <span className="text-sm text-gray-300">
               {formData.is_active ? 'Rule is active' : 'Rule is disabled'}
@@ -823,7 +828,7 @@ export default function RulesManager() {
   };
 
   // Filter rules
-  const filteredRules = rules.filter(rule => {
+  const filteredRules = rules.filter((rule) => {
     if (filterType === 'all') return true;
     return rule.rule_type === filterType;
   });
@@ -847,9 +852,7 @@ export default function RulesManager() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-white">Organization Rules</h2>
-          <p className="text-gray-400 text-sm">
-            Rules determine where files should be organized
-          </p>
+          <p className="text-gray-400 text-sm">Rules determine where files should be organized</p>
         </div>
         <button
           onClick={handleCreateRule}
@@ -884,7 +887,7 @@ export default function RulesManager() {
           All ({rules.length})
         </button>
         {Object.entries(RULE_TYPES).map(([type, config]) => {
-          const count = rules.filter(r => r.rule_type === type).length;
+          const count = rules.filter((r) => r.rule_type === type).length;
           return (
             <button
               key={type}
@@ -906,7 +909,7 @@ export default function RulesManager() {
       {/* Rules List */}
       {filteredRules.length > 0 ? (
         <div className="space-y-3">
-          {filteredRules.map(rule => (
+          {filteredRules.map((rule) => (
             <RuleCard
               key={rule.id}
               rule={rule}
@@ -941,9 +944,16 @@ export default function RulesManager() {
       <div className="p-4 bg-slate-800 rounded-lg">
         <h4 className="font-medium text-white mb-2">💡 Rule Tips</h4>
         <ul className="text-sm text-gray-400 space-y-1 list-disc list-inside">
-          <li><strong>Extension rules</strong> are great for file types (e.g., all PDFs → Documents)</li>
-          <li><strong>Keyword rules</strong> work well for specific content (e.g., "invoice" → Finance)</li>
-          <li><strong>Higher priority</strong> rules are checked first</li>
+          <li>
+            <strong>Extension rules</strong> are great for file types (e.g., all PDFs → Documents)
+          </li>
+          <li>
+            <strong>Keyword rules</strong> work well for specific content (e.g., "invoice" →
+            Finance)
+          </li>
+          <li>
+            <strong>Higher priority</strong> rules are checked first
+          </li>
           <li>Disable rules temporarily without deleting them</li>
         </ul>
       </div>

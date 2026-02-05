@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  X, FileEdit, Play, Undo2, TriangleAlert, CheckCircle,
-  LoaderCircle, Lock, Sparkles
+import {
+  X,
+  FileEdit,
+  Play,
+  Undo2,
+  TriangleAlert,
+  CheckCircle,
+  LoaderCircle,
+  Lock,
+  Sparkles,
 } from 'lucide-react';
 import { useLicense } from '../../context/LicenseContext.jsx';
 import FileSelector from './FileSelector.jsx';
@@ -21,7 +28,7 @@ import {
  */
 export default function BatchRenameModal({ onClose }) {
   const { isPremium, showUpgradePrompt } = useLicense();
-  
+
   // State
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [preview, setPreview] = useState([]);
@@ -29,7 +36,7 @@ export default function BatchRenameModal({ onClose }) {
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [result, setResult] = useState(null);
   const [lastUndoId, setLastUndoId] = useState(null);
-  
+
   // Rename options
   const [options, setOptions] = useState({
     addPrefix: false,
@@ -68,7 +75,7 @@ export default function BatchRenameModal({ onClose }) {
 
   // Handle option changes
   const updateOption = useCallback((key, value) => {
-    setOptions(prev => ({ ...prev, [key]: value }));
+    setOptions((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   // Check batch limits
@@ -82,22 +89,20 @@ export default function BatchRenameModal({ onClose }) {
       return;
     }
 
-    const hasChanges = preview.some(p => p.willChange && !p.conflict);
+    const hasChanges = preview.some((p) => p.willChange && !p.conflict);
     if (!hasChanges) return;
 
     setIsExecuting(true);
-    setProgress({ current: 0, total: preview.filter(p => p.willChange).length });
+    setProgress({ current: 0, total: preview.filter((p) => p.willChange).length });
     setResult(null);
 
-    const execResult = await executeBatchRename(
-      preview,
-      {},
-      (current, total) => setProgress({ current, total })
+    const execResult = await executeBatchRename(preview, {}, (current, total) =>
+      setProgress({ current, total })
     );
 
     setIsExecuting(false);
     setResult(execResult);
-    
+
     if (execResult.undoId) {
       setLastUndoId(execResult.undoId);
     }
@@ -116,9 +121,8 @@ export default function BatchRenameModal({ onClose }) {
     setIsExecuting(true);
     setResult(null);
 
-    const undoResult = await undoBatchRename(
-      lastUndoId,
-      (current, total) => setProgress({ current, total })
+    const undoResult = await undoBatchRename(lastUndoId, (current, total) =>
+      setProgress({ current, total })
     );
 
     setIsExecuting(false);
@@ -133,8 +137,8 @@ export default function BatchRenameModal({ onClose }) {
   }, [lastUndoId]);
 
   // Calculate stats
-  const willChange = preview.filter(p => p.willChange && !p.conflict).length;
-  const hasConflicts = preview.some(p => p.conflict);
+  const willChange = preview.filter((p) => p.willChange && !p.conflict).length;
+  const hasConflicts = preview.some((p) => p.conflict);
 
   return (
     <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50 p-4">
@@ -151,10 +155,7 @@ export default function BatchRenameModal({ onClose }) {
               </span>
             )}
           </h2>
-          <button 
-            onClick={onClose}
-            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -176,7 +177,6 @@ export default function BatchRenameModal({ onClose }) {
             <section>
               <h3 className="text-sm font-medium text-slate-300 mb-2">Rename Options</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                
                 {/* Add Prefix */}
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -271,7 +271,9 @@ export default function BatchRenameModal({ onClose }) {
                         <input
                           type="number"
                           value={options.startNumber}
-                          onChange={(e) => updateOption('startNumber', parseInt(e.target.value) || 1)}
+                          onChange={(e) =>
+                            updateOption('startNumber', parseInt(e.target.value) || 1)
+                          }
                           min="0"
                           className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                         />
@@ -340,10 +342,12 @@ export default function BatchRenameModal({ onClose }) {
 
           {/* Result Message */}
           {result && (
-            <div className={`
+            <div
+              className={`
               p-4 rounded-lg flex items-start gap-3
               ${result.success ? 'bg-green-500/20 border border-green-500/30' : 'bg-red-500/20 border border-red-500/30'}
-            `}>
+            `}
+            >
               {result.success ? (
                 <CheckCircle className="text-green-400 flex-shrink-0" size={20} />
               ) : (
@@ -351,15 +355,16 @@ export default function BatchRenameModal({ onClose }) {
               )}
               <div>
                 <p className={result.success ? 'text-green-300' : 'text-red-300'}>
-                  {result.isUndo 
+                  {result.isUndo
                     ? `Undone ${result.count} file rename${result.count !== 1 ? 's' : ''}`
-                    : `Renamed ${result.count} of ${result.total} file${result.total !== 1 ? 's' : ''}`
-                  }
+                    : `Renamed ${result.count} of ${result.total} file${result.total !== 1 ? 's' : ''}`}
                 </p>
                 {result.errors && result.errors.length > 0 && (
                   <ul className="mt-2 text-sm text-red-300/70">
                     {result.errors.slice(0, 3).map((err, i) => (
-                      <li key={i}>• {err.file}: {err.error}</li>
+                      <li key={i}>
+                        • {err.file}: {err.error}
+                      </li>
                     ))}
                     {result.errors.length > 3 && (
                       <li>... and {result.errors.length - 3} more errors</li>
@@ -398,9 +403,10 @@ export default function BatchRenameModal({ onClose }) {
               disabled={isExecuting || willChange === 0}
               className={`
                 flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors
-                ${willChange > 0 && !isExecuting
-                  ? 'bg-teal-600 text-white hover:bg-teal-500'
-                  : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                ${
+                  willChange > 0 && !isExecuting
+                    ? 'bg-teal-600 text-white hover:bg-teal-500'
+                    : 'bg-slate-700 text-slate-400 cursor-not-allowed'
                 }
               `}
             >

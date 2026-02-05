@@ -2,7 +2,7 @@
  * Scanner Panel Component
  * =======================
  * UI for scanning directories and viewing discovered files.
- * 
+ *
  * Features:
  * - Folder selection via native dialog or text input
  * - Real-time scan progress with file/size counts
@@ -29,34 +29,58 @@ import { sanitizeErrorForUser } from '../../utils/errors.js';
 const Icons = {
   Folder: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+      />
     </svg>
   ),
   FolderOpen: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"
+      />
     </svg>
   ),
   Search: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+      />
     </svg>
   ),
   Stop: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
+      />
     </svg>
   ),
   File: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+      />
     </svg>
   ),
   Check: () => (
@@ -76,8 +100,12 @@ const Icons = {
   ),
   AlertCircle: () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
     </svg>
   ),
 };
@@ -123,7 +151,7 @@ function QuickAccessFolders({ onSelect }) {
     <div className="mb-4">
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Quick access:</p>
       <div className="flex flex-wrap gap-2">
-        {drives.map(drive => (
+        {drives.map((drive) => (
           <button
             key={drive.id}
             onClick={() => onSelect(drive.jd_root_path || drive.base_path)}
@@ -164,10 +192,10 @@ function FolderBrowser({ currentPath, onNavigate }) {
         {expanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />}
         Subfolders ({subdirs.length})
       </button>
-      
+
       {expanded && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto">
-          {subdirs.slice(0, 12).map(dir => (
+          {subdirs.slice(0, 12).map((dir) => (
             <button
               key={dir.path}
               onClick={() => onNavigate(dir.path)}
@@ -180,9 +208,7 @@ function FolderBrowser({ currentPath, onNavigate }) {
             </button>
           ))}
           {subdirs.length > 12 && (
-            <div className="px-3 py-2 text-sm text-gray-500">
-              +{subdirs.length - 12} more...
-            </div>
+            <div className="px-3 py-2 text-sm text-gray-500">+{subdirs.length - 12} more...</div>
           )}
         </div>
       )}
@@ -228,14 +254,10 @@ function ScanProgress({ progress, onCancel }) {
         </div>
       </div>
 
-      <div className="text-sm text-gray-400 truncate">
-        📁 {currentPath || 'Starting...'}
-      </div>
+      <div className="text-sm text-gray-400 truncate">📁 {currentPath || 'Starting...'}</div>
 
       {errors.length > 0 && (
-        <div className="mt-3 text-sm text-yellow-400">
-          ⚠️ {errors.length} error(s) encountered
-        </div>
+        <div className="mt-3 text-sm text-yellow-400">⚠️ {errors.length} error(s) encountered</div>
       )}
     </div>
   );
@@ -282,11 +304,7 @@ function ScanResults({ sessionId, stats, onProceed }) {
   };
 
   if (loading) {
-    return (
-      <div className="p-6 text-center text-gray-400">
-        Loading results...
-      </div>
-    );
+    return <div className="p-6 text-center text-gray-400">Loading results...</div>;
   }
 
   const sortedTypes = Object.keys(groupedFiles).sort(
@@ -320,8 +338,8 @@ function ScanResults({ sessionId, stats, onProceed }) {
       {/* File types breakdown */}
       <div className="space-y-2">
         <h4 className="text-sm font-medium text-gray-400 mb-2">Files by Type</h4>
-        
-        {sortedTypes.map(type => {
+
+        {sortedTypes.map((type) => {
           const style = FILE_TYPE_STYLES[type] || FILE_TYPE_STYLES.other;
           const typeFiles = groupedFiles[type];
           const isExpanded = expandedTypes.has(type);
@@ -472,11 +490,14 @@ export default function ScannerPanel({ onScanComplete }) {
   }, []);
 
   // Proceed to organization
-  const handleProceed = useCallback((sessionId, files) => {
-    if (onScanComplete) {
-      onScanComplete(sessionId, files);
-    }
-  }, [onScanComplete]);
+  const handleProceed = useCallback(
+    (sessionId, files) => {
+      if (onScanComplete) {
+        onScanComplete(sessionId, files);
+      }
+    },
+    [onScanComplete]
+  );
 
   // Render
   if (!fsAvailable) {
@@ -487,8 +508,8 @@ export default function ScannerPanel({ onScanComplete }) {
           <span className="font-semibold">File System Access Required</span>
         </div>
         <p className="text-sm text-yellow-300">
-          File scanning requires running JDex as a desktop application. 
-          The web version cannot access your file system.
+          File scanning requires running JDex as a desktop application. The web version cannot
+          access your file system.
         </p>
       </div>
     );
@@ -500,7 +521,8 @@ export default function ScannerPanel({ onScanComplete }) {
       <div>
         <h2 className="text-xl font-bold text-white mb-2">Scan Files</h2>
         <p className="text-gray-400">
-          Select a folder to scan for files. JDex will catalog them by type so you can organize them.
+          Select a folder to scan for files. JDex will catalog them by type so you can organize
+          them.
         </p>
       </div>
 
@@ -512,9 +534,7 @@ export default function ScannerPanel({ onScanComplete }) {
       )}
 
       {/* Scan in progress */}
-      {isScanning && progress && (
-        <ScanProgress progress={progress} onCancel={handleCancel} />
-      )}
+      {isScanning && progress && <ScanProgress progress={progress} onCancel={handleCancel} />}
 
       {/* Scan results */}
       {!isScanning && scanResult && (
@@ -532,9 +552,7 @@ export default function ScannerPanel({ onScanComplete }) {
 
           {/* Path input */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Folder to scan
-            </label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Folder to scan</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -557,9 +575,7 @@ export default function ScannerPanel({ onScanComplete }) {
           </div>
 
           {/* Folder browser */}
-          {scanPath && (
-            <FolderBrowser currentPath={scanPath} onNavigate={setScanPath} />
-          )}
+          {scanPath && <FolderBrowser currentPath={scanPath} onNavigate={setScanPath} />}
 
           {/* Start button */}
           <button

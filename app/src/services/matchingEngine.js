@@ -2,13 +2,13 @@
  * Matching Engine Service
  * =======================
  * Suggests JD folder destinations for files based on rules.
- * 
+ *
  * Rule Types:
  * 1. Extension rules - Match by file extension (e.g., .pdf → 11.01)
  * 2. Keyword rules - Match by filename keywords (e.g., "invoice" → 12.03)
  * 3. Path rules - Match by path patterns (e.g., /Work/ → 30-39 area)
  * 4. Regex rules - Match by regular expression
- * 
+ *
  * Security:
  * - All inputs are validated
  * - Regex patterns are sandboxed with timeout
@@ -36,10 +36,10 @@ import { Result, AppError } from '../utils/errors.js';
  * Confidence levels for suggestions.
  */
 export const CONFIDENCE = {
-  HIGH: 'high',      // Strong match (exact extension, keyword in filename)
-  MEDIUM: 'medium',  // Partial match (keyword in path, similar extension)
-  LOW: 'low',        // Weak match (regex, heuristic)
-  NONE: 'none',      // No match found
+  HIGH: 'high', // Strong match (exact extension, keyword in filename)
+  MEDIUM: 'medium', // Partial match (keyword in path, similar extension)
+  LOW: 'low', // Weak match (regex, heuristic)
+  NONE: 'none', // No match found
 };
 
 /**
@@ -53,27 +53,27 @@ const DEFAULT_EXTENSION_SUGGESTIONS = {
   docx: { type: 'document', keywords: ['document', 'word'] },
   txt: { type: 'document', keywords: ['note', 'text'] },
   md: { type: 'document', keywords: ['documentation', 'readme'] },
-  
+
   // Spreadsheets
   xls: { type: 'spreadsheet', keywords: ['finance', 'data', 'report'] },
   xlsx: { type: 'spreadsheet', keywords: ['finance', 'data', 'report'] },
   csv: { type: 'data', keywords: ['data', 'export', 'import'] },
-  
+
   // Images
   jpg: { type: 'image', keywords: ['photo', 'image', 'media'] },
   jpeg: { type: 'image', keywords: ['photo', 'image', 'media'] },
   png: { type: 'image', keywords: ['image', 'screenshot', 'graphic'] },
   gif: { type: 'image', keywords: ['image', 'animation'] },
-  
+
   // Code
   js: { type: 'code', keywords: ['development', 'script', 'code'] },
   ts: { type: 'code', keywords: ['development', 'typescript', 'code'] },
   py: { type: 'code', keywords: ['development', 'python', 'script'] },
-  
+
   // Archives
   zip: { type: 'archive', keywords: ['archive', 'backup', 'compressed'] },
   rar: { type: 'archive', keywords: ['archive', 'compressed'] },
-  
+
   // Audio/Video
   mp3: { type: 'audio', keywords: ['music', 'audio', 'podcast'] },
   mp4: { type: 'video', keywords: ['video', 'media', 'recording'] },
@@ -89,18 +89,18 @@ const KEYWORD_INDICATORS = {
   statement: ['finance', 'statement', 'banking'],
   tax: ['finance', 'tax'],
   budget: ['finance', 'budget', 'planning'],
-  
+
   // Work
   meeting: ['work', 'meeting', 'notes'],
   project: ['work', 'project'],
   report: ['work', 'report'],
   presentation: ['work', 'presentation'],
-  
+
   // Personal
   photo: ['personal', 'photo', 'memory'],
   vacation: ['personal', 'travel', 'vacation'],
   family: ['personal', 'family'],
-  
+
   // Reference
   manual: ['reference', 'manual', 'documentation'],
   guide: ['reference', 'guide', 'howto'],
@@ -134,13 +134,13 @@ function safeRegexTest(pattern, text, timeoutMs = 100) {
 function extractKeywords(filename) {
   // Remove extension
   const nameWithoutExt = filename.replace(/\.[^.]+$/, '');
-  
+
   // Split on common separators and convert to lowercase
   const words = nameWithoutExt
     .toLowerCase()
     .split(/[-_.\s]+/)
-    .filter(word => word.length > 2);
-  
+    .filter((word) => word.length > 2);
+
   return words;
 }
 
@@ -150,16 +150,16 @@ function extractKeywords(filename) {
 function stringSimilarity(str1, str2) {
   const s1 = str1.toLowerCase();
   const s2 = str2.toLowerCase();
-  
+
   if (s1 === s2) return 1;
   if (s1.includes(s2) || s2.includes(s1)) return 0.8;
-  
+
   // Simple character overlap
   const set1 = new Set(s1);
   const set2 = new Set(s2);
-  const intersection = [...set1].filter(c => set2.has(c)).length;
+  const intersection = [...set1].filter((c) => set2.has(c)).length;
   const union = new Set([...set1, ...set2]).size;
-  
+
   return intersection / union;
 }
 
@@ -216,26 +216,23 @@ export class MatchingEngine {
    */
   getFoldersWithContext() {
     this.refreshCache();
-    return this.foldersCache.map(folder => {
-      const category = this.categoriesCache.find(c => c.id === folder.category_id);
-      const area = category 
-        ? this.areasCache.find(a => a.id === category.area_id)
-        : null;
-      
+    return this.foldersCache.map((folder) => {
+      const category = this.categoriesCache.find((c) => c.id === folder.category_id);
+      const area = category ? this.areasCache.find((a) => a.id === category.area_id) : null;
+
       return {
         ...folder,
         category,
         area,
-        fullPath: area && category
-          ? `${area.name} > ${category.name} > ${folder.name}`
-          : folder.name,
+        fullPath:
+          area && category ? `${area.name} > ${category.name} > ${folder.name}` : folder.name,
       };
     });
   }
 
   /**
    * Matches a file against all rules and returns suggestions.
-   * 
+   *
    * @param {Object} file - File info from scanner
    * @param {string} file.filename - Name of the file
    * @param {string} file.path - Full path to file
@@ -247,7 +244,7 @@ export class MatchingEngine {
     const suggestions = [];
     const rules = this.getRules();
     const folders = this.getFoldersWithContext();
-    
+
     // Match against each rule
     for (const rule of rules) {
       const match = this.matchRule(rule, file);
@@ -304,7 +301,7 @@ export class MatchingEngine {
   matchExtensionRule(rule, file) {
     const pattern = rule.pattern.toLowerCase().replace(/^\./, '');
     const ext = (file.file_extension || '').toLowerCase();
-    
+
     if (ext === pattern) {
       return {
         confidence: CONFIDENCE.HIGH,
@@ -318,10 +315,13 @@ export class MatchingEngine {
    * Matches keyword-based rule.
    */
   matchKeywordRule(rule, file) {
-    const keywords = rule.pattern.toLowerCase().split(',').map(k => k.trim());
+    const keywords = rule.pattern
+      .toLowerCase()
+      .split(',')
+      .map((k) => k.trim());
     const filename = file.filename.toLowerCase();
     const path = (file.path || '').toLowerCase();
-    
+
     for (const keyword of keywords) {
       if (filename.includes(keyword)) {
         return {
@@ -345,7 +345,7 @@ export class MatchingEngine {
   matchPathRule(rule, file) {
     const pattern = rule.pattern.toLowerCase();
     const path = (file.path || '').toLowerCase();
-    
+
     if (path.includes(pattern)) {
       return {
         confidence: CONFIDENCE.MEDIUM,
@@ -360,7 +360,7 @@ export class MatchingEngine {
    */
   matchRegexRule(rule, file) {
     const testString = `${file.filename} ${file.path || ''}`;
-    
+
     if (safeRegexTest(rule.pattern, testString)) {
       return {
         confidence: CONFIDENCE.LOW,
@@ -376,26 +376,26 @@ export class MatchingEngine {
   findTargetFolder(rule, folders) {
     switch (rule.target_type) {
       case 'folder':
-        return folders.find(f => f.folder_number === rule.target_id);
-      
+        return folders.find((f) => f.folder_number === rule.target_id);
+
       case 'category': {
         // Find first folder in this category
-        const categoryFolders = folders.filter(f => 
-          f.category?.number?.toString().padStart(2, '0') === rule.target_id
+        const categoryFolders = folders.filter(
+          (f) => f.category?.number?.toString().padStart(2, '0') === rule.target_id
         );
         return categoryFolders[0] || null;
       }
-      
+
       case 'area': {
         // Find first folder in this area
-        const [start, end] = rule.target_id.split('-').map(n => parseInt(n));
-        const areaFolders = folders.filter(f => {
+        const [start, end] = rule.target_id.split('-').map((n) => parseInt(n));
+        const areaFolders = folders.filter((f) => {
           const catNum = f.category?.number || 0;
           return catNum >= start && catNum <= end;
         });
         return areaFolders[0] || null;
       }
-      
+
       default:
         return null;
     }
@@ -417,12 +417,15 @@ export class MatchingEngine {
       for (const folder of folders) {
         const folderKeywords = [
           folder.name.toLowerCase(),
-          ...(folder.keywords || '').toLowerCase().split(',').map(k => k.trim()),
+          ...(folder.keywords || '')
+            .toLowerCase()
+            .split(',')
+            .map((k) => k.trim()),
           folder.category?.name?.toLowerCase() || '',
         ].filter(Boolean);
 
         const matchScore = extInfo.keywords.reduce((score, keyword) => {
-          if (folderKeywords.some(fk => fk.includes(keyword) || keyword.includes(fk))) {
+          if (folderKeywords.some((fk) => fk.includes(keyword) || keyword.includes(fk))) {
             return score + 1;
           }
           return score;
@@ -443,8 +446,11 @@ export class MatchingEngine {
     for (const folder of folders) {
       const folderKeywords = [
         ...folder.name.toLowerCase().split(/[-_.\s]+/),
-        ...(folder.keywords || '').toLowerCase().split(',').map(k => k.trim()),
-      ].filter(k => k.length > 2);
+        ...(folder.keywords || '')
+          .toLowerCase()
+          .split(',')
+          .map((k) => k.trim()),
+      ].filter((k) => k.length > 2);
 
       for (const fileKw of fileKeywords) {
         for (const folderKw of folderKeywords) {
@@ -463,7 +469,7 @@ export class MatchingEngine {
 
     // Deduplicate by folder
     const seen = new Set();
-    return suggestions.filter(s => {
+    return suggestions.filter((s) => {
       if (seen.has(s.folder.id)) return false;
       seen.add(s.folder.id);
       return true;
@@ -472,14 +478,14 @@ export class MatchingEngine {
 
   /**
    * Batch matches multiple files.
-   * 
+   *
    * @param {Array} files - Array of file objects
    * @returns {Array} Array of { file, suggestions } objects
    */
   batchMatch(files) {
     this.refreshCache();
-    
-    return files.map(file => ({
+
+    return files.map((file) => ({
       file,
       suggestions: this.matchFile(file),
     }));
@@ -539,7 +545,7 @@ export function getMatchingEngine() {
 export function createExtensionRule(extension, targetFolderNumber, name = null) {
   const engine = getMatchingEngine();
   const ext = extension.replace(/^\./, '').toLowerCase();
-  
+
   return engine.createRule({
     name: name || `Auto-organize .${ext} files`,
     rule_type: 'extension',
@@ -556,7 +562,7 @@ export function createExtensionRule(extension, targetFolderNumber, name = null) 
 export function createKeywordRule(keywords, targetFolderNumber, name = null) {
   const engine = getMatchingEngine();
   const keywordList = Array.isArray(keywords) ? keywords.join(',') : keywords;
-  
+
   return engine.createRule({
     name: name || `Auto-organize files containing: ${keywordList}`,
     rule_type: 'keyword',
@@ -572,7 +578,7 @@ export function createKeywordRule(keywords, targetFolderNumber, name = null) {
  */
 export function suggestRulesForFolder(folder, files) {
   const suggestions = [];
-  
+
   // Count extensions
   const extCounts = {};
   for (const file of files) {

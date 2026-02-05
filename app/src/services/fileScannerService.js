@@ -2,14 +2,14 @@
  * File Scanner Service
  * ====================
  * Recursively scans directories and catalogs files for organization.
- * 
+ *
  * Features:
  * - Recursive directory scanning with progress callbacks
  * - File type detection based on extension
  * - File metadata extraction (size, extension)
  * - Scan session management
  * - Integration with scanned_files database table
- * 
+ *
  * Security:
  * - Uses validated paths from validation.js
  * - Respects system path restrictions
@@ -18,11 +18,7 @@
 
 import { validateFilePath } from '../utils/validation.js';
 import { FileSystemError, Result } from '../utils/errors.js';
-import {
-  addScannedFile,
-  clearScannedFiles,
-  getScannedFiles,
-} from '../db.js';
+import { addScannedFile, clearScannedFiles, getScannedFiles } from '../db.js';
 
 // =============================================================================
 // File Type Mappings
@@ -42,20 +38,20 @@ const EXTENSION_TO_TYPE = {
   pages: 'document',
   md: 'document',
   markdown: 'document',
-  
+
   // Spreadsheets
   xls: 'spreadsheet',
   xlsx: 'spreadsheet',
   csv: 'spreadsheet',
   numbers: 'spreadsheet',
   ods: 'spreadsheet',
-  
+
   // Presentations
   ppt: 'presentation',
   pptx: 'presentation',
   key: 'presentation',
   odp: 'presentation',
-  
+
   // Images
   jpg: 'image',
   jpeg: 'image',
@@ -72,7 +68,7 @@ const EXTENSION_TO_TYPE = {
   raw: 'image',
   cr2: 'image',
   nef: 'image',
-  
+
   // Videos
   mp4: 'video',
   mov: 'video',
@@ -82,7 +78,7 @@ const EXTENSION_TO_TYPE = {
   flv: 'video',
   webm: 'video',
   m4v: 'video',
-  
+
   // Audio
   mp3: 'audio',
   wav: 'audio',
@@ -92,7 +88,7 @@ const EXTENSION_TO_TYPE = {
   wma: 'audio',
   m4a: 'audio',
   aiff: 'audio',
-  
+
   // Archives
   zip: 'archive',
   rar: 'archive',
@@ -102,7 +98,7 @@ const EXTENSION_TO_TYPE = {
   bz2: 'archive',
   dmg: 'archive',
   iso: 'archive',
-  
+
   // Code
   js: 'code',
   jsx: 'code',
@@ -134,27 +130,27 @@ const EXTENSION_TO_TYPE = {
   yaml: 'code',
   yml: 'code',
   toml: 'code',
-  
+
   // Data
   db: 'data',
   sqlite: 'data',
   sqlite3: 'data',
   mdb: 'data',
   accdb: 'data',
-  
+
   // Fonts
   ttf: 'font',
   otf: 'font',
   woff: 'font',
   woff2: 'font',
   eot: 'font',
-  
+
   // Ebooks
   epub: 'ebook',
   mobi: 'ebook',
   azw: 'ebook',
   azw3: 'ebook',
-  
+
   // Design
   psd: 'design',
   ai: 'design',
@@ -313,8 +309,15 @@ export class FileScanner {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       return crypto.randomUUID();
     }
-    // Fallback to timestamp + random string
-    return `scan-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    // Fallback using crypto.getRandomValues (available in all modern environments)
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+      return `scan-${hex}`;
+    }
+    // Last resort: timestamp only (no entropy, but avoids insecure Math.random)
+    return `scan-${Date.now()}-${performance.now().toString(36).replace('.', '')}`;
   }
 
   /**
@@ -342,7 +345,7 @@ export class FileScanner {
 
   /**
    * Scans a directory recursively.
-   * 
+   *
    * @param {string} rootPath - The directory to scan
    * @param {Object} options - Scan options
    * @param {Function} options.onProgress - Progress callback (progress) => void
@@ -352,12 +355,7 @@ export class FileScanner {
    * @returns {Promise<Result>} Scan result
    */
   async scan(rootPath, options = {}) {
-    const {
-      onProgress = () => {},
-      onFile = () => {},
-      maxDepth = 10,
-      saveToDb = true,
-    } = options;
+    const { onProgress = () => {}, onFile = () => {}, maxDepth = 10, saveToDb = true } = options;
 
     // Validate path
     let validatedPath;
@@ -388,18 +386,11 @@ export class FileScanner {
     try {
       const stats = fs.statSync(validatedPath);
       if (!stats.isDirectory()) {
-        return Result.error(
-          new FileSystemError('Path is not a directory', 'scan', rootPath)
-        );
+        return Result.error(new FileSystemError('Path is not a directory', 'scan', rootPath));
       }
     } catch (error) {
       return Result.error(
-        new FileSystemError(
-          `Cannot access directory: ${error.message}`,
-          'scan',
-          rootPath,
-          error
-        )
+        new FileSystemError(`Cannot access directory: ${error.message}`, 'scan', rootPath, error)
       );
     }
 
@@ -504,9 +495,7 @@ export class FileScanner {
       await scanDirectory(validatedPath);
     } catch (error) {
       this.isScanning = false;
-      return Result.error(
-        new FileSystemError('Scan failed', 'scan', rootPath, error)
-      );
+      return Result.error(new FileSystemError('Scan failed', 'scan', rootPath, error));
     }
 
     this.isScanning = false;
@@ -562,7 +551,7 @@ export function getScanner() {
 
 /**
  * Performs a quick count of files in a directory (non-recursive, fast).
- * 
+ *
  * @param {string} dirPath - Directory to count
  * @returns {Object} Count of files by type
  */
@@ -577,7 +566,7 @@ export function quickCount(dirPath) {
 
   try {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-    
+
     for (const entry of entries) {
       if (entry.isFile() && !shouldSkipFile(entry.name)) {
         counts.total++;
@@ -594,7 +583,7 @@ export function quickCount(dirPath) {
 
 /**
  * Lists immediate subdirectories of a path.
- * 
+ *
  * @param {string} dirPath - Directory to list
  * @returns {Array} Array of { name, path } objects
  */
@@ -609,7 +598,7 @@ export function listSubdirectories(dirPath) {
 
   try {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-    
+
     for (const entry of entries) {
       if (entry.isDirectory() && !shouldSkipDirectory(entry.name)) {
         dirs.push({

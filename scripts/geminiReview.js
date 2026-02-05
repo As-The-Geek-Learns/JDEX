@@ -24,7 +24,7 @@
 
 const https = require('https');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 const path = require('path');
 
 // Configuration
@@ -35,6 +35,27 @@ const MAX_DIFF_LENGTH = 30000; // Truncate very large diffs
 const MAX_FULL_REVIEW_LENGTH = 500000; // Max content for full reviews (~125k tokens)
 const DEFAULT_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx'];
 const APP_DIR = 'app'; // JDex app directory
+
+/**
+ * Validate a git ref to prevent command injection.
+ * Only allows characters valid in git refs: alphanumeric, dots, hyphens,
+ * underscores, slashes, tildes, and carets (for HEAD~1, HEAD^2 etc).
+ *
+ * @param {string} ref - The git ref to validate
+ * @returns {string} The validated ref
+ * @throws {Error} If the ref contains unsafe characters
+ */
+function validateGitRef(ref) {
+  if (!ref || typeof ref !== 'string') {
+    throw new Error('Git ref is required and must be a string');
+  }
+  // Allow: word chars, dots, hyphens, slashes, tildes, carets, at-signs (@)
+  // Reject: semicolons, pipes, backticks, $(), spaces, etc.
+  if (!/^[a-zA-Z0-9._\-/~^@]+$/.test(ref)) {
+    throw new Error(`Unsafe git ref: "${ref}". Only alphanumeric, . - / ~ ^ @ characters are allowed.`);
+  }
+  return ref;
+}
 
 /**
  * Review severity levels
@@ -431,9 +452,12 @@ function parseGeminiResponse(response) {
  * @returns {object} Object with diff string and list of files
  */
 function getGitDiff(baseRef = 'HEAD~1', cwd = process.cwd()) {
+  // Validate baseRef to prevent command injection
+  const safeRef = validateGitRef(baseRef);
+
   try {
     // Get list of changed files
-    const filesOutput = execSync(`git diff --name-only ${baseRef}`, {
+    const filesOutput = execFileSync('git', ['diff', '--name-only', safeRef], {
       encoding: 'utf-8',
       cwd: cwd,
       stdio: ['pipe', 'pipe', 'pipe']
@@ -446,7 +470,7 @@ function getGitDiff(baseRef = 'HEAD~1', cwd = process.cwd()) {
     }
     
     // Get the actual diff
-    const diff = execSync(`git diff ${baseRef}`, {
+    const diff = execFileSync('git', ['diff', safeRef], {
       encoding: 'utf-8',
       cwd: cwd,
       stdio: ['pipe', 'pipe', 'pipe'],

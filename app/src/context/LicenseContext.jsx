@@ -2,12 +2,12 @@
  * License Context
  * ===============
  * React context for managing license state throughout the app.
- * 
+ *
  * Usage:
  *   <LicenseProvider>
  *     <App />
  *   </LicenseProvider>
- * 
+ *
  *   // In components:
  *   const { isPremium, tier, activateLicense } = useLicense();
  */
@@ -47,28 +47,31 @@ export function LicenseProvider({ children }) {
   }, []);
 
   // Activate a license
-  const activateLicense = useCallback(async (licenseKey) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const result = await doActivate(licenseKey);
-      
-      if (result.valid) {
-        refreshState();
-        return { success: true, license: result.license };
-      } else {
-        setError(result.error);
-        return { success: false, error: result.error };
+  const activateLicense = useCallback(
+    async (licenseKey) => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const result = await doActivate(licenseKey);
+
+        if (result.valid) {
+          refreshState();
+          return { success: true, license: result.license };
+        } else {
+          setError(result.error);
+          return { success: false, error: result.error };
+        }
+      } catch (e) {
+        const errorMsg = e.message || 'Failed to activate license';
+        setError(errorMsg);
+        return { success: false, error: errorMsg };
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      const errorMsg = e.message || 'Failed to activate license';
-      setError(errorMsg);
-      return { success: false, error: errorMsg };
-    } finally {
-      setLoading(false);
-    }
-  }, [refreshState]);
+    },
+    [refreshState]
+  );
 
   // Deactivate license
   const deactivateLicense = useCallback(() => {
@@ -83,23 +86,29 @@ export function LicenseProvider({ children }) {
   }, []);
 
   // Track usage
-  const trackUsage = useCallback((metric, amount = 1) => {
-    incrementUsage(metric, amount);
-    refreshState();
-  }, [refreshState]);
+  const trackUsage = useCallback(
+    (metric, amount = 1) => {
+      incrementUsage(metric, amount);
+      refreshState();
+    },
+    [refreshState]
+  );
 
   // Re-validate license periodically (every hour while app is open)
   useEffect(() => {
     if (state.license?.key) {
-      const interval = setInterval(() => {
-        validateLicenseKey(state.license.key).then(result => {
-          if (!result.valid && !result.offline) {
-            // License became invalid
-            doDeactivate();
-            refreshState();
-          }
-        });
-      }, 60 * 60 * 1000); // 1 hour
+      const interval = setInterval(
+        () => {
+          validateLicenseKey(state.license.key).then((result) => {
+            if (!result.valid && !result.offline) {
+              // License became invalid
+              doDeactivate();
+              refreshState();
+            }
+          });
+        },
+        60 * 60 * 1000
+      ); // 1 hour
 
       return () => clearInterval(interval);
     }
@@ -110,28 +119,24 @@ export function LicenseProvider({ children }) {
     ...state,
     loading,
     error,
-    
+
     // Actions
     activateLicense,
     deactivateLicense,
     checkAction,
     trackUsage,
     refreshState,
-    
+
     // Helpers
     hasFeature: (featureId) => hasFeature(featureId),
     getRemainingQuota: (metric) => getRemainingQuota(metric),
-    
+
     // Constants
     LICENSE_TIERS,
     FEATURE_INFO,
   };
 
-  return (
-    <LicenseContext.Provider value={value}>
-      {children}
-    </LicenseContext.Provider>
-  );
+  return <LicenseContext.Provider value={value}>{children}</LicenseContext.Provider>;
 }
 
 // =============================================================================
@@ -153,11 +158,11 @@ export function useLicense() {
 export function withPremiumFeature(WrappedComponent, featureId) {
   return function PremiumGatedComponent(props) {
     const { hasFeature, isPremium } = useLicense();
-    
+
     if (!hasFeature(featureId)) {
       return <UpgradePrompt feature={featureId} />;
     }
-    
+
     return <WrappedComponent {...props} />;
   };
 }
@@ -174,13 +179,17 @@ export function UpgradePrompt({ feature, onClose, inline = false }) {
   };
 
   const content = (
-    <div className={`
+    <div
+      className={`
       ${inline ? '' : 'fixed inset-0 bg-black/50 flex items-center justify-center z-50'}
-    `}>
-      <div className={`
+    `}
+    >
+      <div
+        className={`
         bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl overflow-hidden
         ${inline ? 'w-full' : 'w-full max-w-md mx-4 shadow-2xl'}
-      `}>
+      `}
+      >
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-teal-600 p-6 text-center">
           <div className="text-4xl mb-2">⭐</div>
@@ -190,12 +199,8 @@ export function UpgradePrompt({ feature, onClose, inline = false }) {
         {/* Content */}
         <div className="p-6 space-y-4">
           <div className="text-center">
-            <h4 className="text-lg font-semibold text-white mb-1">
-              {featureInfo.name}
-            </h4>
-            <p className="text-gray-400">
-              {featureInfo.description}
-            </p>
+            <h4 className="text-lg font-semibold text-white mb-1">{featureInfo.name}</h4>
+            <p className="text-gray-400">{featureInfo.description}</p>
           </div>
 
           <div className="bg-slate-700/50 rounded-lg p-4">
@@ -213,12 +218,14 @@ export function UpgradePrompt({ feature, onClose, inline = false }) {
           <div className="space-y-2">
             <p className="text-sm text-gray-400 font-medium">Premium includes:</p>
             <ul className="text-sm space-y-1">
-              {Object.entries(FEATURE_INFO).slice(0, 4).map(([key, info]) => (
-                <li key={key} className="flex items-center gap-2 text-gray-300">
-                  <span className="text-green-400">✓</span>
-                  {info.name}
-                </li>
-              ))}
+              {Object.entries(FEATURE_INFO)
+                .slice(0, 4)
+                .map(([key, info]) => (
+                  <li key={key} className="flex items-center gap-2 text-gray-300">
+                    <span className="text-green-400">✓</span>
+                    {info.name}
+                  </li>
+                ))}
             </ul>
           </div>
 
@@ -269,23 +276,31 @@ export function UsageLimitWarning({ metric, current, limit }) {
   if (limit === Infinity) return null;
 
   return (
-    <div className={`
+    <div
+      className={`
       rounded-lg p-3 text-sm
-      ${isAtLimit ? 'bg-red-900/30 border border-red-700' : 
-        isNearLimit ? 'bg-yellow-900/30 border border-yellow-700' : 
-        'bg-slate-800'}
-    `}>
+      ${
+        isAtLimit
+          ? 'bg-red-900/30 border border-red-700'
+          : isNearLimit
+            ? 'bg-yellow-900/30 border border-yellow-700'
+            : 'bg-slate-800'
+      }
+    `}
+    >
       <div className="flex justify-between items-center mb-2">
-        <span className={isAtLimit ? 'text-red-400' : isNearLimit ? 'text-yellow-400' : 'text-gray-400'}>
+        <span
+          className={isAtLimit ? 'text-red-400' : isNearLimit ? 'text-yellow-400' : 'text-gray-400'}
+        >
           {metric === 'filesOrganized' ? 'Files this month' : metric}
         </span>
         <span className="text-white font-medium">
           {current} / {limit}
         </span>
       </div>
-      
+
       <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-        <div 
+        <div
           className={`h-full transition-all ${
             isAtLimit ? 'bg-red-500' : isNearLimit ? 'bg-yellow-500' : 'bg-teal-500'
           }`}
