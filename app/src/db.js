@@ -1919,7 +1919,7 @@ export function createOrganizationRule(rule) {
     if (rule.rule_type === 'regex') {
       try {
         new RegExp(pattern);
-      } catch (e) {
+      } catch (_e) {
         throw new DatabaseError('Invalid regular expression pattern', 'insert');
       }
     }
@@ -2010,7 +2010,7 @@ export function updateOrganizationRule(ruleId, updates) {
       const patternToCheck = updates.pattern || getOrganizationRule(id)?.pattern;
       try {
         new RegExp(patternToCheck);
-      } catch (e) {
+      } catch (_e) {
         throw new DatabaseError('Invalid regular expression pattern', 'update');
       }
     }

@@ -7,7 +7,6 @@ import {
   Settings,
   Download,
   Upload,
-  Shield,
   Lock,
   Cloud,
   ChevronRight,
@@ -28,11 +27,9 @@ import {
   Layers,
   Table,
   Terminal,
-  Folder,
   File,
   ArrowLeft,
   RefreshCw,
-  HardDrive,
   FolderOpen,
 } from 'lucide-react';
 import {
@@ -40,10 +37,7 @@ import {
   getAreas,
   getCategories,
   getFolders,
-  getFolder,
   getItems,
-  searchFolders,
-  searchItems,
   searchAll,
   createFolder,
   updateFolder,
@@ -54,12 +48,9 @@ import {
   getNextFolderNumber,
   getNextItemNumber,
   getStats,
-  getStorageLocations,
-  getRecentActivity,
   exportDatabase,
   exportToJSON,
   importDatabase,
-  saveDatabase,
   createArea,
   updateArea,
   deleteArea,
@@ -67,7 +58,6 @@ import {
   updateCategory,
   deleteCategory,
   executeSQL,
-  getTables,
   getTableData,
   resetDatabase,
 } from './db.js';
@@ -1875,6 +1865,7 @@ export default function App() {
       setIsLoading(false);
     }
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadData = useCallback(() => {

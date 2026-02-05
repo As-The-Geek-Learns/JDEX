@@ -9,7 +9,7 @@ if (process.platform === 'win32') {
     if (require('electron-squirrel-startup')) {
       app.quit();
     }
-  } catch (e) {
+  } catch (_e) {
     // Module not available, skip
   }
 }
