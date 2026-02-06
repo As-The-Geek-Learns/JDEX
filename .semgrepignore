@@ -1,0 +1,18 @@
+# Semgrep ignore file
+# https://semgrep.dev/docs/ignoring-files-folders-code/
+
+# Internal CI/workflow scripts - not production code
+# These use child_process intentionally for running npm commands
+scripts/verify.js
+scripts/ship.js
+scripts/geminiReview.js
+app/scripts/sign-windows.cjs
+app/scripts/notarize.js
+
+# Standard exclusions
+node_modules/
+.git/
+dist/
+dist-electron/
+build/
+*.min.js
