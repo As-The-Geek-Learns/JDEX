@@ -43,10 +43,7 @@ export const premiumLicenseState = {
  *   licenseState: premiumLicenseState
  * });
  */
-export function renderWithProviders(
-  ui,
-  { licenseState = defaultLicenseState, ...options } = {}
-) {
+export function renderWithProviders(ui, { licenseState = defaultLicenseState, ...options } = {}) {
   // Placeholder wrapper - will be expanded when contexts are properly exported
   function Wrapper({ children }) {
     // TODO: Wrap with actual providers when LicenseContext supports initialState
@@ -95,10 +92,7 @@ export function createMockEvent(overrides = {}) {
  * @example
  * await waitForCondition(() => screen.queryByText('Loaded') !== null);
  */
-export async function waitForCondition(
-  condition,
-  { timeout = 5000, interval = 50 } = {}
-) {
+export async function waitForCondition(condition, { timeout = 5000, interval = 50 } = {}) {
   const startTime = Date.now();
   while (!condition()) {
     if (Date.now() - startTime > timeout) {

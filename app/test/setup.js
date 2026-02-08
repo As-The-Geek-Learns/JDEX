@@ -72,9 +72,7 @@ Object.defineProperty(window, 'matchMedia', {
 // sql.js Mock
 // ============================================================
 vi.mock('sql.js', async () => {
-  const { MockDatabase, __setMockDbState } = await import(
-    '../__mocks__/sql.js.js'
-  );
+  const { MockDatabase, __setMockDbState } = await import('../__mocks__/sql.js.js');
   return {
     default: vi.fn(() =>
       Promise.resolve({

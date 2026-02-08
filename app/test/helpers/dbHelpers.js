@@ -1,8 +1,4 @@
-import {
-  __setMockDbState,
-  __resetMockDb,
-  __getMockDbState,
-} from '../../__mocks__/sql.js.js';
+import { __setMockDbState, __resetMockDb, __getMockDbState } from '../../__mocks__/sql.js.js';
 
 /**
  * Set up mock database with JD hierarchy data for testing
@@ -25,19 +21,11 @@ export function setupMockJDData({ areas = [], categories = [], folders = [], ite
 
   if (areas.length) {
     const values = areas.map((a) => [a.id, a.code, a.name, a.description || '']);
-    state['SELECT * FROM areas'] = [
-      { values, columns: ['id', 'code', 'name', 'description'] },
-    ];
+    state['SELECT * FROM areas'] = [{ values, columns: ['id', 'code', 'name', 'description'] }];
   }
 
   if (categories.length) {
-    const values = categories.map((c) => [
-      c.id,
-      c.area_id,
-      c.code,
-      c.name,
-      c.description || '',
-    ]);
+    const values = categories.map((c) => [c.id, c.area_id, c.code, c.name, c.description || '']);
     state['SELECT * FROM categories'] = [
       { values, columns: ['id', 'area_id', 'code', 'name', 'description'] },
     ];
@@ -58,13 +46,7 @@ export function setupMockJDData({ areas = [], categories = [], folders = [], ite
   }
 
   if (items.length) {
-    const values = items.map((i) => [
-      i.id,
-      i.folder_id,
-      i.code,
-      i.name,
-      i.description || '',
-    ]);
+    const values = items.map((i) => [i.id, i.folder_id, i.code, i.name, i.description || '']);
     state['SELECT * FROM items'] = [
       { values, columns: ['id', 'folder_id', 'code', 'name', 'description'] },
     ];

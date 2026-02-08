@@ -27,11 +27,7 @@ export default defineConfig({
       reporter: ['text', 'lcov', 'html'],
       reportsDirectory: './coverage',
       include: ['src/**/*.{js,jsx}'],
-      exclude: [
-        'src/main.jsx',
-        '**/*.test.{js,jsx}',
-        '**/*.spec.{js,jsx}',
-      ],
+      exclude: ['src/main.jsx', '**/*.test.{js,jsx}', '**/*.spec.{js,jsx}'],
       thresholds: {
         global: { statements: 60, branches: 50, functions: 60, lines: 60 },
         'src/utils/validation.js': { statements: 90, lines: 90 },
