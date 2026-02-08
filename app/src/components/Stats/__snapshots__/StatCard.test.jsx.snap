@@ -1,0 +1,81 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`StatCard Snapshot > matches snapshot with all props 1`] = `
+<div
+  class="glass-card p-4 hover:bg-slate-800/50 transition-colors"
+>
+  <div
+    class="flex items-start justify-between"
+  >
+    <div
+      class="flex-1"
+    >
+      <div
+        class="text-3xl font-bold text-purple-400"
+      >
+        1,234
+      </div>
+      <div
+        class="text-sm text-slate-400 flex items-center gap-1 mt-1"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-activity"
+          fill="none"
+          height="14"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="14"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"
+          />
+        </svg>
+        Monthly Stats
+      </div>
+      <div
+        class="text-xs text-slate-500 mt-1"
+      >
+        This month
+      </div>
+    </div>
+    <div
+      class="text-sm font-medium text-green-400"
+    >
+      ↑
+       
+      15
+      %
+    </div>
+  </div>
+</div>
+`;
+
+exports[`StatCard Snapshot > matches snapshot with default props 1`] = `
+<div
+  class="glass-card p-4 hover:bg-slate-800/50 transition-colors"
+>
+  <div
+    class="flex items-start justify-between"
+  >
+    <div
+      class="flex-1"
+    >
+      <div
+        class="text-3xl font-bold text-teal-400"
+      >
+        42
+      </div>
+      <div
+        class="text-sm text-slate-400 flex items-center gap-1 mt-1"
+      >
+        Files Organized
+      </div>
+    </div>
+  </div>
+</div>
+`;

@@ -30,8 +30,15 @@ export default defineConfig({
       exclude: ['src/main.jsx', '**/*.test.{js,jsx}', '**/*.spec.{js,jsx}'],
       thresholds: {
         global: { statements: 60, branches: 50, functions: 60, lines: 60 },
+        // Phase 2: Utility files
         'src/utils/validation.js': { statements: 90, lines: 90 },
         'src/utils/errors.js': { statements: 85, lines: 85 },
+        // Phase 4: React components
+        'src/components/Stats/StatCard.jsx': { statements: 80, lines: 80 },
+        'src/context/LicenseContext.jsx': { statements: 80, lines: 80 },
+        'src/components/Settings/LicenseSettings.jsx': { statements: 80, lines: 80 },
+        'src/components/Settings/FeedbackSettings.jsx': { statements: 80, lines: 80 },
+        'src/components/Settings/CloudDriveSettings.jsx': { statements: 80, lines: 80 },
       },
     },
   },
