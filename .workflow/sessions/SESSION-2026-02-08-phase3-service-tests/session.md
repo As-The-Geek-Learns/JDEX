@@ -1,7 +1,7 @@
 # Session: Phase 3 Service Layer Tests
 
 **Date**: February 8, 2026
-**Status**: Complete
+**Status**: Complete & Merged (PR #23)
 **Plan**: [plan.md](./plan.md)
 
 ---
@@ -159,12 +159,158 @@ When a dependency has architectural issues (like db.js's CDN loading), you can s
 
 ---
 
+## CodeAnt AI Review & Fixes
+
+### PR #23: Nitpicks Addressed
+
+After creating the PR, CodeAnt AI performed an automated review and identified 5 nitpicks. All were addressed and merged.
+
+#### 1. Time-Dependent Tests (licenseService.test.js)
+
+**Issue**: Tests for 30-day license validation and 8-day offline grace period used relative date calculations that could become flaky.
+
+**Fix**: Used Vitest fake timers for deterministic behavior:
+
+```javascript
+it('should return false if license validation is older than 30 days', () => {
+  vi.useFakeTimers();
+  const now = new Date('2026-02-15T12:00:00Z');
+  vi.setSystemTime(now);
+
+  const oldDate = new Date('2026-01-14T12:00:00Z'); // 32 days ago
+
+  const licenseData = {
+    key: 'TEST-KEY',
+    tier: 'premium',
+    validatedAt: oldDate.toISOString(),
+  };
+  localStorage.setItem('jdex_license', JSON.stringify(licenseData));
+
+  expect(isPremium()).toBe(false);
+
+  vi.useRealTimers();
+});
+```
+
+#### 2. MSW Strictness (licenseService.test.js)
+
+**Issue**: `onUnhandledRequest: 'error'` makes tests brittle when unrelated requests occur.
+
+**Fix**: Changed to `'warn'` for more resilient tests:
+
+```javascript
+beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
+```
+
+#### 3. Test Isolation (batchRenameService.test.js)
+
+**Issue**: No cleanup for `vi.stubGlobal()` calls could cause test leakage.
+
+**Fix**: Added proper afterEach cleanup:
+
+```javascript
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// In describe block:
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+```
+
+#### 4. RegExp vs String Pattern (batchRenameService.test.js)
+
+**Issue**: Using RegExp for find/replace with special characters in tests inconsistent with string usage.
+
+**Fix**: Replaced with string-based pattern:
+
+```javascript
+it('should detect duplicate conflicts', () => {
+  const files = [
+    { name: 'prefix_same.txt', path: '/docs/prefix_same.txt' },
+    { name: 'other_same.txt', path: '/docs/other_same.txt' },
+  ];
+
+  const preview = generatePreview(files, {
+    findReplace: true,
+    find: 'prefix_',
+    replace: 'other_',
+  });
+
+  const duplicates = preview.filter((p) => p.conflict === 'duplicate');
+  expect(duplicates.length).toBeGreaterThanOrEqual(1);
+});
+```
+
+#### 5. SQL Pattern Matching (statisticsService.test.js)
+
+**Issue**: Case-sensitive exact SQL matching could break with whitespace/formatting changes.
+
+**Fix**: Added case-insensitive, whitespace-normalized matching:
+
+```javascript
+function createMockDB(execResponses = {}) {
+  return {
+    exec: vi.fn((sql) => {
+      // Normalize SQL: lowercase and collapse whitespace for robust matching
+      const normalizedSql = sql.toLowerCase().replace(/\s+/g, ' ');
+
+      // Check for matching query patterns (case-insensitive)
+      for (const [pattern, response] of Object.entries(execResponses)) {
+        const normalizedPattern = pattern.toLowerCase().replace(/\s+/g, ' ');
+        if (normalizedSql.includes(normalizedPattern)) {
+          return response;
+        }
+      }
+      return [];
+    }),
+  };
+}
+```
+
+---
+
+## PR Merge Summary
+
+**PR #23**: Phase 3 - Service Layer Tests
+
+- **Merged**: February 8, 2026
+- **Method**: Squash merge
+- **Branch**: `feature/phase3-service-tests` → `main`
+- **Commits**:
+  - Initial Phase 3 tests (161 tests added)
+  - CodeAnt AI nitpick fixes
+
+**Final Test Count**: 488 tests passing
+
+---
+
 ## Next Steps (Phase 4+)
 
 The test coverage plan has these remaining phases:
 
 1. **Phase 4: React Component Tests** - Testing Library for StatCard, LicenseContext, Settings components
 2. **Phase 5: Integration Tests** - End-to-end flows, App.jsx critical paths
+
+---
+
+## ASTGL Content Moments (Additional)
+
+### 4. Fake Timers for Date-Dependent Tests
+
+When testing code that depends on the current date/time (like "is this license older than 30 days?"), use fake timers:
+
+```javascript
+vi.useFakeTimers();
+vi.setSystemTime(new Date('2026-02-15T12:00:00Z'));
+// ... test code ...
+vi.useRealTimers();
+```
+
+This makes tests deterministic and avoids flaky failures when tests run at different times.
+
+### 5. Automated Code Review Integration
+
+CodeAnt AI's automated review caught legitimate test quality issues that would have made the test suite brittle over time. Integrating AI-powered code review into the PR workflow catches issues before they become problems.
 
 ---
 
