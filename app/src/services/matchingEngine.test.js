@@ -11,7 +11,7 @@
  * - Rule helper functions
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   CONFIDENCE,
   MatchingEngine,
@@ -20,6 +20,12 @@ import {
   createKeywordRule,
   suggestRulesForFolder,
 } from './matchingEngine.js';
+
+// Reset all mocks AND singleton state before each test for full isolation
+beforeEach(() => {
+  vi.resetAllMocks();
+  getMatchingEngine().invalidateCache();
+});
 
 // =============================================================================
 // Mocks
@@ -682,7 +688,6 @@ describe('MatchingEngine', () => {
   describe('createRule', () => {
     it('should create rule and invalidate cache', () => {
       engine.refreshCache();
-      const initialTime = engine.lastCacheRefresh;
 
       engine.createRule({
         name: 'Test Rule',
@@ -755,7 +760,8 @@ describe('getMatchingEngine', () => {
 describe('createExtensionRule', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset singleton for predictable behavior
+    // Reset singleton cache for predictable behavior
+    getMatchingEngine().invalidateCache();
     getOrganizationRules.mockReturnValue([]);
     getFolders.mockReturnValue([]);
     getCategories.mockReturnValue([]);
@@ -810,6 +816,8 @@ describe('createExtensionRule', () => {
 describe('createKeywordRule', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset singleton cache for predictable behavior
+    getMatchingEngine().invalidateCache();
     getOrganizationRules.mockReturnValue([]);
     getFolders.mockReturnValue([]);
     getCategories.mockReturnValue([]);

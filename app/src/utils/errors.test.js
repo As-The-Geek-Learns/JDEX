@@ -376,65 +376,45 @@ describe('sanitizeErrorForUser', () => {
     expect(result).toBe('Simple error message');
   });
 
-  it('should redact macOS user paths', () => {
-    const error = new Error('File not found: /Users/james/Documents/secret.txt');
+  // Parameterized tests for path redaction (reduces duplication)
+  it.each([
+    ['macOS', '/Users/james/Documents/secret.txt', 'james', '/Users/'],
+    ['Windows', 'C:\\Users\\james\\Documents\\secret.txt', 'james', 'C:\\Users'],
+    ['Linux', '/home/james/Documents/secret.txt', 'james', '/home/'],
+  ])('should redact %s user paths', (_platform, path, username, pathPrefix) => {
+    const error = new Error(`File not found: ${path}`);
     const result = sanitizeErrorForUser(error);
     expect(result).toContain('[redacted]');
-    expect(result).not.toContain('james');
-    expect(result).not.toContain('/Users/');
+    expect(result).not.toContain(username);
+    if (pathPrefix) {
+      expect(result).not.toContain(pathPrefix);
+    }
   });
 
-  it('should redact Windows user paths', () => {
-    const error = new Error('File not found: C:\\Users\\james\\Documents\\secret.txt');
+  // Parameterized tests for database error redaction
+  it.each([
+    ['SQLite references', 'SQLite error: database is locked', 'SQLite'],
+    ['SQL syntax errors', 'sql syntax error near SELECT', 'syntax'],
+    ['constraint errors', 'constraint violation: UNIQUE', 'constraint'],
+  ])('should redact %s', (_type, message, sensitiveText) => {
+    const error = new Error(message);
     const result = sanitizeErrorForUser(error);
     expect(result).toContain('[redacted]');
-    expect(result).not.toContain('james');
+    expect(result.toLowerCase()).not.toContain(sensitiveText.toLowerCase());
   });
 
-  it('should redact Linux user paths', () => {
-    const error = new Error('File not found: /home/james/Documents/secret.txt');
+  // Parameterized tests for Node.js error codes
+  it.each([
+    ['ENOENT', 'ENOENT: no such file or directory'],
+    ['EACCES', 'EACCES: permission denied'],
+    ['errno', 'errno 13: permission denied'],
+  ])('should redact %s errors', (code, message) => {
+    const error = new Error(message);
     const result = sanitizeErrorForUser(error);
     expect(result).toContain('[redacted]');
-    expect(result).not.toContain('james');
-  });
-
-  it('should redact SQLite references', () => {
-    const error = new Error('SQLite error: database is locked');
-    const result = sanitizeErrorForUser(error);
-    expect(result).toContain('[redacted]');
-    expect(result).not.toContain('SQLite');
-  });
-
-  it('should redact SQL syntax errors', () => {
-    const error = new Error('sql syntax error near SELECT');
-    const result = sanitizeErrorForUser(error);
-    expect(result).toContain('[redacted]');
-  });
-
-  it('should redact constraint errors', () => {
-    const error = new Error('constraint violation: UNIQUE');
-    const result = sanitizeErrorForUser(error);
-    expect(result).toContain('[redacted]');
-  });
-
-  it('should redact Node.js error codes', () => {
-    const error = new Error('ENOENT: no such file or directory');
-    const result = sanitizeErrorForUser(error);
-    expect(result).toContain('[redacted]');
-    expect(result).not.toContain('ENOENT');
-  });
-
-  it('should redact EACCES errors', () => {
-    const error = new Error('EACCES: permission denied');
-    const result = sanitizeErrorForUser(error);
-    expect(result).toContain('[redacted]');
-    expect(result).not.toContain('EACCES');
-  });
-
-  it('should redact errno details', () => {
-    const error = new Error('errno 13: permission denied');
-    const result = sanitizeErrorForUser(error);
-    expect(result).toContain('[redacted]');
+    if (code !== 'errno') {
+      expect(result).not.toContain(code);
+    }
   });
 
   it('should redact stack traces', () => {
@@ -494,19 +474,20 @@ describe('LogLevel', () => {
 
 describe('logError', () => {
   let consoleErrorSpy;
-  const originalEnv = process.env.NODE_ENV;
 
   beforeEach(() => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
+    // Unstub env first - less likely to throw
+    // Ensures cleanup even if mockRestore() fails
+    vi.unstubAllEnvs();
     consoleErrorSpy.mockRestore();
-    process.env.NODE_ENV = originalEnv;
   });
 
   it('should log error in development mode with full details', () => {
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
     const error = new AppError('Test error', 'TEST_CODE');
 
     logError(error, 'TestContext');
@@ -519,7 +500,7 @@ describe('logError', () => {
   });
 
   it('should log sanitized error in production mode', () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     const error = new FileSystemError('Error at /Users/james/file', 'read');
 
     logError(error, 'TestContext');
@@ -530,7 +511,7 @@ describe('logError', () => {
   });
 
   it('should include error name and code', () => {
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
     const error = new DatabaseError('Query failed', 'query');
 
     logError(error, 'Database');
@@ -541,7 +522,7 @@ describe('logError', () => {
   });
 
   it('should use default context', () => {
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
     logError(new Error('Test'));
 
     const loggedObj = consoleErrorSpy.mock.calls[0][1];
@@ -549,7 +530,7 @@ describe('logError', () => {
   });
 
   it('should use specified log level', () => {
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
     logError(new Error('Test'), 'Context', LogLevel.WARN);
 
     const loggedObj = consoleErrorSpy.mock.calls[0][1];
@@ -557,7 +538,7 @@ describe('logError', () => {
   });
 
   it('should handle null error', () => {
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
     logError(null, 'Context');
 
     const loggedObj = consoleErrorSpy.mock.calls[0][1];
