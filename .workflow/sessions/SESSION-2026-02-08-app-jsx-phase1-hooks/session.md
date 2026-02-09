@@ -1,9 +1,9 @@
 # Session Summary: App.jsx Phase 1 - Custom Hooks Extraction
 
 **Date:** February 8, 2026
-**Status:** COMPLETE
-**Commit:** `bcc838e`
-**PR:** #25
+**Status:** COMPLETE & MERGED
+**Commits:** `bcc838e` (hooks extraction), `cbeb5cf` (CodeAnt fixes)
+**PR:** #25 (merged to main)
 **Tests:** 986 passing (all green)
 
 ---
@@ -74,6 +74,20 @@ Hooks expose both state and setters where needed (e.g., `setEditingFolder`) to m
 
 ---
 
+## CodeAnt AI Review Fixes
+
+After initial push, CodeAnt AI identified 5 nitpicks. All were addressed in commit `cbeb5cf`:
+
+| Issue | File | Fix Applied |
+|-------|------|-------------|
+| SQL execution surface | `App.jsx` | Added confirmation dialog before executing raw SQL |
+| Possible runtime error | `useFolderCRUD.js` | Added `typeof navigateTo === 'function'` guard |
+| Potential runtime error | `useNavigation.js` | Added early returns + optional chaining with fallbacks for breadcrumb data |
+| Effect cleanup/memory leak | `useAppData.js` | Added `isMounted` pattern with cleanup function |
+| Nested interactive element | `App.jsx` (CategoryTree) | Separated expand button from area selection button for accessibility |
+
+---
+
 ## Files Modified
 
 ### Created (6 files)
@@ -127,12 +141,17 @@ When extracting hooks that need to share state bidirectionally, sometimes the cl
 [ASTGL CONTENT] **Test-Driven Refactoring Confidence**
 Having 986 tests meant every extraction step was immediately verifiable. Run tests after each change, not at the end. If tests break, you know exactly which change caused it.
 
+[ASTGL CONTENT] **AI Code Review as Quality Gate**
+CodeAnt AI caught 5 legitimate issues that manual review missed: runtime error risks from unguarded function calls, memory leak potential from async effects, and an HTML accessibility violation. Automated AI review adds genuine value beyond just linting - it reasons about code behavior.
+
 ---
 
 ## Session Stats
 
-- **Duration:** ~2 hours
+- **Duration:** ~2.5 hours (including CodeAnt fixes)
 - **Hooks extracted:** 6
 - **Lines moved:** ~589
-- **Tests run:** 6 times (after each hook)
+- **CodeAnt issues fixed:** 5
+- **Tests run:** 8 times total
 - **All tests passing:** Yes (986/986)
+- **PR merged:** Yes
