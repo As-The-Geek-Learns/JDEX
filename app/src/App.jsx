@@ -1,4 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAppData } from './hooks/useAppData.js';
+import { useNavigation } from './hooks/useNavigation.js';
+import { useSearch } from './hooks/useSearch.js';
+import { useFolderCRUD } from './hooks/useFolderCRUD.js';
+import { useItemCRUD } from './hooks/useItemCRUD.js';
+import { useModalState } from './hooks/useModalState.js';
 import {
   Search,
   Plus,
@@ -48,24 +54,9 @@ import DropZone from './components/DragDrop/DropZone.jsx';
 import { LicenseProvider } from './context/LicenseContext.jsx';
 import { DragDropProvider, useDragDrop } from './context/DragDropContext.jsx';
 import {
-  initDatabase,
-  getAreas,
-  getCategories,
-  getFolders,
   getFolder,
-  getItems,
-  searchFolders,
-  searchItems,
-  searchAll,
-  createFolder,
-  updateFolder,
-  deleteFolder,
-  createItem,
-  updateItem,
-  deleteItem,
   getNextFolderNumber,
   getNextItemNumber,
-  getStats,
   getStorageLocations,
   getRecentActivity,
   exportDatabase,
@@ -417,20 +408,28 @@ function CategoryTree({ areas, categories, selectedCategory, onSelectCategory, o
 
         return (
           <div key={area.id}>
-            <button
-              onClick={() => onSelectArea(area)}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-700/50 transition-colors"
-            >
-              <span onClick={(e) => toggleArea(area.id, e)}>
+            <div className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-700/50 transition-colors">
+              <button
+                onClick={(e) => toggleArea(area.id, e)}
+                className="p-0.5 hover:bg-slate-600 rounded transition-colors"
+                aria-label={isExpanded ? 'Collapse area' : 'Expand area'}
+                type="button"
+              >
                 {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              </span>
-              <Icon size={16} style={{ color: area.color }} />
-              <span className="font-medium text-sm">
-                {area.range_start.toString().padStart(2, '0')}-
-                {area.range_end.toString().padStart(2, '0')}
-              </span>
-              <span className="text-slate-400 text-sm truncate">{area.name}</span>
-            </button>
+              </button>
+              <button
+                onClick={() => onSelectArea(area)}
+                className="flex-1 flex items-center gap-2 text-left"
+                type="button"
+              >
+                <Icon size={16} style={{ color: area.color }} />
+                <span className="font-medium text-sm">
+                  {area.range_start.toString().padStart(2, '0')}-
+                  {area.range_end.toString().padStart(2, '0')}
+                </span>
+                <span className="text-slate-400 text-sm truncate">{area.name}</span>
+              </button>
+            </div>
 
             {isExpanded && (
               <div className="ml-6 space-y-0.5">
@@ -1388,6 +1387,14 @@ function SettingsModal({ isOpen, onClose, areas, categories, onDataChange }) {
   };
 
   const handleExecuteSQL = () => {
+    if (!sqlQuery.trim()) return;
+    if (
+      !confirm(
+        'WARNING: You are about to execute raw SQL. This can modify or delete data.\n\nAre you sure you want to proceed?'
+      )
+    ) {
+      return;
+    }
     const result = executeSQL(sqlQuery);
     setSqlResult(result);
     if (result.success) onDataChange();
@@ -1973,205 +1980,88 @@ function QuickStatsOverview({ stats }) {
 
 // Main App Component
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [areas, setAreas] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [folders, setFolders] = useState([]);
+  // Core data from useAppData hook
+  const {
+    isLoading,
+    areas,
+    categories,
+    folders,
+    stats,
+    setFolders,
+    setCategories,
+    loadData,
+    triggerRefresh,
+  } = useAppData();
+
+  // Items state - managed separately as it depends on selectedFolder
   const [items, setItems] = useState([]);
-  const [stats, setStats] = useState({});
 
-  // Refresh trigger - increment to force data reload
-  const [refreshKey, setRefreshKey] = useState(0);
+  // Search state from useSearch hook
+  const { searchQuery, searchResults, setSearchQuery, clearSearch } = useSearch();
 
-  // Navigation state
-  const [currentView, setCurrentView] = useState('home'); // home, area, category, folder
-  const [selectedArea, setSelectedArea] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [selectedFolder, setSelectedFolder] = useState(null);
-  const [breadcrumbPath, setBreadcrumbPath] = useState([]);
+  // Navigation from useNavigation hook
+  const {
+    currentView,
+    selectedArea,
+    selectedCategory,
+    selectedFolder,
+    breadcrumbPath,
+    navigateTo,
+  } = useNavigation({
+    areas,
+    setFolders,
+    setCategories,
+    setItems,
+    clearSearch,
+  });
 
-  // Search
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState({ folders: [], items: [] });
+  // Folder CRUD from useFolderCRUD hook
+  const {
+    editingFolder,
+    setEditingFolder,
+    handleCreateFolder,
+    handleUpdateFolder,
+    handleDeleteFolder,
+  } = useFolderCRUD({
+    triggerRefresh,
+    selectedFolder,
+    selectedCategory,
+    navigateTo,
+  });
 
-  // Modals
-  const [showNewFolderModal, setShowNewFolderModal] = useState(false);
-  const [showNewItemModal, setShowNewItemModal] = useState(false);
-  const [editingFolder, setEditingFolder] = useState(null);
-  const [editingItem, setEditingItem] = useState(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showFileOrganizer, setShowFileOrganizer] = useState(false);
-  const [showStatsDashboard, setShowStatsDashboard] = useState(false);
-  const [showBatchRename, setShowBatchRename] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Item CRUD from useItemCRUD hook
+  const { editingItem, setEditingItem, handleCreateItem, handleUpdateItem, handleDeleteItem } =
+    useItemCRUD({
+      triggerRefresh,
+      selectedFolder,
+      setItems,
+    });
 
-  // Initialize database
-  useEffect(() => {
-    async function init() {
-      await initDatabase();
-      loadData();
-      setIsLoading(false);
-    }
-    init();
-  }, []);
+  // Modal states from useModalState hook
+  const {
+    showNewFolderModal,
+    showNewItemModal,
+    showSettings,
+    showFileOrganizer,
+    showStatsDashboard,
+    showBatchRename,
+    setShowNewFolderModal,
+    setShowNewItemModal,
+    setShowSettings,
+    setShowFileOrganizer,
+    setShowStatsDashboard,
+    setShowBatchRename,
+    sidebarOpen,
+    setSidebarOpen,
+  } = useModalState();
 
-  const loadData = useCallback(() => {
-    setAreas(getAreas());
-    setCategories(getCategories());
-    setFolders(getFolders());
-    setStats(getStats());
-  }, []);
-
-  // Trigger refresh helper - call this after any data mutation
-  const triggerRefresh = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
-  }, []);
-
-  // Reload data whenever refreshKey changes
-  useEffect(() => {
-    if (!isLoading) {
-      loadData();
-    }
-  }, [refreshKey, isLoading, loadData]);
-
-  // Handle search
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      const results = searchAll(searchQuery);
-      setSearchResults(results);
-    } else {
-      setSearchResults({ folders: [], items: [] });
-    }
-  }, [searchQuery]);
-
-  // Load items when folder is selected
-  useEffect(() => {
-    if (selectedFolder) {
-      setItems(getItems(selectedFolder.id));
-    }
-  }, [selectedFolder]);
-
-  // Navigation handlers
-  const navigateTo = (type, data = null) => {
-    setSearchQuery('');
-
-    // Ensure data is fresh before navigating
-    const freshFolders = getFolders();
-    const freshCategories = getCategories();
-    setFolders(freshFolders);
-    setCategories(freshCategories);
-
-    switch (type) {
-      case 'home':
-        setCurrentView('home');
-        setSelectedArea(null);
-        setSelectedCategory(null);
-        setSelectedFolder(null);
-        setBreadcrumbPath([]);
-        break;
-      case 'area':
-        setCurrentView('area');
-        setSelectedArea(data);
-        setSelectedCategory(null);
-        setSelectedFolder(null);
-        setBreadcrumbPath([
-          { type: 'area', data, label: `${data.range_start}-${data.range_end} ${data.name}` },
-        ]);
-        break;
-      case 'category': {
-        setCurrentView('category');
-        setSelectedCategory(data);
-        setSelectedFolder(null);
-        // Find area for breadcrumb - use fresh data
-        const area = areas.find((a) => a.id === data.area_id);
-        setBreadcrumbPath([
-          {
-            type: 'area',
-            data: area,
-            label: `${area?.range_start}-${area?.range_end} ${area?.name}`,
-          },
-          {
-            type: 'category',
-            data,
-            label: `${data.number.toString().padStart(2, '0')} ${data.name}`,
-          },
-        ]);
-        break;
-      }
-      case 'folder': {
-        setCurrentView('folder');
-        setSelectedFolder(data);
-        // Refresh items for this folder
-        setItems(getItems(data.id));
-        // Build full breadcrumb - use fresh categories data
-        const folder = data;
-        const cat = freshCategories.find((c) => c.id === folder.category_id);
-        const ar = areas.find((a) => a.id === cat?.area_id);
-        setBreadcrumbPath([
-          { type: 'area', data: ar, label: `${ar?.range_start}-${ar?.range_end} ${ar?.name}` },
-          {
-            type: 'category',
-            data: cat,
-            label: `${cat?.number.toString().padStart(2, '0')} ${cat?.name}`,
-          },
-          { type: 'folder', data: folder, label: `${folder.folder_number} ${folder.name}` },
-        ]);
-        break;
-      }
-    }
-  };
-
-  // CRUD handlers
-  const handleCreateFolder = (folderData) => {
-    createFolder(folderData);
-    triggerRefresh();
-  };
-
-  const handleUpdateFolder = (folderData) => {
-    updateFolder(folderData.id, folderData);
-    triggerRefresh();
-  };
-
-  const handleDeleteFolder = (folder) => {
-    if (confirm(`Delete folder "${folder.folder_number} ${folder.name}"? This cannot be undone.`)) {
-      try {
-        deleteFolder(folder.id);
-        triggerRefresh();
-        if (selectedFolder?.id === folder.id) {
-          navigateTo('category', selectedCategory);
-        }
-      } catch (e) {
-        alert(e.message);
-      }
-    }
-  };
-
-  const handleCreateItem = (itemData) => {
-    createItem(itemData);
-    triggerRefresh();
-    // Also refresh items for the current folder view
-    if (selectedFolder) {
-      setItems(getItems(selectedFolder.id));
-    }
-  };
-
-  const handleUpdateItem = (itemData) => {
-    updateItem(itemData.id, itemData);
-    triggerRefresh();
-    if (selectedFolder) {
-      setItems(getItems(selectedFolder.id));
-    }
-  };
-
-  const handleDeleteItem = (item) => {
-    if (confirm(`Delete item "${item.item_number} ${item.name}"?`)) {
-      deleteItem(item.id);
-      triggerRefresh();
-      if (selectedFolder) {
-        setItems(getItems(selectedFolder.id));
-      }
-    }
-  };
+  // All core state/logic now handled by custom hooks:
+  // - useAppData: Database init, areas, categories, folders, stats, refresh
+  // - useSearch: Search query, results
+  // - useNavigation: View state, breadcrumbs
+  // - useFolderCRUD: Folder create/update/delete, editingFolder
+  // - useItemCRUD: Item create/update/delete, editingItem
+  // - useModalState: All modal visibility states
 
   const handleImport = async (e) => {
     const file = e.target.files[0];
