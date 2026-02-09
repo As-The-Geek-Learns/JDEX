@@ -46,6 +46,10 @@
     "test:ci": "vitest run --reporter=verbose --passWithNoTests",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest watch",
+    "test:unit": "vitest run --config vitest.config.unit.js",
+    "test:unit:watch": "vitest --config vitest.config.unit.js",
+    "test:integration": "vitest run --config vitest.config.integration.js",
+    "test:integration:watch": "vitest --config vitest.config.integration.js",
     "test:e2e": "echo 'Placeholder for Playwright/Cypress'"
   },
   "lint-staged": {
