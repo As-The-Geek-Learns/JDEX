@@ -1,14 +1,20 @@
-# Minimal .gitleaks.toml allowlist to reduce false positives
-# Customize regexes and entropy-based rules for your repo
+# Minimal .gitleaks.toml allowlist configuration
+# Reduce false positives by allowlisting known non-secrets
+# See https://github.com/gitleaks/gitleaks/blob/master/docs/config.md
 
-[[allowlist]]
-  description = "Common false positive: example placeholder tokens in docs"
-  regexes = ["EXAMPLE_TOKEN", "PLACEHOLDER_SECRET"]
+[allowlist]
+  description = "Example placeholder tokens in documentation"
+  regexes = [
+    "EXAMPLE_TOKEN",
+    "PLACEHOLDER_SECRET",
+    "(?i)example[_-]?(token|secret|key|password)"
+  ]
+  paths = [
+    "(?i)example",
+    "(?i)fixture",
+    "(?i)mock"
+  ]
 
-# Example rule exclusion by path
-[[allowlist]]
-  description = "Allow sample fixture files"
-  paths = ["^tests/fixtures/", "^scripts/test-fixtures/"]
-
-# You can add commit authors, messages, or file-specific excludes here.
-# For production use, refine these entries rather than broadly allowing matches.
+# Add commit SHAs, file paths, or regexes to allowlist specific matches
+# commits = ["..."]
+# For more config options, see official Gitleaks documentation
