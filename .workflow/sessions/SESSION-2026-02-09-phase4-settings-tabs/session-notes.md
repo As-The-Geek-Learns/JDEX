@@ -4,7 +4,7 @@
 **Phase:** 4 of App.jsx Decomposition
 **Branch:** `feat/phase4-settings-tabs`
 **PR:** #29
-**Status:** Complete - Awaiting Review
+**Status:** Merged
 
 ---
 
@@ -107,9 +107,40 @@ import { Table, Terminal, RefreshCw } from 'lucide-react';
 d101c4f refactor: extract AreasTab from SettingsModal
 72f7ac5 refactor: extract CategoriesTab from SettingsModal
 ad9cff3 refactor: extract DatabaseTab from SettingsModal
+5a10be7 fix: address CodeAnt AI review findings
 ```
 
 Each commit is atomic - one extraction per commit with all related changes.
+
+---
+
+## CodeAnt AI Review & Response
+
+CodeAnt AI automatically reviewed the PR and identified 5 nitpicks:
+
+### Issues Fixed (commit `5a10be7`)
+
+| Finding | Resolution |
+|---------|------------|
+| **parseInt without radix** | Added radix `10` to all `parseInt` calls in AreasTab and CategoriesTab |
+| **NaN from empty inputs** | Added `isNaN()` validation before database operations |
+| **Controlled input mismatch** | Store numeric values as strings during editing, parse only on submit |
+| **Missing description field in edit** | Added description input to both AreasTab and CategoriesTab edit forms |
+
+### Accepted As-Is
+
+| Finding | Reasoning |
+|---------|-----------|
+| **Raw SQL / destructive actions** | This is a local-first desktop app. The Database tab is an admin tool with client-side `confirm()` dialogs, which is appropriate for this context. No server-side authorization needed since all data is local. |
+
+### [ASTGL CONTENT] Automated Code Review Integration
+
+CodeAnt AI's automated review caught real issues:
+- Input validation gaps that could cause NaN values in the database
+- Missing form fields that would lose data on edit
+- Inconsistent controlled component patterns
+
+This demonstrates the value of automated code review as a safety net, especially for refactoring work where the focus is on structure rather than logic.
 
 ---
 
@@ -130,9 +161,10 @@ Tests:     986 passed (17 test files)
 | 1 | Services extraction | 2,622 | 1,800 | 31% | Merged |
 | 2 | Component extraction | 1,800 | 940 | 48% | Merged |
 | 3 | Modal extraction | 940 | 282 | 70% | #28 Merged |
-| 4 | Settings tabs | 659 | 102 | 85% | #29 |
+| 4 | Settings tabs | 659 | 102 | 85% | #29 Merged |
 
 **App.jsx Total Reduction:** 2,622 → 282 lines (89%)
+**SettingsModal Total Reduction:** 659 → 102 lines (85%)
 
 ---
 
@@ -251,9 +283,19 @@ Using one commit per extraction (same pattern as Phase 3) makes:
 
 ## Next Steps
 
-1. Review and merge PR #29
+1. ~~Review and merge PR #29~~ **Done**
 2. Decide if Phase 5 is needed (App.jsx is already at 282 lines)
 3. Consider the decomposition project complete
+
+### Decomposition Project Status
+
+The App.jsx decomposition project has achieved its goals:
+- **App.jsx**: 2,622 → 282 lines (89% reduction)
+- **SettingsModal**: 659 → 102 lines (85% reduction)
+- Clean component architecture with proper separation of concerns
+- All 986 tests passing
+
+Further decomposition is optional. The codebase is now well-structured and maintainable.
 
 ---
 
