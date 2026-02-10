@@ -146,6 +146,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-        continue-on-error: true
-        # Gitleaks v2 requires a paid license for org repos.
-        # Review findings manually if they appear.
