@@ -44,8 +44,9 @@ jdex-complete-package/          # Monorepo root
 │   │   └── electron-main.js    # Entry point config
 │   ├── src/                    # React frontend
 │   │   ├── App.jsx             # Root component (2,622 lines - monolithic, needs refactoring)
-│   │   ├── db.js               # Database layer (3,344 lines - all CRUD + migrations)
-│   │   ├── index.css            # Global styles + Tailwind directives
+│   │   ├── db.js               # Database facade (451 lines - init, save, re-exports)
+│   │   ├── db/                 # Modular database layer (see Database Architecture below)
+│   │   ├── index.css           # Global styles + Tailwind directives
 │   │   ├── main.jsx            # React entry point
 │   │   ├── components/         # Feature-grouped React components
 │   │   │   ├── BatchRename/    # BatchRenameModal, FileSelector, RenamePreview
@@ -102,14 +103,60 @@ Areas (10-19, 20-29, ...)       # Broad life/work categories
 ### Database
 - **Engine**: sql.js (SQLite compiled to WebAssembly)
 - **Storage**: Serialized to `localStorage` key `jdex_database_v2`
-- **Schema Version**: 7 (migrations in `db.js`)
-- **Key Tables**: areas, categories, folders, items, file_organization_rules, activity_log, statistics
+- **Schema Version**: 7 (migrations in `db/schema/migrations.js`)
+- **Key Tables**: areas, categories, folders, items, organization_rules, activity_log, cloud_drives, watched_folders
 - **All queries use parameterized statements** (no SQL injection risk)
+- **Test Coverage**: 1,422 tests across the database layer
+
+### Database Architecture
+
+The database layer follows a modular repository pattern:
+
+```
+app/src/db/                          (13,329 lines total)
+├── core/                            # Infrastructure (1,945 lines + 1,440 tests)
+│   ├── cache.js                     # TTL cache for query results
+│   ├── database.js                  # DB instance management (getDB, setDB)
+│   ├── query-builder.js             # Fluent query API
+│   ├── result-mapper.js             # Row-to-object mapping
+│   └── transaction.js               # Transaction support
+│
+├── repositories/                    # CRUD operations (3,907 lines + 2,687 tests)
+│   ├── activity-log.js              # Activity logging
+│   ├── area-storage.js              # Area-to-cloud-drive mappings
+│   ├── areas.js                     # Area CRUD
+│   ├── categories.js                # Category CRUD
+│   ├── cloud-drives.js              # Cloud drive configurations
+│   ├── db-utils.js                  # Database utilities (vacuum, integrity)
+│   ├── folders.js                   # Folder CRUD
+│   ├── import-export.js             # Backup and JSON export
+│   ├── items.js                     # Item CRUD
+│   ├── organization-rules.js        # File organization rules
+│   ├── organized-files.js           # Organized file records
+│   ├── scanned-files.js             # Scanned files working set
+│   ├── search.js                    # Search operations
+│   ├── statistics.js                # Database statistics
+│   ├── storage-locations.js         # Storage location CRUD
+│   ├── watch-activity.js            # Watch activity logs
+│   ├── watched-folders.js           # Watch folder configurations
+│   └── utils.js                     # Shared helpers (getDB, saveDatabase)
+│
+└── schema/                          # Schema definitions (1,424 lines + 1,103 tests)
+    ├── constants.js                 # Schema version, validation constants
+    ├── migrations.js                # v2-v7 migrations
+    ├── seeds.js                     # Default data (areas, categories, locations)
+    └── tables.js                    # DDL definitions
+```
+
+The main `db.js` file (451 lines) is now a thin facade that:
+- Initializes sql.js and loads/creates the database
+- Re-exports all repository functions for backward compatibility
+- Provides `getDB()`, `initDatabase()`, `saveDatabase()`, `resetDatabase()`
 
 ### Key Design Decisions
 - **Local-first**: No server, no cloud by default. Data lives in the browser's localStorage.
 - **sql.js loaded from CDN**: `https://sql.js.org/dist/sql-wasm.js` (not bundled)
-- **No ORM**: Direct SQL via sql.js API. All queries in `db.js`.
+- **Repository pattern**: Each domain has its own module with CRUD operations
 - **Single database file**: All tables in one logical unit, exportable as JSON.
 
 ---
@@ -222,9 +269,11 @@ These are acknowledged issues, not bugs:
 | Issue | File | Lines | Impact |
 |-------|------|-------|--------|
 | Monolithic root component | `App.jsx` | 2,622 | Hard to navigate, no routing |
-| All DB logic in one file | `db.js` | 3,344 | Migrations, queries, schema mixed |
-| No automated tests | -- | 0 | No safety net for refactoring |
 | No TypeScript | All `.jsx`/`.js` | -- | No compile-time type checking |
+
+### Resolved Debt
+- ~~All DB logic in one file~~ → Refactored to modular `db/` structure (Feb 2026)
+- ~~No automated tests~~ → 1,422 tests across database layer (Feb 2026)
 
 ---
 
@@ -252,27 +301,34 @@ main ─────────────────────────
 1. Create a feature branch: `feature/your-feature`
 2. If it needs UI: Add component(s) in `app/src/components/YourFeature/`
 3. If it needs business logic: Add service in `app/src/services/yourFeatureService.js`
-4. If it needs database changes: Add migration in `db.js` (increment `SCHEMA_VERSION`)
+4. If it needs database changes:
+   - Add migration in `db/schema/migrations.js`
+   - Update `SCHEMA_VERSION` in `db/schema/constants.js`
+   - Add/update repository in `db/repositories/`
+   - Export from `db/repositories/index.js` and re-export from `db.js`
 5. If it's premium-gated: Check license in component via `useLicense()` from `LicenseContext`
 6. Wire into `App.jsx` (currently all top-level routing/state lives here)
 7. Run `npm run lint:fix && npm run format` before committing
 
 ### Adding a Database Migration
-In `db.js`, migrations are numbered. The current schema version is **7**.
+Migrations are in `db/schema/migrations.js`. The current schema version is **7**.
 ```javascript
-// In the runMigrations() function:
+// In the runMigrations() function in db/schema/migrations.js:
 if (currentVersion < 8) {
   db.run("ALTER TABLE ... ");
   db.run("UPDATE schema_version SET version = 8");
 }
+// Also update SCHEMA_VERSION in db/schema/constants.js
 ```
 
 ### Key Files to Read First
 When starting a new session, these files give the most context:
 1. `app/src/App.jsx` - All UI state, navigation, feature integration
-2. `app/src/db.js` - Database schema, queries, migrations
-3. `app/src/services/licenseService.js` - Premium feature gating logic
-4. `app/tailwind.config.js` - Design system tokens
+2. `app/src/db.js` - Database facade (init, save, re-exports)
+3. `app/src/db/repositories/index.js` - All database CRUD operations
+4. `app/src/db/schema/constants.js` - Schema version, validation constants
+5. `app/src/services/licenseService.js` - Premium feature gating logic
+6. `app/tailwind.config.js` - Design system tokens
 
 ---
 
