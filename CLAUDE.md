@@ -43,9 +43,16 @@ jdex-complete-package/          # Monorepo root
 │   │   ├── main.js             # Main process entry, IPC handlers, window management
 │   │   └── electron-main.js    # Entry point config
 │   ├── src/                    # React frontend
-│   │   ├── App.jsx             # Root component (2,622 lines - monolithic, needs refactoring)
+│   │   ├── App.jsx             # Root component (283 lines - orchestrates hooks/components)
 │   │   ├── db.js               # Database facade (451 lines - init, save, re-exports)
 │   │   ├── db/                 # Modular database layer (see Database Architecture below)
+│   │   ├── hooks/              # Custom React hooks (594 lines total)
+│   │   │   ├── useAppData.js   # Database init, data loading, refresh
+│   │   │   ├── useFolderCRUD.js # Folder create/update/delete
+│   │   │   ├── useItemCRUD.js  # Item create/update/delete
+│   │   │   ├── useModalState.js # All modal visibility states
+│   │   │   ├── useNavigation.js # View state, breadcrumbs
+│   │   │   └── useSearch.js    # Search query and results
 │   │   ├── index.css           # Global styles + Tailwind directives
 │   │   ├── main.jsx            # React entry point
 │   │   ├── components/         # Feature-grouped React components
@@ -301,10 +308,11 @@ These are acknowledged issues, not bugs:
 
 | Issue | File | Lines | Impact |
 |-------|------|-------|--------|
-| Monolithic root component | `App.jsx` | 2,622 | Hard to navigate, no routing |
 | No TypeScript | All `.jsx`/`.js` | -- | No compile-time type checking |
+| Service layer tests | `services/` | -- | Business logic not fully tested |
 
 ### Resolved Debt
+- ~~Monolithic root component~~ → Refactored to hooks + components (283 lines, Feb 2026)
 - ~~All DB logic in one file~~ → Refactored to modular `db/` structure (Feb 2026)
 - ~~No automated tests~~ → 1,422 tests across database layer (Feb 2026)
 
@@ -356,10 +364,10 @@ if (currentVersion < 8) {
 
 ### Key Files to Read First
 When starting a new session, these files give the most context:
-1. `app/src/App.jsx` - All UI state, navigation, feature integration
-2. `app/src/db.js` - Database facade (init, save, re-exports)
-3. `app/src/db/repositories/index.js` - All database CRUD operations
-4. `app/src/db/schema/constants.js` - Schema version, validation constants
+1. `app/src/App.jsx` - Root component (orchestrates hooks and components)
+2. `app/src/hooks/` - Custom hooks (useAppData, useNavigation, useFolderCRUD, etc.)
+3. `app/src/db.js` - Database facade (init, save, re-exports)
+4. `app/src/db/repositories/index.js` - All database CRUD operations
 5. `app/src/services/licenseService.js` - Premium feature gating logic
 6. `app/tailwind.config.js` - Design system tokens
 
