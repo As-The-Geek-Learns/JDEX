@@ -18,8 +18,51 @@ import { initializeSchema } from './db/schema/tables.js';
 import { runMigrations as runSchemasMigrations } from './db/schema/migrations.js';
 import { seedInitialData as seedSchemaData } from './db/schema/seeds.js';
 
+// Core database accessors (sync state with repositories)
+import { setDB as setCoreDB, setSQL as setCoreSQL } from './db/core/database.js';
+
+// Import repository functions for internal use AND re-export
+import {
+  // Activity Log - used internally for logging
+  logActivity,
+  getRecentActivity,
+  // Storage Locations - used internally for export
+  getStorageLocations,
+  createStorageLocation,
+  updateStorageLocation,
+  deleteStorageLocation,
+  // Areas - used internally for export
+  getAreas,
+  createArea,
+  updateArea,
+  deleteArea,
+  // Categories - used internally for export
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+} from './db/repositories/index.js';
+
 // Re-export schema constants for backward compatibility
 export { SCHEMA_VERSION } from './db/schema/constants.js';
+
+// Re-export repository functions for backward compatibility
+export {
+  logActivity,
+  getRecentActivity,
+  getStorageLocations,
+  createStorageLocation,
+  updateStorageLocation,
+  deleteStorageLocation,
+  getAreas,
+  createArea,
+  updateArea,
+  deleteArea,
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+};
 
 let db = null;
 let SQL = null;
@@ -51,6 +94,9 @@ export async function initDatabase() {
     locateFile: (file) => `https://sql.js.org/dist/${file}`,
   });
 
+  // Sync SQL module with core for repository access
+  setCoreSQL(SQL);
+
   // Try to load existing database from localStorage
   const savedDb = localStorage.getItem(STORAGE_KEY);
 
@@ -66,6 +112,9 @@ export async function initDatabase() {
     saveDatabase();
   }
 
+  // Sync database instance with core for repository access
+  setCoreDB(db);
+
   return db;
 }
 
@@ -78,140 +127,11 @@ export function saveDatabase() {
 }
 
 // ============================================
-// AREA FUNCTIONS
+// AREA FUNCTIONS - Now in db/repositories/areas.js
+// CATEGORY FUNCTIONS - Now in db/repositories/categories.js
 // ============================================
 
-export function getAreas() {
-  const results = db.exec('SELECT * FROM areas ORDER BY range_start');
-  return (
-    results[0]?.values.map((row) => ({
-      id: row[0],
-      range_start: row[1],
-      range_end: row[2],
-      name: row[3],
-      description: row[4],
-      color: row[5],
-      created_at: row[6],
-    })) || []
-  );
-}
-
-export function createArea(area) {
-  db.run(
-    'INSERT INTO areas (range_start, range_end, name, description, color) VALUES (?, ?, ?, ?, ?)',
-    [area.range_start, area.range_end, area.name, area.description || '', area.color || '#64748b']
-  );
-  logActivity(
-    'create',
-    'area',
-    `${area.range_start}-${area.range_end}`,
-    `Created area: ${area.name}`
-  );
-  saveDatabase();
-  return db.exec('SELECT last_insert_rowid()')[0].values[0][0];
-}
-
-export function updateArea(id, updates) {
-  const validColumns = ['range_start', 'range_end', 'name', 'description', 'color'];
-  const fields = [];
-  const values = [];
-
-  Object.entries(updates).forEach(([key, value]) => {
-    if (validColumns.includes(key) && value !== undefined) {
-      fields.push(`${key} = ?`);
-      values.push(value);
-    }
-  });
-
-  if (fields.length === 0) return;
-
-  values.push(id);
-  db.run(`UPDATE areas SET ${fields.join(', ')} WHERE id = ?`, values);
-  logActivity('update', 'area', id.toString(), `Updated area ID: ${id}`);
-  saveDatabase();
-}
-
-export function deleteArea(id) {
-  const cats = db.exec(`SELECT COUNT(*) FROM categories WHERE area_id = ${id}`);
-  if (cats[0]?.values[0][0] > 0) {
-    throw new Error('Cannot delete area with existing categories. Delete categories first.');
-  }
-  db.run(`DELETE FROM areas WHERE id = ${id}`);
-  logActivity('delete', 'area', id.toString(), `Deleted area ID: ${id}`);
-  saveDatabase();
-}
-
-// ============================================
-// CATEGORY FUNCTIONS
-// ============================================
-
-export function getCategories(areaId = null) {
-  let query =
-    'SELECT c.*, a.name as area_name, a.color as area_color FROM categories c JOIN areas a ON c.area_id = a.id';
-  if (areaId) query += ` WHERE c.area_id = ${areaId}`;
-  query += ' ORDER BY c.number';
-
-  const results = db.exec(query);
-  return (
-    results[0]?.values.map((row) => ({
-      id: row[0],
-      number: row[1],
-      area_id: row[2],
-      name: row[3],
-      description: row[4],
-      created_at: row[5],
-      area_name: row[6],
-      area_color: row[7],
-    })) || []
-  );
-}
-
-export function createCategory(category) {
-  db.run('INSERT INTO categories (number, area_id, name, description) VALUES (?, ?, ?, ?)', [
-    category.number,
-    category.area_id,
-    category.name,
-    category.description || '',
-  ]);
-  logActivity(
-    'create',
-    'category',
-    category.number.toString(),
-    `Created category: ${category.name}`
-  );
-  saveDatabase();
-  return db.exec('SELECT last_insert_rowid()')[0].values[0][0];
-}
-
-export function updateCategory(id, updates) {
-  const validColumns = ['number', 'area_id', 'name', 'description'];
-  const fields = [];
-  const values = [];
-
-  Object.entries(updates).forEach(([key, value]) => {
-    if (validColumns.includes(key) && value !== undefined) {
-      fields.push(`${key} = ?`);
-      values.push(value);
-    }
-  });
-
-  if (fields.length === 0) return;
-
-  values.push(id);
-  db.run(`UPDATE categories SET ${fields.join(', ')} WHERE id = ?`, values);
-  logActivity('update', 'category', id.toString(), `Updated category ID: ${id}`);
-  saveDatabase();
-}
-
-export function deleteCategory(id) {
-  const folders = db.exec(`SELECT COUNT(*) FROM folders WHERE category_id = ${id}`);
-  if (folders[0]?.values[0][0] > 0) {
-    throw new Error('Cannot delete category with existing folders. Delete or move folders first.');
-  }
-  db.run(`DELETE FROM categories WHERE id = ${id}`);
-  logActivity('delete', 'category', id.toString(), `Deleted category ID: ${id}`);
-  saveDatabase();
-}
+// (Functions moved to repositories - re-exported above)
 
 // ============================================
 // FOLDER FUNCTIONS (Level 3 - XX.XX containers)
@@ -687,61 +607,8 @@ export function searchAll(query) {
 }
 
 // ============================================
-// STORAGE LOCATIONS
+// STORAGE LOCATIONS - Now in db/repositories/storage-locations.js
 // ============================================
-
-export function getStorageLocations() {
-  const results = db.exec('SELECT * FROM storage_locations ORDER BY name');
-  return (
-    results[0]?.values.map((row) => ({
-      id: row[0],
-      name: row[1],
-      type: row[2],
-      path: row[3],
-      is_encrypted: row[4],
-      notes: row[5],
-    })) || []
-  );
-}
-
-export function createStorageLocation(location) {
-  db.run(
-    'INSERT INTO storage_locations (name, type, path, is_encrypted, notes) VALUES (?, ?, ?, ?, ?)',
-    [
-      location.name,
-      location.type,
-      location.path || null,
-      location.is_encrypted ? 1 : 0,
-      location.notes || '',
-    ]
-  );
-  saveDatabase();
-  return db.exec('SELECT last_insert_rowid()')[0].values[0][0];
-}
-
-export function updateStorageLocation(id, updates) {
-  const validColumns = ['name', 'type', 'path', 'is_encrypted', 'notes'];
-  const fields = [];
-  const values = [];
-
-  Object.entries(updates).forEach(([key, value]) => {
-    if (validColumns.includes(key) && value !== undefined) {
-      fields.push(`${key} = ?`);
-      values.push(key === 'is_encrypted' ? (value ? 1 : 0) : value);
-    }
-  });
-
-  if (fields.length === 0) return;
-
-  values.push(id);
-  db.run(`UPDATE storage_locations SET ${fields.join(', ')} WHERE id = ?`, values);
-  saveDatabase();
-}
-
-export function deleteStorageLocation(id) {
-  db.run(`DELETE FROM storage_locations WHERE id = ${id}`);
-  saveDatabase();
-}
 
 // ============================================
 // CLOUD DRIVES (Premium Feature)
@@ -2098,29 +1965,9 @@ export function getFilesReadyToOrganize(sessionId) {
 }
 
 // ============================================
-// ACTIVITY LOG & STATS
+// ACTIVITY LOG - Now in db/repositories/activity-log.js
+// STATS
 // ============================================
-
-export function logActivity(action, entityType, entityNumber, details) {
-  db.run(
-    'INSERT INTO activity_log (action, entity_type, entity_number, details) VALUES (?, ?, ?, ?)',
-    [action, entityType, entityNumber, details]
-  );
-}
-
-export function getRecentActivity(limit = 20) {
-  const results = db.exec(`SELECT * FROM activity_log ORDER BY timestamp DESC LIMIT ${limit}`);
-  return (
-    results[0]?.values.map((row) => ({
-      id: row[0],
-      action: row[1],
-      entity_type: row[2],
-      entity_number: row[3],
-      details: row[4],
-      timestamp: row[5],
-    })) || []
-  );
-}
 
 export function getStats() {
   const totalFolders = db.exec('SELECT COUNT(*) FROM folders')[0]?.values[0][0] || 0;
