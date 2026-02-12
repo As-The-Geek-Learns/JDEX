@@ -159,6 +159,39 @@ The main `db.js` file (451 lines) is now a thin facade that:
 - **Repository pattern**: Each domain has its own module with CRUD operations
 - **Single database file**: All tables in one logical unit, exportable as JSON.
 
+### Architectural Principles
+
+#### Repository Pattern
+All database operations follow the repository pattern:
+- One repository module per domain (areas, folders, items, etc.)
+- Each repository handles CRUD for its entity only
+- Repositories import from `utils.js` for shared helpers
+- New entities get new files, not modifications to existing ones
+
+#### SOLID Guidelines
+
+| Principle | How We Apply It |
+|-----------|-----------------|
+| **Single Responsibility** | Each module has one reason to change |
+| **Open/Closed** | Add features via new files, not modifying existing |
+| **Interface Segregation** | Import only what you need from repositories |
+| **Dependency Inversion** | Use `getDB()` abstraction, not direct db access |
+
+#### Testing Expectations
+- All repository functions must have unit tests
+- Use mocks for database access (`vi.mock('../utils.js')`)
+- Follow AAA pattern: Arrange, Act, Assert
+- Test happy path, edge cases, and error conditions
+- Aim for tests that run fast (no real database)
+
+#### Adding a New Repository
+1. Create `db/repositories/your-entity.js`
+2. Import helpers from `./utils.js`
+3. Export CRUD functions: `getEntities`, `getEntity`, `createEntity`, etc.
+4. Add exports to `db/repositories/index.js`
+5. Create `db/repositories/__tests__/your-entity.test.js`
+6. Re-export from `db.js` for backward compatibility
+
 ---
 
 ## Premium vs. Free Features
