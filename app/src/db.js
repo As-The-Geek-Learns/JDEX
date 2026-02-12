@@ -41,6 +41,24 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  // Folders - used internally for export
+  getFolders,
+  getFolder,
+  getFolderByNumber,
+  getNextFolderNumber,
+  createFolder,
+  updateFolder,
+  deleteFolder,
+  // Items - used internally for export
+  getItems,
+  getNextItemNumber,
+  createItem,
+  updateItem,
+  deleteItem,
+  // Search - used internally for export
+  searchFolders,
+  searchItems,
+  searchAll,
 } from './db/repositories/index.js';
 
 // Re-export schema constants for backward compatibility
@@ -62,6 +80,21 @@ export {
   createCategory,
   updateCategory,
   deleteCategory,
+  getFolders,
+  getFolder,
+  getFolderByNumber,
+  getNextFolderNumber,
+  createFolder,
+  updateFolder,
+  deleteFolder,
+  getItems,
+  getNextItemNumber,
+  createItem,
+  updateItem,
+  deleteItem,
+  searchFolders,
+  searchItems,
+  searchAll,
 };
 
 let db = null;
@@ -134,480 +167,7 @@ export function saveDatabase() {
 // (Functions moved to repositories - re-exported above)
 
 // ============================================
-// FOLDER FUNCTIONS (Level 3 - XX.XX containers)
-// ============================================
-
-export function getFolders(categoryId = null) {
-  let query = `
-    SELECT f.*, c.number as category_number, c.name as category_name, 
-           a.name as area_name, a.color as area_color
-    FROM folders f 
-    JOIN categories c ON f.category_id = c.id 
-    JOIN areas a ON c.area_id = a.id
-    WHERE 1=1
-  `;
-
-  if (categoryId) query += ` AND f.category_id = ${categoryId}`;
-  query += ' ORDER BY f.folder_number';
-
-  const results = db.exec(query);
-  return (
-    results[0]?.values.map((row) => ({
-      id: row[0],
-      folder_number: row[1],
-      category_id: row[2],
-      sequence: row[3],
-      name: row[4],
-      description: row[5],
-      sensitivity: row[6],
-      location: row[7],
-      storage_path: row[8],
-      keywords: row[9],
-      notes: row[10],
-      created_at: row[11],
-      updated_at: row[12],
-      category_number: row[13],
-      category_name: row[14],
-      area_name: row[15],
-      area_color: row[16],
-    })) || []
-  );
-}
-
-export function getFolder(folderId) {
-  const query = `
-    SELECT f.*, c.number as category_number, c.name as category_name, 
-           a.name as area_name, a.color as area_color
-    FROM folders f 
-    JOIN categories c ON f.category_id = c.id 
-    JOIN areas a ON c.area_id = a.id
-    WHERE f.id = ${folderId}
-  `;
-
-  const results = db.exec(query);
-  if (!results[0]?.values[0]) return null;
-
-  const row = results[0].values[0];
-  return {
-    id: row[0],
-    folder_number: row[1],
-    category_id: row[2],
-    sequence: row[3],
-    name: row[4],
-    description: row[5],
-    sensitivity: row[6],
-    location: row[7],
-    storage_path: row[8],
-    keywords: row[9],
-    notes: row[10],
-    created_at: row[11],
-    updated_at: row[12],
-    category_number: row[13],
-    category_name: row[14],
-    area_name: row[15],
-    area_color: row[16],
-  };
-}
-
-/**
- * Get a folder by its JD folder number (e.g., "11.01").
- *
- * @param {string} folderNumber - The JD folder number
- * @returns {Object|null} The folder object or null if not found
- */
-export function getFolderByNumber(folderNumber) {
-  if (!folderNumber || typeof folderNumber !== 'string') {
-    return null;
-  }
-
-  const sanitized = sanitizeText(folderNumber);
-  const result = db.exec(`
-    SELECT f.*, c.name as category_name, c.number as category_number, a.name as area_name, a.color as area_color
-    FROM folders f
-    LEFT JOIN categories c ON f.category_id = c.id
-    LEFT JOIN areas a ON c.area_id = a.id
-    WHERE f.folder_number = '${sanitized}'
-    LIMIT 1
-  `);
-
-  if (!result[0]?.values?.[0]) return null;
-
-  const row = result[0].values[0];
-  return {
-    id: row[0],
-    folder_number: row[1],
-    category_id: row[2],
-    sequence: row[3],
-    name: row[4],
-    description: row[5],
-    sensitivity: row[6],
-    location: row[7],
-    storage_path: row[8],
-    keywords: row[9],
-    notes: row[10],
-    created_at: row[11],
-    updated_at: row[12],
-    category_name: row[13],
-    category_number: row[14],
-    area_name: row[15],
-    area_color: row[16],
-  };
-}
-
-export function getNextFolderNumber(categoryId) {
-  const category = db.exec(`SELECT number FROM categories WHERE id = ${categoryId}`);
-  if (!category[0]) return null;
-
-  const catNumber = category[0].values[0][0];
-  const catStr = String(catNumber).padStart(2, '0');
-
-  const existing = db.exec(`
-    SELECT sequence FROM folders 
-    WHERE category_id = ${categoryId} 
-    ORDER BY sequence DESC LIMIT 1
-  `);
-
-  const nextSeq = existing[0]?.values[0]?.[0] ? existing[0].values[0][0] + 1 : 1;
-  const seqStr = String(nextSeq).padStart(2, '0');
-
-  return { folder_number: `${catStr}.${seqStr}`, sequence: nextSeq };
-}
-
-export function createFolder(folder) {
-  const stmt = db.prepare(`
-    INSERT INTO folders (folder_number, category_id, sequence, name, description, sensitivity, location, storage_path, keywords, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  stmt.run([
-    folder.folder_number,
-    folder.category_id,
-    folder.sequence,
-    folder.name,
-    folder.description || '',
-    folder.sensitivity || 'standard',
-    folder.location || '',
-    folder.storage_path || '',
-    folder.keywords || '',
-    folder.notes || '',
-  ]);
-
-  stmt.free();
-
-  logActivity('create', 'folder', folder.folder_number, `Created folder: ${folder.name}`);
-  saveDatabase();
-
-  return db.exec('SELECT last_insert_rowid()')[0].values[0][0];
-}
-
-export function updateFolder(id, updates) {
-  const validColumns = [
-    'folder_number',
-    'category_id',
-    'sequence',
-    'name',
-    'description',
-    'sensitivity',
-    'location',
-    'storage_path',
-    'keywords',
-    'notes',
-  ];
-
-  const fields = [];
-  const values = [];
-
-  Object.entries(updates).forEach(([key, value]) => {
-    if (validColumns.includes(key) && value !== undefined) {
-      fields.push(`${key} = ?`);
-      values.push(value);
-    }
-  });
-
-  if (fields.length === 0) return;
-
-  fields.push('updated_at = CURRENT_TIMESTAMP');
-  values.push(id);
-
-  db.run(`UPDATE folders SET ${fields.join(', ')} WHERE id = ?`, values);
-
-  const folder = db.exec(`SELECT folder_number, name FROM folders WHERE id = ${id}`);
-  if (folder[0]) {
-    logActivity('update', 'folder', folder[0].values[0][0], `Updated: ${folder[0].values[0][1]}`);
-  }
-
-  saveDatabase();
-}
-
-export function deleteFolder(id) {
-  // Check if folder has items
-  const items = db.exec(`SELECT COUNT(*) FROM items WHERE folder_id = ${id}`);
-  if (items[0]?.values[0][0] > 0) {
-    throw new Error('Cannot delete folder with existing items. Delete or move items first.');
-  }
-
-  const folder = db.exec(`SELECT folder_number, name FROM folders WHERE id = ${id}`);
-  if (folder[0]) {
-    logActivity('delete', 'folder', folder[0].values[0][0], `Deleted: ${folder[0].values[0][1]}`);
-  }
-
-  db.run(`DELETE FROM folders WHERE id = ${id}`);
-  saveDatabase();
-}
-
-// ============================================
-// ITEM FUNCTIONS (Level 4 - XX.XX.XX objects)
-// ============================================
-
-export function getItems(folderId = null) {
-  let query = `
-    SELECT i.*, f.folder_number, f.name as folder_name, f.sensitivity as folder_sensitivity,
-           c.number as category_number, c.name as category_name,
-           a.name as area_name, a.color as area_color
-    FROM items i 
-    JOIN folders f ON i.folder_id = f.id
-    JOIN categories c ON f.category_id = c.id 
-    JOIN areas a ON c.area_id = a.id
-    WHERE 1=1
-  `;
-
-  if (folderId) query += ` AND i.folder_id = ${folderId}`;
-  query += ' ORDER BY i.item_number';
-
-  const results = db.exec(query);
-  return (
-    results[0]?.values.map((row) => ({
-      id: row[0],
-      item_number: row[1],
-      folder_id: row[2],
-      sequence: row[3],
-      name: row[4],
-      description: row[5],
-      file_type: row[6],
-      sensitivity: row[7],
-      location: row[8],
-      storage_path: row[9],
-      file_size: row[10],
-      keywords: row[11],
-      notes: row[12],
-      created_at: row[13],
-      updated_at: row[14],
-      folder_number: row[15],
-      folder_name: row[16],
-      folder_sensitivity: row[17],
-      category_number: row[18],
-      category_name: row[19],
-      area_name: row[20],
-      area_color: row[21],
-      // Computed effective sensitivity
-      effective_sensitivity: row[7] === 'inherit' ? row[17] : row[7],
-    })) || []
-  );
-}
-
-export function getNextItemNumber(folderId) {
-  const folder = db.exec(`SELECT folder_number FROM folders WHERE id = ${folderId}`);
-  if (!folder[0]) return null;
-
-  const folderNumber = folder[0].values[0][0];
-
-  const existing = db.exec(`
-    SELECT sequence FROM items 
-    WHERE folder_id = ${folderId} 
-    ORDER BY sequence DESC LIMIT 1
-  `);
-
-  const nextSeq = existing[0]?.values[0]?.[0] ? existing[0].values[0][0] + 1 : 1;
-  const seqStr = String(nextSeq).padStart(2, '0');
-
-  return { item_number: `${folderNumber}.${seqStr}`, sequence: nextSeq };
-}
-
-export function createItem(item) {
-  const stmt = db.prepare(`
-    INSERT INTO items (item_number, folder_id, sequence, name, description, file_type, sensitivity, location, storage_path, file_size, keywords, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  stmt.run([
-    item.item_number,
-    item.folder_id,
-    item.sequence,
-    item.name,
-    item.description || '',
-    item.file_type || '',
-    item.sensitivity || 'inherit',
-    item.location || '',
-    item.storage_path || '',
-    item.file_size || null,
-    item.keywords || '',
-    item.notes || '',
-  ]);
-
-  stmt.free();
-
-  logActivity('create', 'item', item.item_number, `Created item: ${item.name}`);
-  saveDatabase();
-
-  return db.exec('SELECT last_insert_rowid()')[0].values[0][0];
-}
-
-export function updateItem(id, updates) {
-  const validColumns = [
-    'item_number',
-    'folder_id',
-    'sequence',
-    'name',
-    'description',
-    'file_type',
-    'sensitivity',
-    'location',
-    'storage_path',
-    'file_size',
-    'keywords',
-    'notes',
-  ];
-
-  const fields = [];
-  const values = [];
-
-  Object.entries(updates).forEach(([key, value]) => {
-    if (validColumns.includes(key) && value !== undefined) {
-      fields.push(`${key} = ?`);
-      values.push(value);
-    }
-  });
-
-  if (fields.length === 0) return;
-
-  fields.push('updated_at = CURRENT_TIMESTAMP');
-  values.push(id);
-
-  db.run(`UPDATE items SET ${fields.join(', ')} WHERE id = ?`, values);
-
-  const item = db.exec(`SELECT item_number, name FROM items WHERE id = ${id}`);
-  if (item[0]) {
-    logActivity('update', 'item', item[0].values[0][0], `Updated: ${item[0].values[0][1]}`);
-  }
-
-  saveDatabase();
-}
-
-export function deleteItem(id) {
-  const item = db.exec(`SELECT item_number, name FROM items WHERE id = ${id}`);
-  if (item[0]) {
-    logActivity('delete', 'item', item[0].values[0][0], `Deleted: ${item[0].values[0][1]}`);
-  }
-
-  db.run(`DELETE FROM items WHERE id = ${id}`);
-  saveDatabase();
-}
-
-// ============================================
-// SEARCH FUNCTIONS
-// ============================================
-
-export function searchFolders(query) {
-  const searchQuery = `
-    SELECT f.*, c.number as category_number, c.name as category_name, 
-           a.name as area_name, a.color as area_color
-    FROM folders f 
-    JOIN categories c ON f.category_id = c.id 
-    JOIN areas a ON c.area_id = a.id
-    WHERE f.folder_number LIKE '%${query}%' 
-       OR f.name LIKE '%${query}%' 
-       OR f.description LIKE '%${query}%'
-       OR f.keywords LIKE '%${query}%'
-       OR f.notes LIKE '%${query}%'
-       OR c.name LIKE '%${query}%'
-       OR a.name LIKE '%${query}%'
-    ORDER BY f.folder_number
-  `;
-
-  const results = db.exec(searchQuery);
-  return (
-    results[0]?.values.map((row) => ({
-      id: row[0],
-      folder_number: row[1],
-      category_id: row[2],
-      sequence: row[3],
-      name: row[4],
-      description: row[5],
-      sensitivity: row[6],
-      location: row[7],
-      storage_path: row[8],
-      keywords: row[9],
-      notes: row[10],
-      created_at: row[11],
-      updated_at: row[12],
-      category_number: row[13],
-      category_name: row[14],
-      area_name: row[15],
-      area_color: row[16],
-    })) || []
-  );
-}
-
-export function searchItems(query) {
-  const searchQuery = `
-    SELECT i.*, f.folder_number, f.name as folder_name, f.sensitivity as folder_sensitivity,
-           c.number as category_number, c.name as category_name,
-           a.name as area_name, a.color as area_color
-    FROM items i 
-    JOIN folders f ON i.folder_id = f.id
-    JOIN categories c ON f.category_id = c.id 
-    JOIN areas a ON c.area_id = a.id
-    WHERE i.item_number LIKE '%${query}%' 
-       OR i.name LIKE '%${query}%' 
-       OR i.description LIKE '%${query}%'
-       OR i.keywords LIKE '%${query}%'
-       OR i.notes LIKE '%${query}%'
-       OR f.name LIKE '%${query}%'
-       OR c.name LIKE '%${query}%'
-       OR a.name LIKE '%${query}%'
-    ORDER BY i.item_number
-  `;
-
-  const results = db.exec(searchQuery);
-  return (
-    results[0]?.values.map((row) => ({
-      id: row[0],
-      item_number: row[1],
-      folder_id: row[2],
-      sequence: row[3],
-      name: row[4],
-      description: row[5],
-      file_type: row[6],
-      sensitivity: row[7],
-      location: row[8],
-      storage_path: row[9],
-      file_size: row[10],
-      keywords: row[11],
-      notes: row[12],
-      created_at: row[13],
-      updated_at: row[14],
-      folder_number: row[15],
-      folder_name: row[16],
-      folder_sensitivity: row[17],
-      category_number: row[18],
-      category_name: row[19],
-      area_name: row[20],
-      area_color: row[21],
-      effective_sensitivity: row[7] === 'inherit' ? row[17] : row[7],
-    })) || []
-  );
-}
-
-// Combined search across folders and items
-export function searchAll(query) {
-  return {
-    folders: searchFolders(query),
-    items: searchItems(query),
-  };
-}
-
-// ============================================
-// STORAGE LOCATIONS - Now in db/repositories/storage-locations.js
+// FOLDER, ITEM, SEARCH - Now in db/repositories/
 // ============================================
 
 // ============================================
