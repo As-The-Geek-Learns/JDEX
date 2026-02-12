@@ -75,3 +75,140 @@ export {
 
 // Search
 export { searchFolders, searchItems, searchAll } from './search.js';
+
+// Statistics
+export { getStats, getAreaStats, getCategoryStats, getFolderStats } from './statistics.js';
+
+// Cloud Drives
+export {
+  VALID_DRIVE_TYPES,
+  getCloudDrives,
+  getCloudDrive,
+  getDefaultCloudDrive,
+  getCloudDriveCount,
+  createCloudDrive,
+  updateCloudDrive,
+  deleteCloudDrive,
+  setDefaultCloudDrive,
+} from './cloud-drives.js';
+
+// Area Storage
+export {
+  getAreaStorageMappings,
+  getAreaCloudDrive,
+  getUnmappedAreas,
+  getAreaStorageMappingCount,
+  setAreaCloudDrive,
+  removeAreaMappingsForDrive,
+} from './area-storage.js';
+
+// Organization Rules
+export {
+  VALID_RULE_TYPES,
+  VALID_TARGET_TYPES,
+  getOrganizationRules,
+  getOrganizationRule,
+  getOrganizationRulesByTarget,
+  getOrganizationRuleCount,
+  createOrganizationRule,
+  updateOrganizationRule,
+  deleteOrganizationRule,
+  incrementRuleMatchCount,
+  toggleOrganizationRule,
+  resetRuleMatchCount,
+} from './organization-rules.js';
+
+// Organized Files
+export {
+  VALID_FILE_STATUSES,
+  getOrganizedFiles,
+  getOrganizedFile,
+  findOrganizedFileByPath,
+  getRecentOrganizedFiles,
+  getOrganizedFileCount,
+  getOrganizedFilesStats,
+  recordOrganizedFile,
+  markFileUndone,
+  updateOrganizedFile,
+  deleteOrganizedFile,
+  clearOldOrganizedFiles,
+} from './organized-files.js';
+
+// Scanned Files
+export {
+  VALID_DECISIONS,
+  VALID_CONFIDENCE_LEVELS,
+  generateScanSessionId,
+  clearScannedFiles,
+  getScannedFiles,
+  getScannedFile,
+  getFilesReadyToOrganize,
+  getScanStats,
+  getScannedFileCount,
+  addScannedFile,
+  addScannedFilesBatch,
+  updateScannedFileDecision,
+  acceptScannedFileSuggestion,
+  skipScannedFile,
+  changeScannedFileTarget,
+  updateScannedFileSuggestion,
+  deleteScannedFile,
+} from './scanned-files.js';
+
+// Watched Folders
+export {
+  VALID_CONFIDENCE_THRESHOLDS,
+  getWatchedFolders,
+  getWatchedFolder,
+  getWatchedFolderByPath,
+  getWatchedFolderCount,
+  createWatchedFolder,
+  updateWatchedFolder,
+  deleteWatchedFolder,
+  incrementWatchedFolderStats,
+  toggleWatchedFolder,
+  resetWatchedFolderStats,
+} from './watched-folders.js';
+
+// Watch Activity
+export {
+  VALID_WATCH_ACTIONS,
+  getWatchActivity,
+  getRecentWatchActivity,
+  getQueuedFileCounts,
+  getWatchActivityById,
+  getWatchActivityCount,
+  logWatchActivity,
+  updateWatchActivityAction,
+  deleteWatchActivity,
+  clearOldWatchActivity,
+  clearWatchActivityForFolder,
+} from './watch-activity.js';
+
+// Database Utilities
+export {
+  QUERYABLE_TABLES,
+  executeSQL,
+  getTables,
+  getTableData,
+  getTableSchema,
+  getTableRowCount,
+  getDatabaseSize,
+  vacuumDatabase,
+  checkDatabaseIntegrity,
+} from './db-utils.js';
+
+// Import/Export
+export {
+  EXPORT_VERSION,
+  SCHEMA_DESCRIPTION,
+  exportDatabase,
+  importDatabase,
+  exportDatabaseBytes,
+  importDatabaseBytes,
+  exportToJSON,
+  buildExportData,
+  exportToJSONString,
+  validateImportJSON,
+  getExportSummary,
+} from './import-export.js';
