@@ -540,14 +540,14 @@ export async function batchMove(operations, options = {}) {
     const opResult = {
       ...op,
       success: result.success,
-      result: result.success ? result.value : null,
+      result: result.success ? result.data : null,
       error: result.success ? null : result.error,
     };
 
     results.operations.push(opResult);
 
     if (result.success) {
-      if (result.value.status === OP_STATUS.SKIPPED) {
+      if (result.data.status === OP_STATUS.SKIPPED) {
         results.skipped++;
       } else {
         results.success++;
@@ -598,7 +598,7 @@ export async function batchRollback(recordIds, onProgress = () => {}) {
     results.operations.push({
       recordId,
       success: result.success,
-      result: result.success ? result.value : null,
+      result: result.success ? result.data : null,
       error: result.success ? null : result.error,
     });
 
