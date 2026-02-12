@@ -55,3 +55,21 @@ export {
   cached,
   cachedAsync,
 } from './cache.js';
+
+// Database Lifecycle
+export {
+  getDB,
+  setDB,
+  getSQL,
+  setSQL,
+  isInitialized,
+  saveDatabase,
+  loadFromStorage,
+  clearStorage,
+  initDatabase,
+  resetDatabase,
+  closeDatabase,
+  getDatabaseStats,
+  executeSQL,
+  getTables,
+} from './database.js';
