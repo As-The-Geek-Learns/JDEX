@@ -29,7 +29,7 @@ export default defineConfig({
       include: ['src/**/*.{js,jsx}'],
       exclude: ['src/main.jsx', '**/*.test.{js,jsx}', '**/*.spec.{js,jsx}'],
       thresholds: {
-        global: { statements: 60, branches: 50, functions: 60, lines: 60 },
+        global: { statements: 70, branches: 60, functions: 65, lines: 70 },
         // Phase 2: Utility files
         'src/utils/validation.js': { statements: 90, lines: 90 },
         'src/utils/errors.js': { statements: 85, lines: 85 },

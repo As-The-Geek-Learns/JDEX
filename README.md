@@ -8,6 +8,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
   [![Version](https://img.shields.io/badge/version-2.0.1-green.svg)](https://github.com/As-The-Geek-Learns/JDEX/releases)
   [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](https://github.com/As-The-Geek-Learns/JDEX)
+  [![codecov](https://codecov.io/gh/As-The-Geek-Learns/jdex-premium/graph/badge.svg)](https://codecov.io/gh/As-The-Geek-Learns/jdex-premium)
 </div>
 
 ---
