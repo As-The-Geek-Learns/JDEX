@@ -265,6 +265,24 @@ npm run icons            # Regenerate app icons from source PNG
 - **Tailwind utility classes** for all styling (no CSS modules, no styled-components)
 - **Lucide React** for all icons (consistent import pattern)
 - **sql.js parameterized queries** for all database operations
+- **Underscore prefix for unused variables**: Use `_` prefix to signal intentionally unused bindings
+
+### Underscore Convention for Unused Variables
+ESLint is configured to allow variables prefixed with `_` to be unused. Use this pattern for:
+```javascript
+// Unused callback parameters
+const handleClick = (_event) => { /* event not needed */ };
+
+// Unused destructured values
+const { loading: _loading, data } = useQuery();
+
+// Unused catch errors (when you just need to handle the error case)
+try { ... } catch (_e) { showGenericError(); }
+
+// Unused loop variables
+items.forEach((_item, index) => { /* only need index */ });
+```
+This is configured in `eslint.config.js` via `argsIgnorePattern`, `varsIgnorePattern`, and `caughtErrorsIgnorePattern`.
 
 ### Custom Tailwind Theme
 The project uses a dark theme with custom design tokens in `tailwind.config.js`:

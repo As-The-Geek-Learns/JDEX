@@ -4,8 +4,8 @@
  * Tests for the drag-and-drop zone component.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import DropZone from './DropZone.jsx';
 
 // Mock the contexts
@@ -72,6 +72,7 @@ describe('DropZone', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
 
     useDragDrop.mockReturnValue({
       isDraggingFiles: false,
@@ -88,6 +89,10 @@ describe('DropZone', () => {
     canPerformDragDrop.mockReturnValue({ allowed: true, remaining: 5 });
     moveFileToFolder.mockResolvedValue({ success: true });
     checkForConflict.mockReturnValue({ exists: false });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   // ===========================================================================
@@ -183,10 +188,16 @@ describe('DropZone', () => {
         files: [mockFile],
       };
 
-      await fireEvent.drop(dropZone, {
-        preventDefault: vi.fn(),
-        stopPropagation: vi.fn(),
-        dataTransfer,
+      await act(async () => {
+        fireEvent.drop(dropZone, {
+          preventDefault: vi.fn(),
+          stopPropagation: vi.fn(),
+          dataTransfer,
+        });
+        // Allow promises to resolve
+        await Promise.resolve();
+        // Run timers that clear status messages
+        vi.runAllTimers();
       });
 
       expect(moveFileToFolder).toHaveBeenCalled();
@@ -211,16 +222,19 @@ describe('DropZone', () => {
 
       const mockFile = new File(['content'], 'test.pdf', { type: 'application/pdf' });
 
-      await fireEvent.drop(dropZone, {
-        preventDefault: vi.fn(),
-        stopPropagation: vi.fn(),
-        dataTransfer: { files: [mockFile] },
+      await act(async () => {
+        fireEvent.drop(dropZone, {
+          preventDefault: vi.fn(),
+          stopPropagation: vi.fn(),
+          dataTransfer: { files: [mockFile] },
+        });
+        // Allow promises to resolve
+        await Promise.resolve();
+        // Run timers that clear status messages
+        vi.runAllTimers();
       });
 
-      // Wait for async operations
-      await vi.waitFor(() => {
-        expect(mockOnSuccess).toHaveBeenCalled();
-      });
+      expect(mockOnSuccess).toHaveBeenCalled();
     });
   });
 
@@ -257,15 +271,19 @@ describe('DropZone', () => {
 
       const mockFile = new File(['content'], 'test.pdf', { type: 'application/pdf' });
 
-      await fireEvent.drop(dropZone, {
-        preventDefault: vi.fn(),
-        stopPropagation: vi.fn(),
-        dataTransfer: { files: [mockFile] },
+      await act(async () => {
+        fireEvent.drop(dropZone, {
+          preventDefault: vi.fn(),
+          stopPropagation: vi.fn(),
+          dataTransfer: { files: [mockFile] },
+        });
+        // Allow promises to resolve
+        await Promise.resolve();
+        // Run timers that clear status messages
+        vi.runAllTimers();
       });
 
-      await vi.waitFor(() => {
-        expect(mockOnError).toHaveBeenCalled();
-      });
+      expect(mockOnError).toHaveBeenCalled();
     });
   });
 
@@ -310,12 +328,19 @@ describe('DropZone', () => {
 
       const mockFile = new File(['content'], 'test.pdf', { type: 'application/pdf' });
 
-      await fireEvent.drop(dropZone, {
-        preventDefault: vi.fn(),
-        stopPropagation: vi.fn(),
-        dataTransfer: { files: [mockFile] },
+      await act(async () => {
+        fireEvent.drop(dropZone, {
+          preventDefault: vi.fn(),
+          stopPropagation: vi.fn(),
+          dataTransfer: { files: [mockFile] },
+        });
+        // Allow promises to resolve
+        await Promise.resolve();
+        // Run timers that clear status messages
+        vi.runAllTimers();
       });
 
+      expect(moveFileToFolder).toHaveBeenCalled();
       expect(mockShowUpgradePrompt).not.toHaveBeenCalled();
     });
   });

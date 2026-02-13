@@ -193,8 +193,18 @@ describe('ScannerPanel', () => {
       fireEvent.click(cancelButton);
       expect(mockCancel).toHaveBeenCalled();
 
-      // Clean up by resolving the promise
-      resolvePromise({ success: true, value: {} });
+      // Clean up by resolving the promise with proper stats to avoid render errors
+      resolvePromise({
+        success: true,
+        value: {
+          sessionId: 'test',
+          files: [],
+          stats: { totalFiles: 0, totalSize: 0, totalDirs: 0 },
+        },
+      });
+      await waitFor(() => {
+        expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
+      });
     });
   });
 

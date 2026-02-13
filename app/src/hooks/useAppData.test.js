@@ -34,30 +34,50 @@ describe('useAppData', () => {
   // ===========================================================================
 
   describe('initial state', () => {
-    it('should start with isLoading true', () => {
+    it('should start with isLoading true', async () => {
       const { result } = renderHook(() => useAppData());
 
       expect(result.current.isLoading).toBe(true);
+
+      // Wait for async effects to complete to avoid act() warning
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
     });
 
-    it('should start with empty data arrays', () => {
+    it('should start with empty data arrays', async () => {
       const { result } = renderHook(() => useAppData());
 
       expect(result.current.areas).toEqual([]);
       expect(result.current.categories).toEqual([]);
       expect(result.current.folders).toEqual([]);
+
+      // Wait for async effects to complete
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
     });
 
-    it('should start with empty stats object', () => {
+    it('should start with empty stats object', async () => {
       const { result } = renderHook(() => useAppData());
 
       expect(result.current.stats).toEqual({});
+
+      // Wait for async effects to complete
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
     });
 
-    it('should start with refreshKey at 0', () => {
+    it('should start with refreshKey at 0', async () => {
       const { result } = renderHook(() => useAppData());
 
       expect(result.current.refreshKey).toBe(0);
+
+      // Wait for async effects to complete
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
     });
   });
 
@@ -275,7 +295,7 @@ describe('useAppData', () => {
   // ===========================================================================
 
   describe('return value', () => {
-    it('should return all expected properties', () => {
+    it('should return all expected properties', async () => {
       const { result } = renderHook(() => useAppData());
 
       // State
@@ -295,6 +315,11 @@ describe('useAppData', () => {
       // Actions
       expect(result.current).toHaveProperty('loadData');
       expect(result.current).toHaveProperty('triggerRefresh');
+
+      // Wait for async effects to complete
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
     });
 
     it('should return stable function references', async () => {
