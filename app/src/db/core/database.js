@@ -5,6 +5,7 @@
  * This module manages the sql.js database instance and localStorage persistence.
  */
 
+import initSqlJs from 'sql.js';
 import { STORAGE_KEY } from '../schema/constants.js';
 import { initializeSchema } from '../schema/tables.js';
 import { runMigrations } from '../schema/migrations.js';
@@ -124,7 +125,8 @@ export function clearStorage() {
 // ============================================
 
 /**
- * Load sql.js from CDN if not already loaded.
+ * Load sql.js from bundled package.
+ * Uses the WASM file from the public folder.
  * @returns {Promise<Object>} The sql.js SQL module
  */
 async function loadSqlJs() {
@@ -132,19 +134,13 @@ async function loadSqlJs() {
     return SQL;
   }
 
-  // Load sql.js script from CDN if not present
-  if (!window.initSqlJs) {
-    await new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://sql.js.org/dist/sql-wasm.js';
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  }
+  // Determine the base path for the WASM file
+  // In production/Electron, files are relative to the HTML file
+  // In development, Vite serves from public/
+  const wasmPath = import.meta.env.MODE === 'development' ? '/sql-wasm.wasm' : './sql-wasm.wasm';
 
-  SQL = await window.initSqlJs({
-    locateFile: (file) => `https://sql.js.org/dist/${file}`,
+  SQL = await initSqlJs({
+    locateFile: () => wasmPath,
   });
 
   return SQL;

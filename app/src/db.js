@@ -5,6 +5,8 @@
 // Level 3: Folders (XX.XX - container folders)
 // Level 4: Items (XX.XX.XX - actual tracked objects)
 
+import initSqlJs from 'sql.js';
+
 // Schema modules
 import { STORAGE_KEY } from './db/schema/constants.js';
 import { initializeSchema } from './db/schema/tables.js';
@@ -368,19 +370,14 @@ export function getDB() {
 export async function initDatabase() {
   if (db) return db;
 
-  // Load sql.js from CDN
-  if (!window.initSqlJs) {
-    await new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://sql.js.org/dist/sql-wasm.js';
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  }
+  // Determine the base path for the WASM file
+  // In production/Electron, files are relative to the HTML file
+  // In development, Vite serves from public/
+  const wasmPath = import.meta.env.MODE === 'development' ? '/sql-wasm.wasm' : './sql-wasm.wasm';
 
-  SQL = await window.initSqlJs({
-    locateFile: (file) => `https://sql.js.org/dist/${file}`,
+  // Load sql.js from bundled package
+  SQL = await initSqlJs({
+    locateFile: () => wasmPath,
   });
 
   // Sync SQL module with core for repository access
