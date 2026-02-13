@@ -5,9 +5,9 @@ export default defineConfig({
   testDir: './specs',
   // Per-test timeout (60 seconds)
   timeout: 60000,
-  // Global timeout for the entire test run (10 minutes in CI)
-  globalTimeout: process.env.CI ? 10 * 60 * 1000 : undefined,
-  retries: process.env.CI ? 2 : 0,
+  // Global timeout for the entire test run (30 minutes in CI)
+  globalTimeout: process.env.CI ? 30 * 60 * 1000 : undefined,
+  retries: process.env.CI ? 1 : 0, // Reduced from 2 since tests pass reliably
   workers: 1, // Electron tests must run serially
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
 

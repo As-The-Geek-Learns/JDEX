@@ -22,8 +22,9 @@ test.describe('Folder Creation', () => {
     await window.waitForTimeout(500);
 
     // Check form fields are present
-    const categorySelect = window.locator('select, [role="combobox"]').first();
-    const nameInput = window.getByLabel(/name/i).first();
+    // The modal has a select for category and an input for folder name (by placeholder)
+    const categorySelect = window.locator('select').first();
+    const nameInput = window.getByPlaceholder(/script documentation/i);
 
     await expect(categorySelect).toBeVisible({ timeout: 5000 });
     await expect(nameInput).toBeVisible({ timeout: 5000 });
@@ -40,17 +41,17 @@ test.describe('Folder Creation', () => {
     await categorySelect.selectOption({ index: 1 }); // Select first available category
     await window.waitForTimeout(300);
 
-    // Fill in folder name
-    const nameInput = window.getByLabel(/name/i).first();
+    // Fill in folder name (use placeholder since label isn't associated)
+    const nameInput = window.getByPlaceholder(/script documentation/i);
     await nameInput.fill('Test E2E Folder');
 
-    // Submit the form
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    // Submit the form (button says "Create Folder")
+    const createBtn = window.getByRole('button', { name: /create folder/i });
     await createBtn.click();
     await window.waitForTimeout(500);
 
     // Modal should close
-    const modal = window.locator('[role="dialog"], .modal').first();
+    const modal = window.locator('.modal-backdrop, [class*="fixed inset-0"]').first();
     await expect(modal).not.toBeVisible({ timeout: 5000 });
   });
 
@@ -66,8 +67,13 @@ test.describe('Folder Creation', () => {
     await window.waitForTimeout(500);
 
     // Folder number should be auto-generated (XX.XX format)
-    const folderNumber = window.locator('input[disabled], text=/\\d{2}\\.\\d{2}/').first();
+    // The input has class 'jd-number' and is disabled
+    const folderNumber = window.locator('input.jd-number');
     await expect(folderNumber).toBeVisible({ timeout: 5000 });
+
+    // Verify the value matches XX.XX pattern
+    const value = await folderNumber.inputValue();
+    expect(value).toMatch(/^\d{2}\.\d{2}$/);
   });
 
   test('should close modal when cancel is clicked', async ({ window }) => {
@@ -129,10 +135,10 @@ test.describe('Folder Editing', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const nameInput = window.getByLabel(/name/i).first();
+    const nameInput = window.getByPlaceholder(/script documentation/i);
     await nameInput.fill('Folder to Edit');
 
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    const createBtn = window.getByRole('button', { name: /create folder/i });
     await createBtn.click();
     await window.waitForTimeout(500);
 
@@ -162,10 +168,10 @@ test.describe('Folder Deletion', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const nameInput = window.getByLabel(/name/i).first();
+    const nameInput = window.getByPlaceholder(/script documentation/i);
     await nameInput.fill('Folder to Delete');
 
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    const createBtn = window.getByRole('button', { name: /create folder/i });
     await createBtn.click();
     await window.waitForTimeout(500);
 

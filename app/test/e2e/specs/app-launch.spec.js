@@ -64,14 +64,13 @@ test.describe('Initial State', () => {
 });
 
 test.describe('Window Properties', () => {
-  test('should have correct window title', async ({ electronApp }) => {
-    const title = await electronApp.evaluate(({ BrowserWindow }) => {
-      const windows = BrowserWindow.getAllWindows();
-      return windows[0]?.getTitle() || '';
-    });
+  test('should have correct window title', async ({ window }) => {
+    // Wait for the page to fully load and get the document title
+    await window.waitForLoadState('domcontentloaded');
+    const title = await window.title();
 
-    // Title should contain JDex or be the app name
-    expect(title.toLowerCase()).toMatch(/jdex|johnny decimal/i);
+    // Title should contain JDex (page title is "JDex - Johnny Decimal Index")
+    expect(title.toLowerCase()).toContain('jdex');
   });
 
   test('should have minimum window size', async ({ electronApp }) => {

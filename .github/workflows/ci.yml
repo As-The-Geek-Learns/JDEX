@@ -172,8 +172,8 @@ jobs:
     needs: build
     # E2E tests are optional - don't block PRs if they fail
     continue-on-error: true
-    # Job timeout: 15 minutes (prevents runaway jobs)
-    timeout-minutes: 15
+    # Job timeout: 35 minutes (56 tests × ~30s each + buffer)
+    timeout-minutes: 35
 
     steps:
       - name: Checkout code
@@ -206,7 +206,7 @@ jobs:
           CI: true
           DEBUG: pw:browser*
           ELECTRON_ENABLE_LOGGING: '1'
-        timeout-minutes: 12
+        timeout-minutes: 32
 
       - name: Upload test results
         if: always()
