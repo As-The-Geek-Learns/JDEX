@@ -9,16 +9,15 @@
  * - Upgrade prompt display
  */
 
-import React from 'react';
+import { useContext, createContext } from 'react';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import {
   MockLicenseProvider,
   createMockLicenseValue,
   LICENSE_TIERS,
   FEATURE_INFO,
   StatefulLicenseProvider,
-  renderWithAllProviders,
 } from '../../helpers/setupAllProviders.jsx';
 import { UpgradePrompt, UsageLimitWarning } from '../../../src/context/LicenseContext.jsx';
 
@@ -414,9 +413,7 @@ describe('License Activation Flow', () => {
     }
 
     function LicenseConsumer() {
-      const license = React.useContext(
-        React.createContext(createMockLicenseValue({ isPremium: false }))
-      );
+      const license = useContext(createContext(createMockLicenseValue({ isPremium: false })));
       return (
         <div>
           <span data-testid="tier">{license?.tier?.name || 'Free'}</span>

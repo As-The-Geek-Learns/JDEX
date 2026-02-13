@@ -79,8 +79,8 @@ import {
   logWatchActivity,
   incrementWatchedFolderStats,
 } from '../db.js';
-import { getMatchingEngine, CONFIDENCE } from './matchingEngine.js';
-import { moveFile, buildDestinationPath, hasFileSystemAccess } from './fileOperations.js';
+import { getMatchingEngine } from './matchingEngine.js';
+import { moveFile } from './fileOperations.js';
 
 // =============================================================================
 // Test Helpers
@@ -156,7 +156,7 @@ function setupElectronEnvironment(mockFs = createMockFs(), mockPath = createMock
 /**
  * Setup Node.js environment (non-Electron).
  */
-function setupNodeEnvironment(mockFs = createMockFs(), mockPath = createMockPath()) {
+function _setupNodeEnvironment(_mockFs = createMockFs(), _mockPath = createMockPath()) {
   // Remove window to simulate Node environment
   delete globalThis.window;
 

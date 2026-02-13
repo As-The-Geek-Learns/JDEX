@@ -1,4 +1,3 @@
-import React from 'react';
 import { Zap, FileText, FolderSearch, Code, Hash } from 'lucide-react';
 
 /**

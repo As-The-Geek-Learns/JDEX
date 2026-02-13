@@ -18,7 +18,7 @@
 
 import { validateFilePath } from '../utils/validation.js';
 import { FileSystemError, Result } from '../utils/errors.js';
-import { addScannedFile, clearScannedFiles, getScannedFiles } from '../db.js';
+import { addScannedFile, clearScannedFiles } from '../db.js';
 
 // =============================================================================
 // File Type Mappings

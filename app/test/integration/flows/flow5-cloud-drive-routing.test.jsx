@@ -14,8 +14,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import React from 'react';
 
 // =============================================================================
 // Mock Setup
@@ -37,7 +35,6 @@ import {
   findMatchingDirectories,
   detectDrive,
   detectAllDrives,
-  getDrivePath,
 } from '../../../src/services/cloudDriveService.js';
 
 // Import helpers
@@ -261,7 +258,7 @@ describe('Flow 5: Cloud Drive Routing', () => {
     });
 
     it('should have platform-specific paths for each drive', () => {
-      for (const [key, drive] of Object.entries(KNOWN_DRIVES)) {
+      for (const [_key, drive] of Object.entries(KNOWN_DRIVES)) {
         expect(drive.paths).toBeDefined();
         // At least one platform should be defined
         expect(drive.paths.macos || drive.paths.windows || drive.paths.linux).toBeTruthy();

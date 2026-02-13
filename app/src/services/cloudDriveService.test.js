@@ -61,7 +61,7 @@ vi.mock('../utils/validation.js', () => ({
 
 import { getCloudDrives, getCloudDrive, createCloudDrive, updateCloudDrive } from '../db.js';
 
-import { validateFilePath, isPathWithinBase } from '../utils/validation.js';
+import { isPathWithinBase } from '../utils/validation.js';
 
 // =============================================================================
 // Test Suite

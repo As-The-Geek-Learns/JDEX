@@ -49,18 +49,8 @@ vi.mock('../../services/watcherService.js', () => ({
 }));
 
 import { useLicense } from '../../context/LicenseContext.jsx';
-import {
-  getWatchedFolders,
-  createWatchedFolder,
-  deleteWatchedFolder,
-  getRecentWatchActivity,
-} from '../../db.js';
-import {
-  initWatcherService,
-  startWatcher,
-  stopWatcher,
-  getWatcherStatus,
-} from '../../services/watcherService.js';
+import { getWatchedFolders, deleteWatchedFolder, getRecentWatchActivity } from '../../db.js';
+import { initWatcherService, getWatcherStatus } from '../../services/watcherService.js';
 
 describe('WatchFolders', () => {
   const mockWatchedFolders = [

@@ -17,7 +17,6 @@
 
 import {
   getOrganizationRules,
-  getOrganizationRule,
   createOrganizationRule,
   updateOrganizationRule,
   incrementRuleMatchCount,
@@ -25,8 +24,6 @@ import {
   getCategories,
   getAreas,
 } from '../db.js';
-import { validateRequiredString, sanitizeText } from '../utils/validation.js';
-import { Result, AppError } from '../utils/errors.js';
 
 // =============================================================================
 // Constants
@@ -82,7 +79,7 @@ const DEFAULT_EXTENSION_SUGGESTIONS = {
 /**
  * Common keywords that might indicate folder destinations.
  */
-const KEYWORD_INDICATORS = {
+const _KEYWORD_INDICATORS = {
   // Finance
   invoice: ['finance', 'invoice', 'billing'],
   receipt: ['finance', 'receipt', 'expense'],
@@ -407,7 +404,7 @@ export class MatchingEngine {
   heuristicMatch(file, folders) {
     const suggestions = [];
     const ext = (file.file_extension || '').toLowerCase();
-    const filename = file.filename.toLowerCase();
+    const _filename = file.filename.toLowerCase();
     const fileKeywords = extractKeywords(file.filename);
 
     // Try extension-based default suggestions

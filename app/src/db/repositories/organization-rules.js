@@ -70,7 +70,7 @@ function validatePriority(value) {
 function validateRegexPattern(pattern) {
   try {
     new RegExp(pattern);
-  } catch (e) {
+  } catch (_e) {
     throw new DatabaseError('Invalid regular expression pattern', 'query');
   }
 }

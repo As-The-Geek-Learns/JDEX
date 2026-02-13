@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { FolderOpen, X, Plus } from 'lucide-react';
 import { getNextFolderNumber } from '../../db.js';
 

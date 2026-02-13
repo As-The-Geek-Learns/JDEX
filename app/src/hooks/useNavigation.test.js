@@ -403,7 +403,7 @@ describe('useNavigation', () => {
     it('should return stable goHome reference', () => {
       const { result, rerender } = renderHook(() => useNavigation(defaultOptions));
 
-      const initialGoHome = result.current.goHome;
+      const _initialGoHome = result.current.goHome;
 
       rerender();
 

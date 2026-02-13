@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ChartColumn,
   TrendingUp,
@@ -14,7 +14,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useLicense } from '../../context/LicenseContext.jsx';
-import { getDashboardStats, hasStatisticsData } from '../../services/statisticsService.js';
+import { getDashboardStats } from '../../services/statisticsService.js';
 import StatCard from './StatCard.jsx';
 import ActivityChart from './ActivityChart.jsx';
 import FileTypeChart from './FileTypeChart.jsx';

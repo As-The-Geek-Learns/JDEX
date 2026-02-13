@@ -1,4 +1,3 @@
-import React from 'react';
 import { Search, FolderOpen, Plus, ArrowLeft, File } from 'lucide-react';
 import { Breadcrumb, QuickStatsOverview } from '../Common/index.js';
 import { FolderCard, ItemCard } from '../Cards/index.js';

@@ -11,7 +11,7 @@
  * - Preview what files a rule would match
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   getOrganizationRules,
   createOrganizationRule,
@@ -223,12 +223,6 @@ const REGEX_QUICK_REFERENCE = [
   { symbol: '[abc]', meaning: 'Any character in brackets', example: '[0-9] → any digit' },
   { symbol: '\\', meaning: 'Escape special characters', example: '\\. → literal dot' },
 ];
-
-const TARGET_TYPES = {
-  folder: { label: 'Specific Folder', description: 'XX.XX' },
-  category: { label: 'Category', description: 'XX' },
-  area: { label: 'Area', description: 'XX-XX' },
-};
 
 // =============================================================================
 // Regex Helper Component
@@ -502,7 +496,7 @@ function RuleCard({ rule, folders, onEdit, onDelete, onToggle }) {
 /**
  * Modal for creating/editing rules.
  */
-function RuleModal({ isOpen, rule, folders, categories, areas, onSave, onClose }) {
+function RuleModal({ isOpen, rule, folders, _categories, _areas, onSave, onClose }) {
   const isEditing = !!rule?.id;
 
   const [formData, setFormData] = useState({

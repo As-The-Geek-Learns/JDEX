@@ -71,7 +71,7 @@ export const mockFs = {
     delete mockFileSystem[path];
   }),
 
-  mkdirSync: vi.fn((path, options) => {
+  mkdirSync: vi.fn((path, _options) => {
     mockDirectoryExists[path] = true;
   }),
 

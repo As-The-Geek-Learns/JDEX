@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppData } from './hooks/useAppData.js';
 import { useNavigation } from './hooks/useNavigation.js';
 import { useSearch } from './hooks/useSearch.js';
@@ -114,7 +114,7 @@ export default function App() {
   };
 
   // Get display data based on current view - using useMemo for proper recalculation
-  const displayFolders = React.useMemo(() => {
+  const displayFolders = useMemo(() => {
     if (searchQuery.trim()) return searchResults.folders;
     if (selectedCategory) return folders.filter((f) => f.category_id === selectedCategory.id);
     if (selectedArea) {
@@ -124,7 +124,7 @@ export default function App() {
     return folders;
   }, [searchQuery, searchResults.folders, selectedCategory, selectedArea, folders, categories]);
 
-  const displayItems = React.useMemo(() => {
+  const displayItems = useMemo(() => {
     if (searchQuery.trim()) return searchResults.items;
     if (selectedFolder) return items;
     return [];

@@ -20,9 +20,7 @@ import {
   incrementWatchedFolderStats,
 } from '../db.js';
 import { getMatchingEngine, CONFIDENCE } from './matchingEngine.js';
-import { moveFile, buildDestinationPath, hasFileSystemAccess } from './fileOperations.js';
-import { FileSystemError } from '../utils/errors.js';
-import { validateFilePath } from '../utils/validation.js';
+import { moveFile, buildDestinationPath } from './fileOperations.js';
 
 // File type detection based on extension
 const FILE_TYPE_MAP = {
@@ -98,7 +96,7 @@ let path = null;
 
 // Configuration
 const DEBOUNCE_MS = 2000; // Wait 2 seconds after file stops changing
-const POLL_INTERVAL_MS = 5000; // Fallback polling interval
+const _POLL_INTERVAL_MS = 5000; // Fallback polling interval
 
 // =============================================================================
 // Initialization
@@ -115,7 +113,7 @@ export function initWatcherService() {
     // Check if we're in Electron
     if (typeof window !== 'undefined' && window.process?.type === 'renderer') {
       // Running in Electron renderer
-      const { ipcRenderer } = window.require('electron');
+      const { ipcRenderer: _ipcRenderer } = window.require('electron');
       fs = window.require('fs');
       path = window.require('path');
       isElectron = true;

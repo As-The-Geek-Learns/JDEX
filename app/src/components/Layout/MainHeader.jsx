@@ -1,4 +1,3 @@
-import React from 'react';
 import { Search, Menu } from 'lucide-react';
 
 function MainHeader({ searchQuery, onSearchChange, onToggleSidebar, folderCount, itemCount }) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   X,
   FileEdit,
@@ -8,7 +8,6 @@ import {
   CheckCircle,
   LoaderCircle,
   Lock,
-  Sparkles,
 } from 'lucide-react';
 import { useLicense } from '../../context/LicenseContext.jsx';
 import FileSelector from './FileSelector.jsx';

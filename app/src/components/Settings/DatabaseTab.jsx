@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Table, Terminal, RefreshCw } from 'lucide-react';
 import { executeSQL, getTableData, resetDatabase } from '../../db.js';
 

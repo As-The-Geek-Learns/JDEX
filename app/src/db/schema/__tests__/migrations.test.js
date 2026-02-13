@@ -160,7 +160,7 @@ describe('Migration Registry', () => {
   });
 
   it('all migrations are functions', () => {
-    for (const [version, fn] of Object.entries(migrations)) {
+    for (const [_version, fn] of Object.entries(migrations)) {
       expect(typeof fn).toBe('function');
     }
   });

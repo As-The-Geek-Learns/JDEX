@@ -1,4 +1,3 @@
-import React from 'react';
 import { TrendingUp, ChartColumn } from 'lucide-react';
 import {
   AreaChart,

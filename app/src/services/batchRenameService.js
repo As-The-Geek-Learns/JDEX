@@ -248,7 +248,7 @@ export function generatePreview(files, options) {
  * @param {Function} onProgress - Progress callback (current, total)
  * @returns {Object} { success, count, errors, undoId }
  */
-export async function executeBatchRename(preview, options = {}, onProgress = () => {}) {
+export async function executeBatchRename(preview, _options = {}, onProgress = () => {}) {
   const fs = window.require ? window.require('fs') : null;
 
   if (!fs) {

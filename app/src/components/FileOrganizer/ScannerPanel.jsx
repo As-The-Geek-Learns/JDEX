@@ -11,13 +11,12 @@
  * - Preview of scanned files
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   getScanner,
   formatFileSize,
   hasFileSystemAccess,
   listSubdirectories,
-  quickCount,
 } from '../../services/fileScannerService.js';
 import { getCloudDrives, getScannedFiles } from '../../db.js';
 import { sanitizeErrorForUser } from '../../utils/errors.js';

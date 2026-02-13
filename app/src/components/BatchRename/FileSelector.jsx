@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { Folder, File, Check, X, RefreshCw } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Folder, File, Check, RefreshCw } from 'lucide-react';
 import { readDirectoryFiles } from '../../services/batchRenameService.js';
 import { validateFilePath, sanitizeText } from '../../utils/validation.js';
 
@@ -42,39 +42,6 @@ export default function FileSelector({ selectedFiles, onFilesChange, maxFiles = 
     [setSafeError]
   );
 
-  // Handle folder selection via Electron dialog
-  const handleSelectFolder = useCallback(async () => {
-    try {
-      const { dialog } = window.require('@electron/remote') || {};
-
-      if (!dialog) {
-        // Fallback: prompt for path
-        const inputPath = window.prompt('Enter folder path:');
-        const validatedPath = validateUserPath(inputPath);
-        if (validatedPath) {
-          loadFolder(validatedPath);
-        }
-        return;
-      }
-
-      const result = await dialog.showOpenDialog({
-        properties: ['openDirectory'],
-        title: 'Select folder with files to rename',
-      });
-
-      if (!result.canceled && result.filePaths.length > 0) {
-        loadFolder(result.filePaths[0]);
-      }
-    } catch (err) {
-      // Fallback for when @electron/remote isn't available
-      const inputPath = window.prompt('Enter folder path:');
-      const validatedPath = validateUserPath(inputPath);
-      if (validatedPath) {
-        loadFolder(validatedPath);
-      }
-    }
-  }, [validateUserPath]);
-
   // Load files from a folder
   const loadFolder = useCallback(
     (path) => {
@@ -104,6 +71,39 @@ export default function FileSelector({ selectedFiles, onFilesChange, maxFiles = 
     },
     [onFilesChange, setSafeError]
   );
+
+  // Handle folder selection via Electron dialog
+  const handleSelectFolder = useCallback(async () => {
+    try {
+      const { dialog } = window.require('@electron/remote') || {};
+
+      if (!dialog) {
+        // Fallback: prompt for path
+        const inputPath = window.prompt('Enter folder path:');
+        const validatedPath = validateUserPath(inputPath);
+        if (validatedPath) {
+          loadFolder(validatedPath);
+        }
+        return;
+      }
+
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+        title: 'Select folder with files to rename',
+      });
+
+      if (!result.canceled && result.filePaths.length > 0) {
+        loadFolder(result.filePaths[0]);
+      }
+    } catch (_err) {
+      // Fallback for when @electron/remote isn't available
+      const inputPath = window.prompt('Enter folder path:');
+      const validatedPath = validateUserPath(inputPath);
+      if (validatedPath) {
+        loadFolder(validatedPath);
+      }
+    }
+  }, [validateUserPath, loadFolder]);
 
   // Toggle file selection
   const toggleFile = useCallback(

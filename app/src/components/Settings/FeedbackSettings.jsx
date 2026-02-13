@@ -10,7 +10,7 @@
  * - Optional: Link to external feedback form
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   MessageSquare,
   Bug,
@@ -18,7 +18,6 @@ import {
   Palette,
   CircleHelp,
   Mail,
-  ExternalLink,
   Send,
   CheckCircle,
   Copy,

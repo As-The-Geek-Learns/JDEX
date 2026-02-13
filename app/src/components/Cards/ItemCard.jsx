@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { File, Edit2, Trash2 } from 'lucide-react';
 import SensitivityBadge from '../Common/SensitivityBadge.jsx';
 

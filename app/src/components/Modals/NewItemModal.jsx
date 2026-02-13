@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { File, X, Plus } from 'lucide-react';
 import { getNextItemNumber } from '../../db.js';
 

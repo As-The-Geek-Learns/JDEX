@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 
 /**
  * DragDropContext
@@ -18,7 +18,7 @@ export function DragDropProvider({ children }) {
   const [dragData, setDragData] = useState(null);
 
   // Track drag counter (for nested elements)
-  const [dragCounter, setDragCounter] = useState(0);
+  const [_dragCounter, setDragCounter] = useState(0);
 
   // Called when drag enters the app window
   const handleDragEnter = useCallback((event) => {

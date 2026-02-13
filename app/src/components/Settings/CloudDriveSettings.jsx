@@ -10,14 +10,10 @@
  * - Configure JD root folder within each drive
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   detectAllDrives,
-  detectAndCompare,
   configureDetectedDrive,
-  addCustomDrive,
-  setDriveJDRoot,
-  getDrivePath,
   getCloudDrives,
   getDefaultCloudDrive,
   setDefaultCloudDrive,

@@ -267,7 +267,7 @@ describe('FileSelector', () => {
     it('should prevent selecting more than maxFiles', () => {
       window.prompt.mockReturnValue('/test/folder');
 
-      const { rerender } = render(
+      render(
         <FileSelector
           selectedFiles={mockFiles.slice(0, 2)}
           onFilesChange={mockOnFilesChange}

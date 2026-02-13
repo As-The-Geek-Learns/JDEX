@@ -11,18 +11,13 @@
  * - Integration with matching engine
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import ScannerPanel from './ScannerPanel.jsx';
 import RulesManager from './RulesManager.jsx';
 import WatchFolders from './WatchFolders.jsx';
-import { getMatchingEngine, CONFIDENCE } from '../../services/matchingEngine.js';
+import { getMatchingEngine } from '../../services/matchingEngine.js';
 import { formatFileSize } from '../../services/fileScannerService.js';
-import {
-  batchMove,
-  previewOperations,
-  CONFLICT_STRATEGY,
-  OP_STATUS,
-} from '../../services/fileOperations.js';
+import { batchMove, CONFLICT_STRATEGY } from '../../services/fileOperations.js';
 import { getScannedFiles, updateScannedFileDecision, getFolders } from '../../db.js';
 import { sanitizeErrorForUser } from '../../utils/errors.js';
 
@@ -724,12 +719,12 @@ export default function FileOrganizer({ onClose }) {
   const [activeTab, setActiveTab] = useState('scan');
   const [scanSessionId, setScanSessionId] = useState(null);
   const [organizationResult, setOrganizationResult] = useState(null);
-  const [isOrganizing, setIsOrganizing] = useState(false);
+  const [_isOrganizing, setIsOrganizing] = useState(false);
   const [organizeProgress, setOrganizeProgress] = useState(null);
   const [showProgressModal, setShowProgressModal] = useState(false);
 
   // Handle scan completion
-  const handleScanComplete = useCallback((sessionId, files) => {
+  const handleScanComplete = useCallback((sessionId, _files) => {
     setScanSessionId(sessionId);
     setActiveTab('organize');
   }, []);

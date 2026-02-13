@@ -27,25 +27,10 @@ import {
 } from '../../../__mocks__/sql.js.js';
 
 // Services under test
-import {
-  MatchingEngine,
-  getMatchingEngine,
-  suggestRulesForFolder,
-  CONFIDENCE,
-} from '@/services/matchingEngine.js';
-import {
-  getActiveRulesCount,
-  getTopRules,
-  getDashboardStats,
-  hasStatisticsData,
-} from '@/services/statisticsService.js';
+import { MatchingEngine, CONFIDENCE } from '@/services/matchingEngine.js';
 
 // Test fixtures
 import {
-  extensionRules,
-  keywordRules,
-  regexRules,
-  pathRules,
   allActiveRules,
   createExtensionRule as createExtensionRuleFixture,
   createKeywordRule as createKeywordRuleFixture,
@@ -183,7 +168,7 @@ function deleteMockRule(ruleId) {
 // =============================================================================
 
 describe('Flow 2: Rules Engine + Matching + Statistics', () => {
-  let engine;
+  let _engine;
 
   beforeEach(() => {
     // Reset mock database
@@ -197,7 +182,7 @@ describe('Flow 2: Rules Engine + Matching + Statistics', () => {
     __setTableData('organization_rules', []);
 
     // Get fresh matching engine instance and invalidate cache
-    engine = new MatchingEngine();
+    _engine = new MatchingEngine();
   });
 
   afterEach(() => {
@@ -664,7 +649,7 @@ describe('Flow 2: Rules Engine + Matching + Statistics', () => {
       expect(rules.length).toBe(2);
 
       // Both would match an invoice PDF - verify sorting logic
-      const confOrder = { high: 3, medium: 2, low: 1, none: 0 };
+      const _confOrder = { high: 3, medium: 2, low: 1, none: 0 };
       const sortedRules = [...rules].sort((a, b) => b.priority - a.priority);
 
       expect(sortedRules[0].priority).toBe(60);
@@ -887,7 +872,7 @@ describe('Flow 2: Rules Engine + Matching + Statistics', () => {
     it('should create rules with all rule types', () => {
       const ruleTypes = ['extension', 'keyword', 'regex', 'path'];
 
-      ruleTypes.forEach((ruleType, index) => {
+      ruleTypes.forEach((ruleType, _index) => {
         addMockRule({
           name: `${ruleType} Rule`,
           rule_type: ruleType,

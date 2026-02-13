@@ -1,4 +1,3 @@
-import React from 'react';
 import { Cloud, Lock, Briefcase, FolderTree } from 'lucide-react';
 
 function SensitivityBadge({ sensitivity, isInherited = false }) {

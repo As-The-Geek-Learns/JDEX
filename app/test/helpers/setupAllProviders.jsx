@@ -5,7 +5,7 @@
  * Use this for tests that need License + DragDrop + other contexts.
  */
 
-import React, { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { render } from '@testing-library/react';
 import { vi } from 'vitest';
 import {

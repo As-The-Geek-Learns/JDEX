@@ -283,7 +283,7 @@ describe('FeedbackSettings Email Submission', () => {
 
   it('resets state after timeout', async () => {
     vi.useFakeTimers();
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const _user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<FeedbackSettings />);
 
     const textarea = screen.getByPlaceholderText(/Share your thoughts/);

@@ -75,7 +75,7 @@ import {
   getDefaultCloudDrive,
   getCloudDrive,
 } from '../db.js';
-import { validateFilePath, isPathWithinBase } from '../utils/validation.js';
+import { isPathWithinBase } from '../utils/validation.js';
 import { sanitizeFilename } from './batchRenameService.js';
 
 // =============================================================================
@@ -599,10 +599,10 @@ describe('fileOperations', () => {
     });
 
     it('should skip file when conflict strategy is SKIP and file exists', () => {
-      let existsCallCount = 0;
+      let _existsCallCount = 0;
       const mockFs = createMockFs({
         existsSync: vi.fn(() => {
-          existsCallCount++;
+          _existsCallCount++;
           return true; // Both source and destination exist
         }),
         statSync: vi.fn(() => ({ isDirectory: () => false, size: 1024 })),

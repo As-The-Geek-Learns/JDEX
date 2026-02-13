@@ -20,7 +20,6 @@ import {
 } from '../../db.js';
 import {
   initWatcherService,
-  isWatcherAvailable,
   startWatcher,
   stopWatcher,
   getWatcherStatus,
@@ -72,7 +71,20 @@ export default function WatchFolders() {
   const remainingSlots = MAX_WATCH_FOLDERS - watchedFolders.length;
   const canAddMore = remainingSlots > 0;
 
-  // Initialize
+  // Load watched folder data
+  const loadData = useCallback(() => {
+    try {
+      const folders = watcherAvailable ? getWatcherStatus() : getWatchedFolders();
+      setWatchedFolders(folders);
+      setActivity(getRecentWatchActivity({ limit: 20 }));
+      setQueuedCounts(getQueuedFileCounts());
+    } catch (e) {
+      setError(sanitizeErrorForUser(e));
+    }
+  }, [watcherAvailable]);
+
+  // Initialize watcher service and subscribe to events - runs once on mount.
+  // loadData is intentionally excluded from deps to prevent double initialization.
   useEffect(() => {
     const available = initWatcherService();
     setWatcherAvailable(available);
@@ -96,18 +108,8 @@ export default function WatchFolders() {
     ];
 
     return () => unsubscribes.forEach((unsub) => unsub());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const loadData = useCallback(() => {
-    try {
-      const folders = watcherAvailable ? getWatcherStatus() : getWatchedFolders();
-      setWatchedFolders(folders);
-      setActivity(getRecentWatchActivity({ limit: 20 }));
-      setQueuedCounts(getQueuedFileCounts());
-    } catch (e) {
-      setError(sanitizeErrorForUser(e));
-    }
-  }, [watcherAvailable]);
 
   // Handlers
   const handleAddFolder = useCallback(

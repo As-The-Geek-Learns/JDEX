@@ -1,5 +1,3 @@
-import React from 'react';
-
 /**
  * StatCard - Reusable card component for displaying a single statistic
  */

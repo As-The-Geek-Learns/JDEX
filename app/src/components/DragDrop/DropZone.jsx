@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Download, CircleAlert, CheckCircle, X } from 'lucide-react';
 import { useDragDrop } from '../../context/DragDropContext.jsx';
 import { useLicense } from '../../context/LicenseContext.jsx';

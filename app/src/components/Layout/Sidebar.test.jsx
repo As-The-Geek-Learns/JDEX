@@ -10,13 +10,15 @@ import Sidebar from './Sidebar.jsx';
 
 // Mock CategoryTree since it's a separate component
 vi.mock('../Navigation/index.js', () => ({
-  CategoryTree: vi.fn(({ areas, categories, onSelectCategory, onSelectArea }) => (
-    <div data-testid="category-tree">
-      <span>Mock CategoryTree</span>
-      <span data-testid="areas-count">{areas?.length || 0}</span>
-      <span data-testid="categories-count">{categories?.length || 0}</span>
-    </div>
-  )),
+  CategoryTree: vi.fn(
+    ({ areas, categories, onSelectCategory: _onSelectCategory, onSelectArea: _onSelectArea }) => (
+      <div data-testid="category-tree">
+        <span>Mock CategoryTree</span>
+        <span data-testid="areas-count">{areas?.length || 0}</span>
+        <span data-testid="categories-count">{categories?.length || 0}</span>
+      </div>
+    )
+  ),
 }));
 
 describe('Sidebar', () => {

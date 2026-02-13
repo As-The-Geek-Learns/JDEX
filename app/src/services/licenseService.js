@@ -209,7 +209,7 @@ export async function validateLicenseKey(licenseKey) {
         error: data.message || 'License key not found',
       };
     }
-  } catch (error) {
+  } catch (_error) {
     // Network error - check if we have a cached valid license
     const cached = getStoredLicense();
     if (cached && cached.key === cleanKey) {

@@ -1,4 +1,4 @@
-import React from 'react';
+import { Fragment } from 'react';
 import { Home, ChevronRight } from 'lucide-react';
 
 function Breadcrumb({ path, onNavigate }) {
@@ -11,7 +11,7 @@ function Breadcrumb({ path, onNavigate }) {
         <Home size={16} />
       </button>
       {path.map((item, index) => (
-        <React.Fragment key={index}>
+        <Fragment key={index}>
           <ChevronRight size={14} className="text-slate-600" />
           <button
             onClick={() => onNavigate(item.type, item.data)}
@@ -23,7 +23,7 @@ function Breadcrumb({ path, onNavigate }) {
           >
             {item.label}
           </button>
-        </React.Fragment>
+        </Fragment>
       ))}
     </nav>
   );

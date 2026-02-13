@@ -136,7 +136,7 @@ function categorizeFileType(extension) {
  * @returns {string} Full destination path
  */
 export function buildDestinationPath(folder, fileName, jdRootPath) {
-  const fs = window.require ? window.require('fs') : null;
+  const _fs = window.require ? window.require('fs') : null;
   const path = window.require ? window.require('path') : null;
 
   if (!path) {

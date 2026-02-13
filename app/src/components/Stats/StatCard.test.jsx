@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import StatCard from './StatCard';
-import { Activity, FileText, Folder } from 'lucide-react';
+import { Activity, Folder } from 'lucide-react';
 
 // =============================================================================
 // Snapshot Tests

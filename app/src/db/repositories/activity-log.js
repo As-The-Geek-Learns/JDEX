@@ -4,7 +4,7 @@
  * CRUD operations for activity logging and retrieval.
  */
 
-import { getDB, mapResults, validatePositiveInteger } from './utils.js';
+import { getDB, mapResults } from './utils.js';
 
 // Column definitions for activity_log table
 const ACTIVITY_COLUMNS = ['id', 'action', 'entity_type', 'entity_number', 'details', 'timestamp'];

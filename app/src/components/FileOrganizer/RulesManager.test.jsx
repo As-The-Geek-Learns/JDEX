@@ -22,7 +22,6 @@ vi.mock('../../db.js', () => ({
 import {
   getOrganizationRules,
   createOrganizationRule,
-  updateOrganizationRule,
   deleteOrganizationRule,
   getFolders,
   getCategories,

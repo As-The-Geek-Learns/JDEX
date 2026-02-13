@@ -14,9 +14,9 @@
  * - Database logging
  */
 
+import { useContext } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
-import React from 'react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 
 // =============================================================================
 // Mock Setup
@@ -49,7 +49,6 @@ import {
   MockDragDropProvider,
   MockDragDropContext,
   setupIntegrationDb,
-  LICENSE_TIERS,
 } from '../../helpers/setupAllProviders.jsx';
 
 // Import fixtures
@@ -836,7 +835,7 @@ describe('Flow 4: Drag-and-Drop Organization', () => {
       });
 
       function TestComponent() {
-        const ctx = React.useContext(MockDragDropContext);
+        const ctx = useContext(MockDragDropContext);
         return (
           <div>
             <span data-testid="dragging">{String(ctx.isDraggingFiles)}</span>

@@ -4,7 +4,7 @@
  * UI for managing premium license activation.
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useLicense, UsageLimitWarning } from '../../context/LicenseContext.jsx';
 
 // =============================================================================
@@ -49,8 +49,8 @@ export default function LicenseSettings() {
     tier,
     license,
     usage,
-    loading,
-    error,
+    loading: _loading,
+    error: _error,
     activateLicense,
     deactivateLicense,
     FEATURE_INFO,

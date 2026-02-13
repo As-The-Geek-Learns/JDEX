@@ -5,7 +5,7 @@
  * Uses parameterized queries for security.
  */
 
-import { getDB, saveDatabase, validatePositiveInteger } from './utils.js';
+import { getDB, saveDatabase } from './utils.js';
 import { logActivity } from './activity-log.js';
 import { validateRequiredString, validateOptionalString } from '../../utils/validation.js';
 import { DatabaseError } from '../../utils/errors.js';
@@ -22,7 +22,7 @@ export const VALID_DRIVE_TYPES = ['icloud', 'dropbox', 'onedrive', 'google', 'pr
 /**
  * Column definitions for cloud_drives table.
  */
-const CLOUD_DRIVE_COLUMNS = [
+const _CLOUD_DRIVE_COLUMNS = [
   'id',
   'name',
   'base_path',

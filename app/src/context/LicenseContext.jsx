@@ -12,7 +12,7 @@
  *   const { isPremium, tier, activateLicense } = useLicense();
  */
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import {
   getLicenseState,
   activateLicense as doActivate,
@@ -157,7 +157,7 @@ export function useLicense() {
 
 export function withPremiumFeature(WrappedComponent, featureId) {
   return function PremiumGatedComponent(props) {
-    const { hasFeature, isPremium } = useLicense();
+    const { hasFeature, isPremium: _isPremium } = useLicense();
 
     if (!hasFeature(featureId)) {
       return <UpgradePrompt feature={featureId} />;

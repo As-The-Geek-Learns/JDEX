@@ -36,7 +36,7 @@ vi.mock('../db.js', () => ({
 
 // Mock the validation utils
 vi.mock('../utils/validation.js', () => ({
-  validateFilePath: vi.fn((path, options) => {
+  validateFilePath: vi.fn((path, _options) => {
     if (!path || typeof path !== 'string') {
       throw new Error('Invalid file path');
     }
@@ -47,7 +47,7 @@ vi.mock('../utils/validation.js', () => ({
   }),
 }));
 
-import { addScannedFile, clearScannedFiles } from '../db.js';
+import { addScannedFile } from '../db.js';
 import { validateFilePath } from '../utils/validation.js';
 
 // =============================================================================

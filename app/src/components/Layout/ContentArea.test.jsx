@@ -10,12 +10,12 @@ import ContentArea from './ContentArea.jsx';
 
 // Mock child components to isolate ContentArea testing
 vi.mock('../Common/index.js', () => ({
-  Breadcrumb: vi.fn(({ path, onNavigate }) => (
+  Breadcrumb: vi.fn(({ path, onNavigate: _onNavigate }) => (
     <div data-testid="breadcrumb">
       <span data-testid="breadcrumb-path">{path.length} items</span>
     </div>
   )),
-  QuickStatsOverview: vi.fn(({ stats }) => (
+  QuickStatsOverview: vi.fn(({ stats: _stats }) => (
     <div data-testid="quick-stats">
       <span>Stats Overview</span>
     </div>
@@ -23,7 +23,7 @@ vi.mock('../Common/index.js', () => ({
 }));
 
 vi.mock('../Cards/index.js', () => ({
-  FolderCard: vi.fn(({ folder, onEdit, onDelete, onOpen }) => (
+  FolderCard: vi.fn(({ folder, onEdit, onDelete, onOpen: _onOpen }) => (
     <div data-testid={`folder-card-${folder.id}`}>
       <span>{folder.name}</span>
       <button onClick={() => onEdit(folder)}>Edit</button>
@@ -40,7 +40,7 @@ vi.mock('../Cards/index.js', () => ({
 }));
 
 vi.mock('../DragDrop/DropZone.jsx', () => ({
-  default: vi.fn(({ children, folder, onSuccess }) => (
+  default: vi.fn(({ children, folder, onSuccess: _onSuccess }) => (
     <div data-testid={`dropzone-${folder.id}`}>{children}</div>
   )),
 }));

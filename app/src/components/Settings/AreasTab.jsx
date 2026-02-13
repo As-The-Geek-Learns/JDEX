@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Edit2, Trash2, X, Check, CircleAlert, Plus } from 'lucide-react';
 import { createArea, updateArea, deleteArea } from '../../db.js';
 

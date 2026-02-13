@@ -1,4 +1,3 @@
-import React from 'react';
 import { FolderOpen, File, Lock, Briefcase } from 'lucide-react';
 
 function QuickStatsOverview({ stats }) {
