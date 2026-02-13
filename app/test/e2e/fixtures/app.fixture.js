@@ -20,10 +20,18 @@ export const test = base.extend({
   /**
    * Electron app instance
    */
-  electronApp: async (_, use) => {
+  // eslint-disable-next-line no-empty-pattern
+  electronApp: async ({}, use) => {
+    // Build Electron args - add sandbox disabling for CI environments
+    const electronArgs = [path.join(APP_ROOT, 'electron/main.js')];
+    if (process.env.CI) {
+      // GitHub Actions runners don't have proper permissions for chrome-sandbox
+      electronArgs.unshift('--no-sandbox', '--disable-setuid-sandbox');
+    }
+
     // Launch Electron app
     const app = await electron.launch({
-      args: [path.join(APP_ROOT, 'electron/main.js')],
+      args: electronArgs,
       cwd: APP_ROOT,
       env: {
         ...process.env,
