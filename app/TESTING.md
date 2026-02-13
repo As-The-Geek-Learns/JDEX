@@ -20,12 +20,13 @@ npm run test:ci
 
 ## Test Statistics
 
-| Metric                | Count |
-| --------------------- | ----- |
-| Test Files            | 74    |
-| Total Tests           | 2,611 |
-| Coverage (Statements) | ~82%  |
-| Coverage (Branches)   | ~89%  |
+| Metric                | Count  |
+| --------------------- | ------ |
+| Test Files            | 80+    |
+| Total Tests           | 2,720+ |
+| Coverage (Statements) | ~82%   |
+| Coverage (Branches)   | ~89%   |
+| E2E Tests             | 40+    |
 
 ---
 
@@ -37,13 +38,26 @@ npm run test:ci
 app/
 ├── test/
 │   ├── setup.js                    # Global test setup, mocks
-│   └── integration/
-│       └── flows/                  # Integration tests
-│           ├── flow1-premium-feature-gating.test.jsx
-│           ├── flow2-rules-matching-stats.test.jsx
-│           ├── flow3-batch-rename-undo.test.jsx
-│           ├── flow4-drag-drop-organization.test.jsx
-│           └── flow5-cloud-drive-routing.test.jsx
+│   ├── integration/
+│   │   └── flows/                  # Integration tests
+│   │       ├── flow1-premium-feature-gating.test.jsx
+│   │       ├── flow2-rules-matching-stats.test.jsx
+│   │       ├── flow3-batch-rename-undo.test.jsx
+│   │       ├── flow4-drag-drop-organization.test.jsx
+│   │       ├── flow5-cloud-drive-routing.test.jsx
+│   │       └── flow6-jd-hierarchy-crud.test.jsx
+│   │
+│   └── e2e/                        # E2E tests (Playwright + Electron)
+│       ├── playwright.config.js
+│       ├── fixtures/
+│       │   └── app.fixture.js
+│       └── specs/
+│           ├── app-launch.spec.js
+│           ├── navigation.spec.js
+│           ├── crud-folder.spec.js
+│           ├── crud-item.spec.js
+│           ├── search.spec.js
+│           └── import-export.spec.js
 │
 ├── __mocks__/
 │   └── sql.js.js                   # sql.js mock for database tests
@@ -67,12 +81,13 @@ app/
 
 ### Test Types
 
-| Type            | Location                         | Purpose                   |
-| --------------- | -------------------------------- | ------------------------- |
-| **Unit**        | `src/**/*.test.js`               | Pure functions, utilities |
-| **Component**   | `src/components/**/*.test.jsx`   | React component behavior  |
-| **Repository**  | `src/db/repositories/__tests__/` | Database CRUD operations  |
-| **Integration** | `test/integration/flows/`        | Multi-component workflows |
+| Type            | Location                         | Purpose                      |
+| --------------- | -------------------------------- | ---------------------------- |
+| **Unit**        | `src/**/*.test.js`               | Pure functions, utilities    |
+| **Component**   | `src/components/**/*.test.jsx`   | React component behavior     |
+| **Repository**  | `src/db/repositories/__tests__/` | Database CRUD operations     |
+| **Integration** | `test/integration/flows/`        | Multi-component workflows    |
+| **E2E**         | `test/e2e/specs/`                | Full Electron app user flows |
 
 ---
 
@@ -395,8 +410,91 @@ vi.mock('./module');
 
 ---
 
+## E2E Testing with Playwright
+
+JDex uses Playwright for end-to-end testing of the Electron application.
+
+### Running E2E Tests
+
+```bash
+# Run E2E tests (headless)
+npm run test:e2e
+
+# Run E2E tests with visible browser
+npm run test:e2e:headed
+
+# Run E2E tests in debug mode
+npm run test:e2e:debug
+```
+
+### E2E Test Structure
+
+```
+app/test/e2e/
+├── playwright.config.js       # Playwright configuration
+├── fixtures/
+│   └── app.fixture.js         # Electron app launch fixture
+└── specs/
+    ├── app-launch.spec.js     # App startup tests
+    ├── navigation.spec.js     # Sidebar/breadcrumb navigation
+    ├── crud-folder.spec.js    # Folder CRUD operations
+    ├── crud-item.spec.js      # Item CRUD operations
+    ├── search.spec.js         # Search functionality
+    └── import-export.spec.js  # Backup/restore tests
+```
+
+### Writing E2E Tests
+
+E2E tests use a custom fixture that launches the Electron app:
+
+```javascript
+import { test, expect } from '../fixtures/app.fixture.js';
+
+test('should display the main window', async ({ window }) => {
+  // window is the Playwright Page for the Electron window
+  const logo = window.locator('text=JDex');
+  await expect(logo).toBeVisible();
+});
+
+test('should interact with Electron APIs', async ({ electronApp }) => {
+  // electronApp provides access to Electron's main process
+  const isReady = await electronApp.evaluate(({ app }) => app.isReady());
+  expect(isReady).toBe(true);
+});
+```
+
+### E2E Test Fixtures
+
+The app fixture provides:
+
+- **`electronApp`**: The Electron application instance
+- **`window`**: The main BrowserWindow as a Playwright Page
+- **`cleanState`**: Resets localStorage/database between tests
+
+### E2E Best Practices
+
+1. **Use proper waits**: Use Playwright's auto-waiting instead of arbitrary timeouts
+2. **Reset state**: Use `cleanState` fixture for tests that modify data
+3. **Stable selectors**: Prefer `getByRole`, `getByLabel`, `getByText` over CSS selectors
+4. **Independent tests**: Each test should be able to run in isolation
+
+### CI Integration
+
+E2E tests run in CI using `xvfb-run` for headless Electron testing on Linux:
+
+```yaml
+- name: Run E2E tests
+  run: xvfb-run --auto-servernum npm run test:e2e
+```
+
+Test results and artifacts are uploaded on failure for debugging.
+
+---
+
 ## Resources
 
 - [Vitest Documentation](https://vitest.dev/)
 - [Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
 - [Vitest Mocking Guide](https://vitest.dev/guide/mocking.html)
+- [Playwright Documentation](https://playwright.dev/)
+- [Playwright Electron Guide](https://playwright.dev/docs/api/class-electron)

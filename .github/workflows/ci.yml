@@ -164,6 +164,54 @@ jobs:
             p/secrets
 
   # ===========================================================================
+  # E2E Tests (Playwright + Electron)
+  # ===========================================================================
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: build
+    # E2E tests are optional - don't block PRs if they fail
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Install system dependencies for Electron
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
+
+      - name: Build the app
+        run: npm run build
+
+      - name: Run E2E tests
+        run: xvfb-run --auto-servernum npm run test:e2e
+        env:
+          CI: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: app/test/e2e/test-results/
+          retention-days: 7
+
+  # ===========================================================================
   # Secrets Scan
   # ===========================================================================
   secrets-scan:

@@ -50,7 +50,9 @@
     "test:unit:watch": "vitest --config vitest.config.unit.js",
     "test:integration": "vitest run --config vitest.config.integration.js",
     "test:integration:watch": "vitest --config vitest.config.integration.js",
-    "test:e2e": "echo 'Placeholder for Playwright/Cypress'"
+    "test:e2e": "npx playwright test --config test/e2e/playwright.config.js",
+    "test:e2e:headed": "npx playwright test --config test/e2e/playwright.config.js --headed",
+    "test:e2e:debug": "npx playwright test --config test/e2e/playwright.config.js --debug"
   },
   "lint-staged": {
     "*.{js,jsx}": [
@@ -72,6 +74,7 @@
   "devDependencies": {
     "@electron/notarize": "^2.1.0",
     "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -93,6 +96,7 @@
     "lint-staged": "^15.3.0",
     "lodash": "^4.17.23",
     "msw": "^2.7.0",
+    "playwright": "^1.58.2",
     "png-to-ico": "^3.0.1",
     "postcss": "^8.4.32",
     "prettier": "^3.8.1",
