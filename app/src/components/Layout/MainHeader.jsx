@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import { Search, Menu } from 'lucide-react';
 import { getShortcutForAction } from '../../hooks/useKeyboardShortcuts.js';
+import UndoStatusIndicator from './UndoStatusIndicator.jsx';
 
 const MainHeader = forwardRef(function MainHeader(
   { searchQuery, onSearchChange, onToggleSidebar, folderCount, itemCount },
@@ -26,6 +27,8 @@ const MainHeader = forwardRef(function MainHeader(
             className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-10 pr-4 py-2 text-white placeholder-slate-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
           />
         </div>
+
+        <UndoStatusIndicator />
 
         <div className="text-sm text-slate-400">
           {folderCount} folders, {itemCount} items

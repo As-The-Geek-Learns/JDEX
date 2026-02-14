@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { createFolder, updateFolder, deleteFolder } from '../db.js';
+import { createFolder, updateFolder, deleteFolder, getFolder } from '../db.js';
+import { useUndo, ACTION_TYPES, ENTITY_TYPES } from '../context/UndoContext.jsx';
 
 /**
  * useFolderCRUD - Manages folder CRUD operations and editing state
@@ -21,16 +22,29 @@ export function useFolderCRUD({ triggerRefresh, selectedFolder, selectedCategory
   // Editing state
   const [editingFolder, setEditingFolder] = useState(null);
 
+  // Undo context
+  const { pushAction } = useUndo();
+
   /**
    * Create a new folder
    * @param {Object} folderData - Folder data to create
    */
   const handleCreateFolder = useCallback(
     (folderData) => {
-      createFolder(folderData);
+      const newId = createFolder(folderData);
+
+      // Push to undo stack
+      pushAction({
+        type: ACTION_TYPES.CREATE,
+        entityType: ENTITY_TYPES.FOLDER,
+        entityId: newId,
+        entityData: { ...folderData, id: newId },
+        description: `Created folder "${folderData.folder_number} ${folderData.name}"`,
+      });
+
       triggerRefresh();
     },
-    [triggerRefresh]
+    [triggerRefresh, pushAction]
   );
 
   /**
@@ -39,10 +53,24 @@ export function useFolderCRUD({ triggerRefresh, selectedFolder, selectedCategory
    */
   const handleUpdateFolder = useCallback(
     (folderData) => {
+      // Capture before state for undo
+      const beforeState = getFolder(folderData.id);
+
       updateFolder(folderData.id, folderData);
+
+      // Push to undo stack
+      pushAction({
+        type: ACTION_TYPES.UPDATE,
+        entityType: ENTITY_TYPES.FOLDER,
+        entityId: folderData.id,
+        previousState: beforeState,
+        newState: { ...beforeState, ...folderData },
+        description: `Updated folder "${folderData.folder_number || beforeState?.folder_number} ${folderData.name || beforeState?.name}"`,
+      });
+
       triggerRefresh();
     },
-    [triggerRefresh]
+    [triggerRefresh, pushAction]
   );
 
   /**
@@ -52,11 +80,22 @@ export function useFolderCRUD({ triggerRefresh, selectedFolder, selectedCategory
    */
   const handleDeleteFolder = useCallback(
     (folder) => {
-      if (
-        confirm(`Delete folder "${folder.folder_number} ${folder.name}"? This cannot be undone.`)
-      ) {
+      if (confirm(`Delete folder "${folder.folder_number} ${folder.name}"?`)) {
         try {
+          // Capture full state before delete for undo
+          const fullFolder = getFolder(folder.id);
+
           deleteFolder(folder.id);
+
+          // Push to undo stack
+          pushAction({
+            type: ACTION_TYPES.DELETE,
+            entityType: ENTITY_TYPES.FOLDER,
+            entityId: folder.id,
+            deletedEntity: fullFolder,
+            description: `Deleted folder "${folder.folder_number} ${folder.name}"`,
+          });
+
           triggerRefresh();
           if (selectedFolder?.id === folder.id && typeof navigateTo === 'function') {
             navigateTo('category', selectedCategory);
@@ -66,7 +105,7 @@ export function useFolderCRUD({ triggerRefresh, selectedFolder, selectedCategory
         }
       }
     },
-    [triggerRefresh, selectedFolder, selectedCategory, navigateTo]
+    [triggerRefresh, selectedFolder, selectedCategory, navigateTo, pushAction]
   );
 
   return {

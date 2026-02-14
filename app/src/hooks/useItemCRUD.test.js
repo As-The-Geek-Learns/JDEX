@@ -10,10 +10,28 @@ import { useItemCRUD } from './useItemCRUD.js';
 
 // Mock the database module
 vi.mock('../db.js', () => ({
-  createItem: vi.fn(),
+  createItem: vi.fn(() => 1),
   updateItem: vi.fn(),
   deleteItem: vi.fn(),
   getItems: vi.fn(() => []),
+  getItem: vi.fn((id) => ({ id, item_number: '11.01.001', name: 'Test Item' })),
+}));
+
+// Mock the UndoContext with stable function references
+const mockPushAction = vi.fn();
+const mockUndo = vi.fn();
+const mockRedo = vi.fn();
+
+vi.mock('../context/UndoContext.jsx', () => ({
+  useUndo: vi.fn(() => ({
+    pushAction: mockPushAction,
+    undo: mockUndo,
+    redo: mockRedo,
+    canUndo: false,
+    canRedo: false,
+  })),
+  ACTION_TYPES: { CREATE: 'CREATE', UPDATE: 'UPDATE', DELETE: 'DELETE' },
+  ENTITY_TYPES: { FOLDER: 'folder', ITEM: 'item' },
 }));
 
 // Mock window.confirm

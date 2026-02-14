@@ -73,6 +73,21 @@ export const KEYBOARD_SHORTCUTS = Object.freeze([
     description: 'Close Modal',
     allowInInput: true,
   },
+  // Undo/Redo shortcuts
+  {
+    key: 'z',
+    modifiers: ['mod'],
+    action: 'undo',
+    description: 'Undo',
+    allowInInput: true,
+  },
+  {
+    key: 'z',
+    modifiers: ['mod', 'shift'],
+    action: 'redo',
+    description: 'Redo',
+    allowInInput: true,
+  },
 ]);
 
 /**
@@ -187,7 +202,8 @@ export function getShortcutForAction(action) {
  * @param {Object} modalState - Object containing current modal states
  */
 export function useKeyboardShortcuts(handlers, modalState = {}) {
-  const { openModal, closeAllModals, toggleSidebar, focusSearch, openCommandPalette } = handlers;
+  const { openModal, closeAllModals, toggleSidebar, focusSearch, openCommandPalette, undo, redo } =
+    handlers;
 
   // Check if any modal is currently open (excluding command palette)
   const isAnyModalOpen = useCallback(() => {
@@ -280,6 +296,16 @@ export function useKeyboardShortcuts(handlers, modalState = {}) {
               closeAllModals?.();
             }
             break;
+
+          case 'undo':
+            event.preventDefault();
+            undo?.();
+            break;
+
+          case 'redo':
+            event.preventDefault();
+            redo?.();
+            break;
         }
 
         // Only handle first matching shortcut
@@ -289,7 +315,16 @@ export function useKeyboardShortcuts(handlers, modalState = {}) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [openModal, closeAllModals, toggleSidebar, focusSearch, openCommandPalette, isAnyModalOpen]);
+  }, [
+    openModal,
+    closeAllModals,
+    toggleSidebar,
+    focusSearch,
+    openCommandPalette,
+    undo,
+    redo,
+    isAnyModalOpen,
+  ]);
 }
 
 export default useKeyboardShortcuts;

@@ -21,6 +21,7 @@ import {
 import { LicenseProvider } from './context/LicenseContext.jsx';
 import { DragDropProvider } from './context/DragDropContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
+import { UndoProvider, useUndo } from './context/UndoContext.jsx';
 import { exportDatabase, exportToJSON, importDatabase } from './db.js';
 
 // Main App Component
@@ -105,6 +106,9 @@ export default function App() {
   // Command palette state
   const [showCommandPalette, setShowCommandPalette] = useState(false);
 
+  // Undo/redo context
+  const { undo, redo } = useUndo();
+
   // Keyboard shortcut handlers
   const openModal = useCallback(
     (modalName) => {
@@ -179,7 +183,7 @@ export default function App() {
 
   // Register keyboard shortcuts
   useKeyboardShortcuts(
-    { openModal, closeAllModals, toggleSidebar, focusSearch, openCommandPalette },
+    { openModal, closeAllModals, toggleSidebar, focusSearch, openCommandPalette, undo, redo },
     {
       showNewFolderModal,
       showNewItemModal,
@@ -270,125 +274,129 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <LicenseProvider>
-        <DragDropProvider>
-          <div className="min-h-screen flex">
-            <Sidebar
-              isOpen={sidebarOpen}
-              areas={areas}
-              categories={categories}
-              currentView={currentView}
-              searchQuery={searchQuery}
-              selectedCategory={selectedCategory}
-              onNewFolder={() => setShowNewFolderModal(true)}
-              onNewItem={() => setShowNewItemModal(true)}
-              onFileOrganizer={() => setShowFileOrganizer(true)}
-              onStatsDashboard={() => setShowStatsDashboard(true)}
-              onBatchRename={() => setShowBatchRename(true)}
-              onSettings={() => setShowSettings(true)}
-              onNavigate={navigateTo}
-              onExportDatabase={exportDatabase}
-              onExportJSON={exportToJSON}
-              onImport={handleImport}
-            />
-
-            {/* Main Content */}
-            <main className="flex-1 flex flex-col min-h-screen">
-              <MainHeader
-                ref={searchInputRef}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                onToggleSidebar={toggleSidebar}
-                folderCount={displayFolders.length}
-                itemCount={displayItems.length}
-              />
-              <ContentArea
+      <UndoProvider onRefresh={triggerRefresh}>
+        <LicenseProvider>
+          <DragDropProvider>
+            <div className="min-h-screen flex">
+              <Sidebar
+                isOpen={sidebarOpen}
+                areas={areas}
+                categories={categories}
                 currentView={currentView}
                 searchQuery={searchQuery}
-                selectedArea={selectedArea}
                 selectedCategory={selectedCategory}
-                selectedFolder={selectedFolder}
-                breadcrumbPath={breadcrumbPath}
-                stats={stats}
-                displayFolders={displayFolders}
-                displayItems={displayItems}
-                onNavigate={navigateTo}
-                onEditFolder={setEditingFolder}
-                onDeleteFolder={handleDeleteFolder}
-                onEditItem={setEditingItem}
-                onDeleteItem={handleDeleteItem}
                 onNewFolder={() => setShowNewFolderModal(true)}
                 onNewItem={() => setShowNewItemModal(true)}
-                onRefresh={() => triggerRefresh()}
+                onFileOrganizer={() => setShowFileOrganizer(true)}
+                onStatsDashboard={() => setShowStatsDashboard(true)}
+                onBatchRename={() => setShowBatchRename(true)}
+                onSettings={() => setShowSettings(true)}
+                onNavigate={navigateTo}
+                onExportDatabase={exportDatabase}
+                onExportJSON={exportToJSON}
+                onImport={handleImport}
               />
-            </main>
 
-            {/* Modals */}
-            <NewFolderModal
-              isOpen={showNewFolderModal}
-              onClose={() => setShowNewFolderModal(false)}
-              categories={categories}
-              folders={folders}
-              onSave={handleCreateFolder}
-              preselectedCategory={selectedCategory}
-            />
+              {/* Main Content */}
+              <main className="flex-1 flex flex-col min-h-screen">
+                <MainHeader
+                  ref={searchInputRef}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  onToggleSidebar={toggleSidebar}
+                  folderCount={displayFolders.length}
+                  itemCount={displayItems.length}
+                />
+                <ContentArea
+                  currentView={currentView}
+                  searchQuery={searchQuery}
+                  selectedArea={selectedArea}
+                  selectedCategory={selectedCategory}
+                  selectedFolder={selectedFolder}
+                  breadcrumbPath={breadcrumbPath}
+                  stats={stats}
+                  displayFolders={displayFolders}
+                  displayItems={displayItems}
+                  onNavigate={navigateTo}
+                  onEditFolder={setEditingFolder}
+                  onDeleteFolder={handleDeleteFolder}
+                  onEditItem={setEditingItem}
+                  onDeleteItem={handleDeleteItem}
+                  onNewFolder={() => setShowNewFolderModal(true)}
+                  onNewItem={() => setShowNewItemModal(true)}
+                  onRefresh={() => triggerRefresh()}
+                />
+              </main>
 
-            <NewItemModal
-              isOpen={showNewItemModal}
-              onClose={() => setShowNewItemModal(false)}
-              folders={folders}
-              items={items}
-              onSave={handleCreateItem}
-              preselectedFolder={selectedFolder}
-            />
+              {/* Modals */}
+              <NewFolderModal
+                isOpen={showNewFolderModal}
+                onClose={() => setShowNewFolderModal(false)}
+                categories={categories}
+                folders={folders}
+                onSave={handleCreateFolder}
+                preselectedCategory={selectedCategory}
+              />
 
-            <EditFolderModal
-              folder={editingFolder}
-              isOpen={!!editingFolder}
-              onClose={() => setEditingFolder(null)}
-              onSave={handleUpdateFolder}
-            />
+              <NewItemModal
+                isOpen={showNewItemModal}
+                onClose={() => setShowNewItemModal(false)}
+                folders={folders}
+                items={items}
+                onSave={handleCreateItem}
+                preselectedFolder={selectedFolder}
+              />
 
-            <EditItemModal
-              item={editingItem}
-              isOpen={!!editingItem}
-              onClose={() => setEditingItem(null)}
-              onSave={handleUpdateItem}
-            />
+              <EditFolderModal
+                folder={editingFolder}
+                isOpen={!!editingFolder}
+                onClose={() => setEditingFolder(null)}
+                onSave={handleUpdateFolder}
+              />
 
-            <SettingsModal
-              isOpen={showSettings}
-              onClose={() => setShowSettings(false)}
-              areas={areas}
-              categories={categories}
-              onDataChange={triggerRefresh}
-            />
+              <EditItemModal
+                item={editingItem}
+                isOpen={!!editingItem}
+                onClose={() => setEditingItem(null)}
+                onSave={handleUpdateItem}
+              />
 
-            {/* File Organizer (full-screen overlay) */}
-            {showFileOrganizer && <FileOrganizer onClose={() => setShowFileOrganizer(false)} />}
+              <SettingsModal
+                isOpen={showSettings}
+                onClose={() => setShowSettings(false)}
+                areas={areas}
+                categories={categories}
+                onDataChange={triggerRefresh}
+              />
 
-            {/* Statistics Dashboard (premium feature) */}
-            {showStatsDashboard && <StatsDashboard onClose={() => setShowStatsDashboard(false)} />}
+              {/* File Organizer (full-screen overlay) */}
+              {showFileOrganizer && <FileOrganizer onClose={() => setShowFileOrganizer(false)} />}
 
-            {/* Batch Rename Modal (premium feature) */}
-            {showBatchRename && <BatchRenameModal onClose={() => setShowBatchRename(false)} />}
+              {/* Statistics Dashboard (premium feature) */}
+              {showStatsDashboard && (
+                <StatsDashboard onClose={() => setShowStatsDashboard(false)} />
+              )}
 
-            {/* Command Palette */}
-            <CommandPalette
-              isOpen={showCommandPalette}
-              onClose={closeCommandPalette}
-              handlers={{
-                openModal,
-                navigateTo,
-                focusSearch,
-                toggleSidebar,
-                exportDatabase,
-                exportJSON: exportToJSON,
-              }}
-            />
-          </div>
-        </DragDropProvider>
-      </LicenseProvider>
+              {/* Batch Rename Modal (premium feature) */}
+              {showBatchRename && <BatchRenameModal onClose={() => setShowBatchRename(false)} />}
+
+              {/* Command Palette */}
+              <CommandPalette
+                isOpen={showCommandPalette}
+                onClose={closeCommandPalette}
+                handlers={{
+                  openModal,
+                  navigateTo,
+                  focusSearch,
+                  toggleSidebar,
+                  exportDatabase,
+                  exportJSON: exportToJSON,
+                }}
+              />
+            </div>
+          </DragDropProvider>
+        </LicenseProvider>
+      </UndoProvider>
     </ThemeProvider>
   );
 }

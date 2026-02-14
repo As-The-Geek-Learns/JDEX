@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { createItem, updateItem, deleteItem, getItems } from '../db.js';
+import { createItem, updateItem, deleteItem, getItems, getItem } from '../db.js';
+import { useUndo, ACTION_TYPES, ENTITY_TYPES } from '../context/UndoContext.jsx';
 
 /**
  * useItemCRUD - Manages item CRUD operations and editing state
@@ -20,6 +21,9 @@ export function useItemCRUD({ triggerRefresh, selectedFolder, setItems }) {
   // Editing state
   const [editingItem, setEditingItem] = useState(null);
 
+  // Undo context
+  const { pushAction } = useUndo();
+
   /**
    * Refresh items for the current folder view
    */
@@ -35,11 +39,21 @@ export function useItemCRUD({ triggerRefresh, selectedFolder, setItems }) {
    */
   const handleCreateItem = useCallback(
     (itemData) => {
-      createItem(itemData);
+      const newId = createItem(itemData);
+
+      // Push to undo stack
+      pushAction({
+        type: ACTION_TYPES.CREATE,
+        entityType: ENTITY_TYPES.ITEM,
+        entityId: newId,
+        entityData: { ...itemData, id: newId },
+        description: `Created item "${itemData.item_number} ${itemData.name}"`,
+      });
+
       triggerRefresh();
       refreshItems();
     },
-    [triggerRefresh, refreshItems]
+    [triggerRefresh, refreshItems, pushAction]
   );
 
   /**
@@ -48,11 +62,25 @@ export function useItemCRUD({ triggerRefresh, selectedFolder, setItems }) {
    */
   const handleUpdateItem = useCallback(
     (itemData) => {
+      // Capture before state for undo
+      const beforeState = getItem(itemData.id);
+
       updateItem(itemData.id, itemData);
+
+      // Push to undo stack
+      pushAction({
+        type: ACTION_TYPES.UPDATE,
+        entityType: ENTITY_TYPES.ITEM,
+        entityId: itemData.id,
+        previousState: beforeState,
+        newState: { ...beforeState, ...itemData },
+        description: `Updated item "${itemData.item_number || beforeState?.item_number} ${itemData.name || beforeState?.name}"`,
+      });
+
       triggerRefresh();
       refreshItems();
     },
-    [triggerRefresh, refreshItems]
+    [triggerRefresh, refreshItems, pushAction]
   );
 
   /**
@@ -62,12 +90,25 @@ export function useItemCRUD({ triggerRefresh, selectedFolder, setItems }) {
   const handleDeleteItem = useCallback(
     (item) => {
       if (confirm(`Delete item "${item.item_number} ${item.name}"?`)) {
+        // Capture full state before delete for undo
+        const fullItem = getItem(item.id);
+
         deleteItem(item.id);
+
+        // Push to undo stack
+        pushAction({
+          type: ACTION_TYPES.DELETE,
+          entityType: ENTITY_TYPES.ITEM,
+          entityId: item.id,
+          deletedEntity: fullItem,
+          description: `Deleted item "${item.item_number} ${item.name}"`,
+        });
+
         triggerRefresh();
         refreshItems();
       }
     },
-    [triggerRefresh, refreshItems]
+    [triggerRefresh, refreshItems, pushAction]
   );
 
   return {
