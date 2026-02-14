@@ -18,13 +18,14 @@ test.describe('Sidebar Navigation', () => {
     await window.waitForTimeout(300);
 
     // Categories should be visible (2-digit numbers like 10, 11, 12)
-    const category = window.locator('.jd-number, text=/^\\d{2}$/').first();
+    // Categories have jd-number class for displaying the number
+    const category = window.locator('.jd-number').first();
     await expect(category).toBeVisible({ timeout: 5000 });
   });
 
   test('should navigate to category when clicked', async ({ window }) => {
-    // Find and click a category
-    const category = window.locator('.jd-number, text=/^\\d{2}$/').first();
+    // Find and click a category (jd-number class)
+    const category = window.locator('.jd-number').first();
     await expect(category).toBeVisible({ timeout: 10000 });
 
     await category.click();
@@ -56,7 +57,7 @@ test.describe('Sidebar Navigation', () => {
 test.describe('Breadcrumb Navigation', () => {
   test('should show breadcrumb trail when navigating', async ({ window }) => {
     // Navigate to a category first
-    const category = window.locator('.jd-number, text=/^\\d{2}$/').first();
+    const category = window.locator('.jd-number').first();
 
     if (await category.isVisible().catch(() => false)) {
       await category.click();
@@ -71,7 +72,7 @@ test.describe('Breadcrumb Navigation', () => {
 
   test('should navigate back via home button', async ({ window }) => {
     // Navigate to a category
-    const category = window.locator('.jd-number, text=/^\\d{2}$/').first();
+    const category = window.locator('.jd-number').first();
 
     if (await category.isVisible().catch(() => false)) {
       await category.click();
@@ -95,8 +96,8 @@ test.describe('View Modes', () => {
   });
 
   test('should show folders when category is selected', async ({ window }) => {
-    // Navigate to a category
-    const category = window.locator('.jd-number, text=/^\\d{2}$/').first();
+    // Navigate to a category (jd-number class)
+    const category = window.locator('.jd-number').first();
     await expect(category).toBeVisible({ timeout: 10000 });
 
     await category.click();

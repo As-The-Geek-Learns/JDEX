@@ -23,7 +23,8 @@ test.describe('Item Creation', () => {
 
     // Check form fields are present
     const folderSelect = window.locator('select, [role="combobox"]').first();
-    const nameInput = window.getByLabel(/name/i).first();
+    // Item name input uses placeholder "e.g., README.md"
+    const nameInput = window.getByPlaceholder(/readme/i);
 
     await expect(folderSelect).toBeVisible({ timeout: 5000 });
     await expect(nameInput).toBeVisible({ timeout: 5000 });
@@ -39,10 +40,11 @@ test.describe('Item Creation', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const folderNameInput = window.getByLabel(/name/i).first();
+    // Folder name input uses placeholder "e.g., Script Documentation"
+    const folderNameInput = window.getByPlaceholder(/script documentation/i);
     await folderNameInput.fill('Test Folder for Items');
 
-    const createFolderBtn = window.getByRole('button', { name: /create|save/i });
+    const createFolderBtn = window.getByRole('button', { name: /create folder/i });
     await createFolderBtn.click();
     await window.waitForTimeout(500);
 
@@ -56,12 +58,12 @@ test.describe('Item Creation', () => {
     await folderSelectForItem.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    // Fill in item name
-    const nameInput = window.getByLabel(/name/i).first();
+    // Fill in item name (placeholder "e.g., README.md")
+    const nameInput = window.getByPlaceholder(/readme/i);
     await nameInput.fill('Test E2E Item');
 
     // Submit the form
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    const createBtn = window.getByRole('button', { name: /create item/i });
     await createBtn.click();
     await window.waitForTimeout(500);
 
@@ -80,10 +82,11 @@ test.describe('Item Creation', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const folderNameInput = window.getByLabel(/name/i).first();
+    // Folder name input uses placeholder "e.g., Script Documentation"
+    const folderNameInput = window.getByPlaceholder(/script documentation/i);
     await folderNameInput.fill('Folder for Item Number Test');
 
-    const createFolderBtn = window.getByRole('button', { name: /create|save/i });
+    const createFolderBtn = window.getByRole('button', { name: /create folder/i });
     await createFolderBtn.click();
     await window.waitForTimeout(500);
 
@@ -97,8 +100,8 @@ test.describe('Item Creation', () => {
     await folderSelect.selectOption({ index: 1 });
     await window.waitForTimeout(500);
 
-    // Item number should be auto-generated (XX.XX.XXX format)
-    const itemNumber = window.locator('input[disabled], text=/\\d{2}\\.\\d{2}\\.\\d{3}/').first();
+    // Item number should be auto-generated (XX.XX.XXX format) - input has class jd-number
+    const itemNumber = window.locator('input.jd-number');
     await expect(itemNumber).toBeVisible({ timeout: 5000 });
   });
 
@@ -130,10 +133,11 @@ test.describe('Item Display', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const folderNameInput = window.getByLabel(/name/i).first();
+    // Folder name input uses placeholder "e.g., Script Documentation"
+    const folderNameInput = window.getByPlaceholder(/script documentation/i);
     await folderNameInput.fill('Display Test Folder');
 
-    const createFolderBtn = window.getByRole('button', { name: /create|save/i });
+    const createFolderBtn = window.getByRole('button', { name: /create folder/i });
     await createFolderBtn.click();
     await window.waitForTimeout(500);
 
@@ -146,10 +150,11 @@ test.describe('Item Display', () => {
     await folderSelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const itemNameInput = window.getByLabel(/name/i).first();
+    // Item name input uses placeholder "e.g., README.md"
+    const itemNameInput = window.getByPlaceholder(/readme/i);
     await itemNameInput.fill('Display Test Item');
 
-    const createItemBtn = window.getByRole('button', { name: /create|save/i });
+    const createItemBtn = window.getByRole('button', { name: /create item/i });
     await createItemBtn.click();
     await window.waitForTimeout(500);
 
@@ -170,10 +175,11 @@ test.describe('Item Form Validation', () => {
     await window.waitForTimeout(500);
 
     // Try to submit without selecting folder
-    const nameInput = window.getByLabel(/name/i).first();
+    // Item name input uses placeholder "e.g., README.md"
+    const nameInput = window.getByPlaceholder(/readme/i);
     await nameInput.fill('Test Item Without Folder');
 
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    const createBtn = window.getByRole('button', { name: /create item/i });
 
     // Button might be disabled or form submission fails
     const _isDisabled = await createBtn.isDisabled().catch(() => false);
@@ -192,7 +198,7 @@ test.describe('Item Form Validation', () => {
     await folderSelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    const createBtn = window.getByRole('button', { name: /create item/i });
 
     // Button should be disabled or show validation error
     const _isDisabled = await createBtn.isDisabled().catch(() => false);

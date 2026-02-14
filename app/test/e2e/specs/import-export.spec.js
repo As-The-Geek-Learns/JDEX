@@ -3,20 +3,20 @@ import { test, expect } from '../fixtures/app.fixture.js';
 
 test.describe('Export Functionality', () => {
   test('should display backup button', async ({ window }) => {
-    // Backup button should be visible in sidebar
-    const backupBtn = window.getByRole('button', { name: /backup/i });
+    // Backup button should be visible in sidebar (exact match to avoid "Backup Projects")
+    const backupBtn = window.getByRole('button', { name: 'Backup', exact: true });
     await expect(backupBtn).toBeVisible({ timeout: 10000 });
   });
 
   test('should display JSON export button', async ({ window }) => {
     // JSON export button should be visible
-    const jsonBtn = window.getByRole('button', { name: /json/i });
+    const jsonBtn = window.getByRole('button', { name: 'JSON', exact: true });
     await expect(jsonBtn).toBeVisible({ timeout: 10000 });
   });
 
   test('should trigger download on backup click', async ({ window }) => {
-    // Click the backup button
-    const backupBtn = window.getByRole('button', { name: /backup/i });
+    // Click the backup button (exact match)
+    const backupBtn = window.getByRole('button', { name: 'Backup', exact: true });
 
     // Set up download listener
     const _downloadPromise = window.waitForEvent('download', { timeout: 5000 }).catch(() => null);
@@ -40,10 +40,11 @@ test.describe('Export Functionality', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const nameInput = window.getByLabel(/name/i).first();
+    // Folder name input uses placeholder "e.g., Script Documentation"
+    const nameInput = window.getByPlaceholder(/script documentation/i);
     await nameInput.fill('ExportTestFolder');
 
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    const createBtn = window.getByRole('button', { name: /create folder/i });
     await createBtn.click();
     await window.waitForTimeout(500);
 
@@ -81,10 +82,11 @@ test.describe('Data Persistence', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const nameInput = window.getByLabel(/name/i).first();
+    // Folder name input uses placeholder "e.g., Script Documentation"
+    const nameInput = window.getByPlaceholder(/script documentation/i);
     await nameInput.fill('PersistenceTestFolder');
 
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    const createBtn = window.getByRole('button', { name: /create folder/i });
     await createBtn.click();
     await window.waitForTimeout(500);
 
@@ -110,10 +112,11 @@ test.describe('Data Persistence', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const folderNameInput = window.getByLabel(/name/i).first();
+    // Folder name input uses placeholder "e.g., Script Documentation"
+    const folderNameInput = window.getByPlaceholder(/script documentation/i);
     await folderNameInput.fill('ItemPersistenceFolder');
 
-    const createFolderBtn = window.getByRole('button', { name: /create|save/i });
+    const createFolderBtn = window.getByRole('button', { name: /create folder/i });
     await createFolderBtn.click();
     await window.waitForTimeout(500);
 
@@ -126,10 +129,11 @@ test.describe('Data Persistence', () => {
     await folderSelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const itemNameInput = window.getByLabel(/name/i).first();
+    // Item name input uses placeholder "e.g., README.md"
+    const itemNameInput = window.getByPlaceholder(/readme/i);
     await itemNameInput.fill('PersistenceTestItem');
 
-    const createItemBtn = window.getByRole('button', { name: /create|save/i });
+    const createItemBtn = window.getByRole('button', { name: /create item/i });
     await createItemBtn.click();
     await window.waitForTimeout(500);
 
@@ -161,10 +165,11 @@ test.describe('Database State', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const nameInput = window.getByLabel(/name/i).first();
+    // Folder name input uses placeholder "e.g., Script Documentation"
+    const nameInput = window.getByPlaceholder(/script documentation/i);
     await nameInput.fill('IntegrityFolder1');
 
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    const createBtn = window.getByRole('button', { name: /create folder/i });
     await createBtn.click();
     await window.waitForTimeout(500);
 

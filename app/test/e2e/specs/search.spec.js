@@ -35,10 +35,11 @@ test.describe('Search Results', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const nameInput = window.getByLabel(/name/i).first();
+    // Folder name input uses placeholder "e.g., Script Documentation"
+    const nameInput = window.getByPlaceholder(/script documentation/i);
     await nameInput.fill('UniqueSearchFolder123');
 
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    const createBtn = window.getByRole('button', { name: /create folder/i });
     await createBtn.click();
     await window.waitForTimeout(500);
 
@@ -62,10 +63,11 @@ test.describe('Search Results', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const folderNameInput = window.getByLabel(/name/i).first();
+    // Folder name input uses placeholder "e.g., Script Documentation"
+    const folderNameInput = window.getByPlaceholder(/script documentation/i);
     await folderNameInput.fill('SearchItemTestFolder');
 
-    const createFolderBtn = window.getByRole('button', { name: /create|save/i });
+    const createFolderBtn = window.getByRole('button', { name: /create folder/i });
     await createFolderBtn.click();
     await window.waitForTimeout(500);
 
@@ -78,10 +80,11 @@ test.describe('Search Results', () => {
     await folderSelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const itemNameInput = window.getByLabel(/name/i).first();
+    // Item name input uses placeholder "e.g., README.md"
+    const itemNameInput = window.getByPlaceholder(/readme/i);
     await itemNameInput.fill('UniqueSearchItem456');
 
-    const createItemBtn = window.getByRole('button', { name: /create|save/i });
+    const createItemBtn = window.getByRole('button', { name: /create item/i });
     await createItemBtn.click();
     await window.waitForTimeout(500);
 
@@ -118,10 +121,11 @@ test.describe('Search Behavior', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const nameInput = window.getByLabel(/name/i).first();
+    // Folder name input uses placeholder "e.g., Script Documentation"
+    const nameInput = window.getByPlaceholder(/script documentation/i);
     await nameInput.fill('LiveSearchTest');
 
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    const createBtn = window.getByRole('button', { name: /create folder/i });
     await createBtn.click();
     await window.waitForTimeout(500);
 
@@ -167,10 +171,11 @@ test.describe('Search by JD Number', () => {
     await categorySelect.selectOption({ index: 1 });
     await window.waitForTimeout(300);
 
-    const nameInput = window.getByLabel(/name/i).first();
+    // Folder name input uses placeholder "e.g., Script Documentation"
+    const nameInput = window.getByPlaceholder(/script documentation/i);
     await nameInput.fill('JDNumberSearchTest');
 
-    const createBtn = window.getByRole('button', { name: /create|save/i });
+    const createBtn = window.getByRole('button', { name: /create folder/i });
     await createBtn.click();
     await window.waitForTimeout(500);
 
