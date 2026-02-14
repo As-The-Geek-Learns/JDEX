@@ -6,6 +6,9 @@
 scripts/verify.js
 scripts/ship.js
 scripts/geminiReview.js
+
+# Internal build/signing scripts - not production code
+# These use child_process intentionally for code signing operations
 app/scripts/sign-windows.cjs
 app/scripts/notarize.js
 
