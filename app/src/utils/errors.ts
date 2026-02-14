@@ -8,16 +8,30 @@
  * Always use sanitizeErrorForUser() before displaying errors in the UI.
  */
 
+// Re-export ValidationError from validation module
+export { ValidationError } from './validation.js';
+
 // =============================================================================
 // Custom Error Classes
 // =============================================================================
+
+/**
+ * Error details that can be attached to AppError.
+ */
+export interface ErrorDetails {
+  [key: string]: unknown;
+}
 
 /**
  * Base class for all JDex application errors.
  * Provides consistent structure and safe serialization.
  */
 export class AppError extends Error {
-  constructor(message, code = 'APP_ERROR', details = null) {
+  readonly code: string;
+  readonly details: ErrorDetails | null;
+  readonly timestamp: string;
+
+  constructor(message: string, code: string = 'APP_ERROR', details: ErrorDetails | null = null) {
     super(message);
     this.name = 'AppError';
     this.code = code;
@@ -28,7 +42,7 @@ export class AppError extends Error {
   /**
    * Convert to a safe object for logging (excludes sensitive data).
    */
-  toLogObject() {
+  toLogObject(): { name: string; code: string; message: string; timestamp: string } {
     return {
       name: this.name,
       code: this.code,
@@ -53,17 +67,26 @@ export const FILE_ERROR_TYPE = {
   DIRECTORY_NOT_EMPTY: 'directory_not_empty',
   NETWORK_ERROR: 'network_error',
   UNKNOWN: 'unknown',
-};
+} as const;
+
+export type FileErrorType = (typeof FILE_ERROR_TYPE)[keyof typeof FILE_ERROR_TYPE];
+
+/**
+ * System error with code property (like Node.js errors).
+ */
+interface SystemError extends Error {
+  code?: string;
+}
 
 /**
  * Classify a system error code into a user-friendly error type.
- * @param {Error} error - The original system error
- * @returns {string} One of FILE_ERROR_TYPE values
+ * @param error - The original system error
+ * @returns One of FILE_ERROR_TYPE values
  */
-export function classifyFileError(error) {
+export function classifyFileError(error: Error | SystemError | null | undefined): FileErrorType {
   if (!error) return FILE_ERROR_TYPE.UNKNOWN;
 
-  const code = error.code || '';
+  const code = (error as SystemError).code || '';
   const message = (error.message || '').toLowerCase();
 
   // Permission errors
@@ -120,38 +143,65 @@ export function classifyFileError(error) {
 }
 
 /**
+ * File system operation types.
+ */
+export type FileOperation =
+  | 'read'
+  | 'write'
+  | 'move'
+  | 'delete'
+  | 'scan'
+  | 'create'
+  | 'mkdir'
+  | 'buildPath'
+  | 'rename'
+  | 'rollback'
+  | 'unknown';
+
+/**
  * Error for file system operations.
  * Use when file read/write/move operations fail.
  */
 export class FileSystemError extends AppError {
-  constructor(message, operation = 'unknown', path = null, originalError = null) {
+  readonly operation: FileOperation;
+  readonly hasPath: boolean;
+  readonly errorType: FileErrorType;
+  readonly systemCode: string | null;
+
+  constructor(
+    message: string,
+    operation: FileOperation = 'unknown',
+    path: string | null = null,
+    originalError: Error | SystemError | null = null
+  ) {
     super(message, 'FILE_SYSTEM_ERROR');
     this.name = 'FileSystemError';
-    this.operation = operation; // 'read', 'write', 'move', 'delete', 'scan'
+    this.operation = operation;
     // Don't store the actual path - it might be sensitive
     this.hasPath = path !== null;
     // Classify the error type
     this.errorType = originalError ? classifyFileError(originalError) : FILE_ERROR_TYPE.UNKNOWN;
     // Store system error code for debugging
-    this.systemCode = originalError?.code || null;
+    this.systemCode = (originalError as SystemError)?.code || null;
   }
 
   /**
    * Check if this error is likely transient and worth retrying.
    */
-  isRetryable() {
-    return [
+  isRetryable(): boolean {
+    const retryableTypes: readonly FileErrorType[] = [
       FILE_ERROR_TYPE.FILE_IN_USE,
       FILE_ERROR_TYPE.NETWORK_ERROR,
       FILE_ERROR_TYPE.CROSS_DEVICE,
-    ].includes(this.errorType);
+    ];
+    return retryableTypes.includes(this.errorType);
   }
 
   /**
    * Get a suggested action for the user based on error type.
    */
-  getSuggestedAction() {
-    const actions = {
+  getSuggestedAction(): string {
+    const actions: Record<FileErrorType, string> = {
       [FILE_ERROR_TYPE.PERMISSION_DENIED]:
         'Check file permissions or try running with admin rights.',
       [FILE_ERROR_TYPE.FILE_NOT_FOUND]: 'The file may have been moved or deleted.',
@@ -170,9 +220,9 @@ export class FileSystemError extends AppError {
   /**
    * Get a user-friendly message based on the error type and operation.
    */
-  getUserMessage() {
+  getUserMessage(): string {
     // Type-specific messages take priority
-    const typeMessages = {
+    const typeMessages: Partial<Record<FileErrorType, string>> = {
       [FILE_ERROR_TYPE.PERMISSION_DENIED]:
         'Permission denied. You may not have access to this file.',
       [FILE_ERROR_TYPE.FILE_NOT_FOUND]: 'File not found. It may have been moved or deleted.',
@@ -183,11 +233,11 @@ export class FileSystemError extends AppError {
     };
 
     if (typeMessages[this.errorType]) {
-      return typeMessages[this.errorType];
+      return typeMessages[this.errorType]!;
     }
 
     // Fall back to operation-based messages
-    const operationMessages = {
+    const operationMessages: Record<FileOperation, string> = {
       read: 'Unable to read the file. Please check if it exists and you have permission.',
       write: 'Unable to save the file. Please check if you have write permission.',
       move: 'Unable to move the file. The destination may not be accessible.',
@@ -206,8 +256,8 @@ export class FileSystemError extends AppError {
   /**
    * Get a short label for the error type (for badges/tags).
    */
-  getTypeLabel() {
-    const labels = {
+  getTypeLabel(): string {
+    const labels: Record<FileErrorType, string> = {
       [FILE_ERROR_TYPE.PERMISSION_DENIED]: 'Permission Denied',
       [FILE_ERROR_TYPE.FILE_NOT_FOUND]: 'Not Found',
       [FILE_ERROR_TYPE.FILE_IN_USE]: 'File In Use',
@@ -224,18 +274,32 @@ export class FileSystemError extends AppError {
 }
 
 /**
+ * Database operation types.
+ */
+export type DatabaseOperation =
+  | 'query'
+  | 'insert'
+  | 'update'
+  | 'delete'
+  | 'connect'
+  | 'migrate'
+  | 'unknown';
+
+/**
  * Error for database operations.
  * Use when SQL queries or database connections fail.
  */
 export class DatabaseError extends AppError {
-  constructor(message, operation = 'unknown') {
+  readonly operation: DatabaseOperation;
+
+  constructor(message: string, operation: DatabaseOperation = 'unknown') {
     super(message, 'DATABASE_ERROR');
     this.name = 'DatabaseError';
-    this.operation = operation; // 'query', 'insert', 'update', 'delete', 'connect'
+    this.operation = operation;
   }
 
-  getUserMessage() {
-    const messages = {
+  getUserMessage(): string {
+    const messages: Record<DatabaseOperation, string> = {
       query: 'Unable to retrieve data. Please try again.',
       insert: 'Unable to save the new item. Please try again.',
       update: 'Unable to update the item. Please try again.',
@@ -249,26 +313,32 @@ export class DatabaseError extends AppError {
 }
 
 /**
- * Error for validation failures.
- * Re-exported from validation.js for convenience.
+ * Cloud drive operation types.
  */
-export { ValidationError } from './validation.js';
+export type CloudDriveOperation = 'detect' | 'connect' | 'sync' | 'read' | 'write' | 'unknown';
 
 /**
  * Error for cloud drive operations.
  * Use when cloud storage operations fail.
  */
 export class CloudDriveError extends AppError {
-  constructor(message, driveName = 'unknown', operation = 'unknown') {
+  readonly driveName: string;
+  readonly operation: CloudDriveOperation;
+
+  constructor(
+    message: string,
+    driveName: string = 'unknown',
+    operation: CloudDriveOperation = 'unknown'
+  ) {
     super(message, 'CLOUD_DRIVE_ERROR');
     this.name = 'CloudDriveError';
-    this.driveName = driveName; // 'icloud', 'dropbox', 'onedrive', etc.
-    this.operation = operation; // 'detect', 'connect', 'sync', 'read', 'write'
+    this.driveName = driveName;
+    this.operation = operation;
   }
 
-  getUserMessage() {
+  getUserMessage(): string {
     const driveDisplay = this.driveName === 'unknown' ? 'cloud drive' : this.driveName;
-    const messages = {
+    const messages: Record<CloudDriveOperation, string> = {
       detect: `Unable to detect ${driveDisplay}. Please ensure it's installed and running.`,
       connect: `Unable to connect to ${driveDisplay}. Please check your connection.`,
       sync: `${driveDisplay} sync may be incomplete. Please check its status.`,
@@ -281,18 +351,25 @@ export class CloudDriveError extends AppError {
 }
 
 /**
+ * Organization operation types.
+ */
+export type OrganizationOperation = 'match' | 'move' | 'rule' | 'scan' | 'conflict' | 'unknown';
+
+/**
  * Error for organization/matching operations.
  * Use when file organization logic fails.
  */
 export class OrganizationError extends AppError {
-  constructor(message, operation = 'unknown') {
+  readonly operation: OrganizationOperation;
+
+  constructor(message: string, operation: OrganizationOperation = 'unknown') {
     super(message, 'ORGANIZATION_ERROR');
     this.name = 'OrganizationError';
-    this.operation = operation; // 'match', 'move', 'rule', 'scan'
+    this.operation = operation;
   }
 
-  getUserMessage() {
-    const messages = {
+  getUserMessage(): string {
+    const messages: Record<OrganizationOperation, string> = {
       match: 'Unable to find a matching folder for this file.',
       move: 'Unable to organize the file. The destination may not be available.',
       rule: 'Unable to apply the organization rule.',
@@ -312,7 +389,7 @@ export class OrganizationError extends AppError {
  * Patterns that indicate sensitive information in error messages.
  * These will be redacted before showing to users.
  */
-const SENSITIVE_PATTERNS = [
+const SENSITIVE_PATTERNS: RegExp[] = [
   // File paths
   /\/Users\/[^/\s]+/gi, // macOS user paths
   /C:\\Users\\[^\\\s]+/gi, // Windows user paths
@@ -337,40 +414,50 @@ const SENSITIVE_PATTERNS = [
 ];
 
 /**
+ * Error types that have getUserMessage method.
+ */
+interface UserMessageError extends Error {
+  getUserMessage(): string;
+}
+
+/**
+ * Type guard to check if error has getUserMessage.
+ */
+function hasUserMessage(error: unknown): error is UserMessageError {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'getUserMessage' in error &&
+    typeof (error as UserMessageError).getUserMessage === 'function'
+  );
+}
+
+/**
  * Sanitize an error for safe display to users.
  * Removes sensitive information like paths, system details, and stack traces.
  *
- * @param {Error|string} error - The error to sanitize
- * @returns {string} A safe, user-friendly error message
+ * @param error - The error to sanitize
+ * @returns A safe, user-friendly error message
  */
-export function sanitizeErrorForUser(error) {
+export function sanitizeErrorForUser(error: Error | string | null | undefined): string {
   // Handle null/undefined
   if (!error) {
     return 'An unexpected error occurred. Please try again.';
   }
 
   // If it's one of our custom errors, use the user message
-  if (error instanceof FileSystemError) {
-    return error.getUserMessage();
-  }
-  if (error instanceof DatabaseError) {
-    return error.getUserMessage();
-  }
-  if (error instanceof CloudDriveError) {
-    return error.getUserMessage();
-  }
-  if (error instanceof OrganizationError) {
+  if (hasUserMessage(error)) {
     return error.getUserMessage();
   }
 
   // For ValidationError, the message is usually safe to show
   // (we control what goes into it)
-  if (error.name === 'ValidationError') {
+  if (error instanceof Error && error.name === 'ValidationError') {
     return error.message;
   }
 
   // For generic errors, sanitize the message
-  let message = typeof error === 'string' ? error : error.message || '';
+  let message = typeof error === 'string' ? error : (error as Error).message || '';
 
   // Remove sensitive patterns
   for (const pattern of SENSITIVE_PATTERNS) {
@@ -402,25 +489,51 @@ export const LogLevel = {
   INFO: 'info',
   WARN: 'warn',
   ERROR: 'error',
-};
+} as const;
+
+export type LogLevelType = (typeof LogLevel)[keyof typeof LogLevel];
+
+/**
+ * Log entry structure.
+ */
+interface LogEntry {
+  timestamp: string;
+  level: LogLevelType;
+  context: string;
+  errorName: string;
+  errorCode: string;
+  message?: string;
+  stack?: string;
+}
+
+/**
+ * Error with optional code property.
+ */
+interface ErrorWithCode extends Error {
+  code?: string;
+}
 
 /**
  * Log an error for debugging purposes.
  * In development, logs full details. In production, logs sanitized version.
  *
- * @param {Error} error - The error to log
- * @param {string} context - Where the error occurred (e.g., 'FileScanner.scan')
- * @param {string} level - Log level (default 'error')
+ * @param error - The error to log
+ * @param context - Where the error occurred (e.g., 'FileScanner.scan')
+ * @param level - Log level (default 'error')
  */
-export function logError(error, context = 'unknown', level = LogLevel.ERROR) {
+export function logError(
+  error: Error | null | undefined,
+  context: string = 'unknown',
+  level: LogLevelType = LogLevel.ERROR
+): void {
   const isDev = process.env.NODE_ENV === 'development';
 
-  const logEntry = {
+  const logEntry: LogEntry = {
     timestamp: new Date().toISOString(),
     level,
     context,
     errorName: error?.name || 'Error',
-    errorCode: error?.code || 'UNKNOWN',
+    errorCode: (error as ErrorWithCode)?.code || 'UNKNOWN',
   };
 
   if (isDev) {
@@ -440,26 +553,53 @@ export function logError(error, context = 'unknown', level = LogLevel.ERROR) {
 // =============================================================================
 
 /**
+ * Async function type for error handling wrapper.
+ */
+type AsyncFunction<T extends unknown[], R> = (...args: T) => Promise<R>;
+
+/**
  * Wrap an async function to catch and handle errors consistently.
  *
- * @param {Function} fn - The async function to wrap
- * @param {string} context - Context for error logging
- * @returns {Function} Wrapped function that handles errors
+ * @param fn - The async function to wrap
+ * @param context - Context for error logging
+ * @returns Wrapped function that handles errors
  *
  * @example
  * const safeScan = withErrorHandling(scanDirectory, 'FileScanner.scan');
  * const result = await safeScan('/some/path');
  */
-export function withErrorHandling(fn, context) {
-  return async (...args) => {
+export function withErrorHandling<T extends unknown[], R>(
+  fn: AsyncFunction<T, R>,
+  context: string
+): AsyncFunction<T, R> {
+  return async (...args: T): Promise<R> => {
     try {
       return await fn(...args);
     } catch (error) {
-      logError(error, context);
+      logError(error as Error, context);
       throw error; // Re-throw so caller can handle
     }
   };
 }
+
+/**
+ * Result type for operations that may fail.
+ */
+export interface ResultOk<T> {
+  success: true;
+  data: T;
+  error: null;
+  userMessage: null;
+}
+
+export interface ResultError {
+  success: false;
+  data: null;
+  error: Error;
+  userMessage: string;
+}
+
+export type ResultType<T> = ResultOk<T> | ResultError;
 
 /**
  * Create a result object for operations that may fail.
@@ -483,7 +623,7 @@ export function withErrorHandling(fn, context) {
  * }
  */
 export const Result = {
-  ok(data) {
+  ok<T>(data: T): ResultOk<T> {
     return {
       success: true,
       data,
@@ -492,7 +632,7 @@ export const Result = {
     };
   },
 
-  error(error, userMessage = null) {
+  error(error: Error, userMessage: string | null = null): ResultError {
     return {
       success: false,
       data: null,

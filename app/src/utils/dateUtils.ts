@@ -5,20 +5,31 @@
  */
 
 /**
+ * Date range with start and end dates.
+ */
+export interface DateRange {
+  start: Date | null;
+  end: Date | null;
+}
+
+/**
  * Get a previous period date range based on current range.
  * The previous period has the same duration as the current period,
  * ending the day before the current period starts.
  *
- * @param {Date} start - Current period start
- * @param {Date} end - Current period end
- * @returns {{ start: Date, end: Date }} Previous period range
+ * @param start - Current period start
+ * @param end - Current period end
+ * @returns Previous period range
  *
  * @example
  * // If current period is Feb 1-7 (7 days)
  * // Previous period will be Jan 25-31 (7 days)
  * getPreviousPeriodRange(new Date('2026-02-01'), new Date('2026-02-07'))
  */
-export function getPreviousPeriodRange(start, end) {
+export function getPreviousPeriodRange(
+  start: Date | null | undefined,
+  end: Date | null | undefined
+): DateRange {
   if (!start || !end) return { start: null, end: null };
 
   const duration = end.getTime() - start.getTime();

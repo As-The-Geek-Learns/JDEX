@@ -20,14 +20,14 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./test/setup.js'],
-    include: ['src/**/*.{test,spec}.{js,jsx}', 'test/integration/**/*.{test,spec}.{js,jsx}'],
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}', 'test/integration/**/*.{test,spec}.{js,jsx,ts,tsx}'],
     exclude: ['node_modules', 'dist', 'build'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       reportsDirectory: './coverage',
-      include: ['src/**/*.{js,jsx}'],
-      exclude: ['src/main.jsx', '**/*.test.{js,jsx}', '**/*.spec.{js,jsx}'],
+      include: ['src/**/*.{js,jsx,ts,tsx}'],
+      exclude: ['src/main.jsx', 'src/main.tsx', '**/*.test.{js,jsx,ts,tsx}', '**/*.spec.{js,jsx,ts,tsx}'],
       thresholds: {
         global: { statements: 70, branches: 60, functions: 65, lines: 70 },
         // Phase 2: Utility files

@@ -16,7 +16,10 @@
  * Includes field name and value for debugging (value is sanitized in logs).
  */
 export class ValidationError extends Error {
-  constructor(message, field = 'unknown', value = undefined) {
+  readonly field: string;
+  readonly hasValue: boolean;
+
+  constructor(message: string, field: string = 'unknown', value?: unknown) {
     super(message);
     this.name = 'ValidationError';
     this.field = field;
@@ -37,10 +40,10 @@ export class ValidationError extends Error {
  * of HTML injection — including malformed tags like `<script` without a
  * closing bracket — without the complexity of a tag-matching loop.
  *
- * @param {string} str - The string to sanitize
- * @returns {string} String with all angle brackets removed
+ * @param str - The string to sanitize
+ * @returns String with all angle brackets removed
  */
-function stripHtmlChars(str) {
+function stripHtmlChars(str: string): string {
   return str.replace(/[<>]/g, '');
 }
 
@@ -48,10 +51,10 @@ function stripHtmlChars(str) {
  * Sanitize text input by removing potentially dangerous characters.
  * Use for short text fields like names and titles.
  *
- * @param {string|null|undefined} input - The text to sanitize
- * @returns {string} Sanitized text
+ * @param input - The text to sanitize
+ * @returns Sanitized text
  */
-export function sanitizeText(input) {
+export function sanitizeText(input: string | null | undefined): string {
   if (input === null || input === undefined) {
     return '';
   }
@@ -74,10 +77,10 @@ export function sanitizeText(input) {
  * Sanitize longer text that may contain line breaks.
  * Use for descriptions, notes, and multi-line content.
  *
- * @param {string|null|undefined} input - The text to sanitize
- * @returns {string} Sanitized text with preserved line breaks
+ * @param input - The text to sanitize
+ * @returns Sanitized text with preserved line breaks
  */
-export function sanitizeDescription(input) {
+export function sanitizeDescription(input: string | null | undefined): string {
   if (input === null || input === undefined) {
     return '';
   }
@@ -106,13 +109,17 @@ export function sanitizeDescription(input) {
  * Validate a required string field.
  * Throws ValidationError if invalid.
  *
- * @param {unknown} value - The value to validate
- * @param {string} fieldName - Name of the field (for error messages)
- * @param {number} maxLength - Maximum allowed length (default 500)
- * @returns {string} The validated and sanitized string
- * @throws {ValidationError} If validation fails
+ * @param value - The value to validate
+ * @param fieldName - Name of the field (for error messages)
+ * @param maxLength - Maximum allowed length (default 500)
+ * @returns The validated and sanitized string
+ * @throws ValidationError If validation fails
  */
-export function validateRequiredString(value, fieldName, maxLength = 500) {
+export function validateRequiredString(
+  value: unknown,
+  fieldName: string,
+  maxLength: number = 500
+): string {
   if (value === null || value === undefined) {
     throw new ValidationError(`${fieldName} is required`, fieldName, value);
   }
@@ -142,13 +149,17 @@ export function validateRequiredString(value, fieldName, maxLength = 500) {
  * Validate an optional string field.
  * Returns null if empty/undefined, validated string otherwise.
  *
- * @param {unknown} value - The value to validate
- * @param {string} fieldName - Name of the field (for error messages)
- * @param {number} maxLength - Maximum allowed length (default 500)
- * @returns {string|null} The validated string or null
- * @throws {ValidationError} If validation fails
+ * @param value - The value to validate
+ * @param fieldName - Name of the field (for error messages)
+ * @param maxLength - Maximum allowed length (default 500)
+ * @returns The validated string or null
+ * @throws ValidationError If validation fails
  */
-export function validateOptionalString(value, fieldName, maxLength = 500) {
+export function validateOptionalString(
+  value: unknown,
+  fieldName: string,
+  maxLength: number = 500
+): string | null {
   if (value === null || value === undefined || value === '') {
     return null;
   }
@@ -181,7 +192,7 @@ export function validateOptionalString(value, fieldName, maxLength = 500) {
 /**
  * Dangerous path patterns that could indicate path traversal attacks.
  */
-const DANGEROUS_PATH_PATTERNS = [
+const DANGEROUS_PATH_PATTERNS: RegExp[] = [
   /\.\./, // Parent directory traversal
   /^~/, // Home directory (we'll expand this separately)
   /\0/, // Null byte injection
@@ -195,17 +206,26 @@ const DANGEROUS_PATH_PATTERNS = [
 ];
 
 /**
+ * Options for file path validation.
+ */
+export interface ValidateFilePathOptions {
+  allowHome?: boolean;
+  allowedRoots?: string[];
+}
+
+/**
  * Validate a file path is safe to use.
  * Checks for path traversal attacks and dangerous patterns.
  *
- * @param {string} path - The path to validate
- * @param {Object} options - Validation options
- * @param {boolean} options.allowHome - Allow ~ home directory paths (default false)
- * @param {string[]} options.allowedRoots - Array of allowed root paths (if set, path must start with one)
- * @returns {string} The validated path
- * @throws {ValidationError} If path is invalid or dangerous
+ * @param path - The path to validate
+ * @param options - Validation options
+ * @returns The validated path
+ * @throws ValidationError If path is invalid or dangerous
  */
-export function validateFilePath(path, options = {}) {
+export function validateFilePath(
+  path: string | null | undefined,
+  options: ValidateFilePathOptions = {}
+): string {
   const { allowHome = false, allowedRoots = [] } = options;
 
   if (!path || typeof path !== 'string') {
@@ -252,11 +272,14 @@ export function validateFilePath(path, options = {}) {
  * Validate that a path is within a given base directory.
  * Prevents escaping from intended directory scope.
  *
- * @param {string} path - The path to validate
- * @param {string} basePath - The base directory the path must be within
- * @returns {boolean} True if path is within basePath
+ * @param path - The path to validate
+ * @param basePath - The base directory the path must be within
+ * @returns True if path is within basePath
  */
-export function isPathWithinBase(path, basePath) {
+export function isPathWithinBase(
+  path: string | null | undefined,
+  basePath: string | null | undefined
+): boolean {
   if (!path || !basePath) {
     return false;
   }
@@ -276,14 +299,19 @@ export function isPathWithinBase(path, basePath) {
 /**
  * Validate a number within bounds.
  *
- * @param {unknown} value - The value to validate
- * @param {string} fieldName - Name of the field
- * @param {number} min - Minimum value (default 0)
- * @param {number} max - Maximum value (default MAX_SAFE_INTEGER)
- * @returns {number} The validated number
- * @throws {ValidationError} If validation fails
+ * @param value - The value to validate
+ * @param fieldName - Name of the field
+ * @param min - Minimum value (default 0)
+ * @param max - Maximum value (default MAX_SAFE_INTEGER)
+ * @returns The validated number
+ * @throws ValidationError If validation fails
  */
-export function validateNumber(value, fieldName, min = 0, max = Number.MAX_SAFE_INTEGER) {
+export function validateNumber(
+  value: unknown,
+  fieldName: string,
+  min: number = 0,
+  max: number = Number.MAX_SAFE_INTEGER
+): number {
   if (value === null || value === undefined) {
     throw new ValidationError(`${fieldName} is required`, fieldName, value);
   }
@@ -308,13 +336,18 @@ export function validateNumber(value, fieldName, min = 0, max = Number.MAX_SAFE_
 /**
  * Validate an optional number within bounds.
  *
- * @param {unknown} value - The value to validate
- * @param {string} fieldName - Name of the field
- * @param {number} min - Minimum value
- * @param {number} max - Maximum value
- * @returns {number|null} The validated number or null
+ * @param value - The value to validate
+ * @param fieldName - Name of the field
+ * @param min - Minimum value
+ * @param max - Maximum value
+ * @returns The validated number or null
  */
-export function validateOptionalNumber(value, fieldName, min = 0, max = Number.MAX_SAFE_INTEGER) {
+export function validateOptionalNumber(
+  value: unknown,
+  fieldName: string,
+  min: number = 0,
+  max: number = Number.MAX_SAFE_INTEGER
+): number | null {
   if (value === null || value === undefined || value === '') {
     return null;
   }
@@ -325,12 +358,12 @@ export function validateOptionalNumber(value, fieldName, min = 0, max = Number.M
 /**
  * Validate a positive integer (for IDs, counts, etc.)
  *
- * @param {unknown} value - The value to validate
- * @param {string} fieldName - Name of the field
- * @returns {number} The validated positive integer
- * @throws {ValidationError} If validation fails
+ * @param value - The value to validate
+ * @param fieldName - Name of the field
+ * @returns The validated positive integer
+ * @throws ValidationError If validation fails
  */
-export function validatePositiveInteger(value, fieldName) {
+export function validatePositiveInteger(value: unknown, fieldName: string): number {
   const num = validateNumber(value, fieldName, 1, Number.MAX_SAFE_INTEGER);
 
   if (!Number.isInteger(num)) {
@@ -347,11 +380,11 @@ export function validatePositiveInteger(value, fieldName) {
 /**
  * Validate a JD folder number (XX.XX format)
  *
- * @param {string} folderNumber - The folder number to validate
- * @returns {string} The validated folder number
- * @throws {ValidationError} If invalid format
+ * @param folderNumber - The folder number to validate
+ * @returns The validated folder number
+ * @throws ValidationError If invalid format
  */
-export function validateJDFolderNumber(folderNumber) {
+export function validateJDFolderNumber(folderNumber: string | null | undefined): string {
   if (!folderNumber || typeof folderNumber !== 'string') {
     throw new ValidationError('Folder number is required', 'folderNumber', folderNumber);
   }
@@ -375,11 +408,11 @@ export function validateJDFolderNumber(folderNumber) {
 /**
  * Validate a JD item number (XX.XX.XX format)
  *
- * @param {string} itemNumber - The item number to validate
- * @returns {string} The validated item number
- * @throws {ValidationError} If invalid format
+ * @param itemNumber - The item number to validate
+ * @returns The validated item number
+ * @throws ValidationError If invalid format
  */
-export function validateJDItemNumber(itemNumber) {
+export function validateJDItemNumber(itemNumber: string | null | undefined): string {
   if (!itemNumber || typeof itemNumber !== 'string') {
     throw new ValidationError('Item number is required', 'itemNumber', itemNumber);
   }
@@ -403,11 +436,11 @@ export function validateJDItemNumber(itemNumber) {
 /**
  * Validate a JD category number (0-99)
  *
- * @param {unknown} categoryNumber - The category number to validate
- * @returns {number} The validated category number
- * @throws {ValidationError} If invalid
+ * @param categoryNumber - The category number to validate
+ * @returns The validated category number
+ * @throws ValidationError If invalid
  */
-export function validateJDCategoryNumber(categoryNumber) {
+export function validateJDCategoryNumber(categoryNumber: unknown): number {
   const num = validateNumber(categoryNumber, 'Category number', 0, 99);
 
   if (!Number.isInteger(num)) {
@@ -428,10 +461,10 @@ export function validateJDCategoryNumber(categoryNumber) {
 /**
  * Validate and normalize a file extension.
  *
- * @param {string} extension - The extension to validate (with or without dot)
- * @returns {string} Normalized extension (lowercase, with leading dot)
+ * @param extension - The extension to validate (with or without dot)
+ * @returns Normalized extension (lowercase, with leading dot)
  */
-export function validateFileExtension(extension) {
+export function validateFileExtension(extension: string | null | undefined): string {
   if (!extension || typeof extension !== 'string') {
     return '';
   }
