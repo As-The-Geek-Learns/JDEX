@@ -91,6 +91,12 @@ const PRESETS = [
 ];
 
 // =============================================================================
+// Calendar Constants
+// =============================================================================
+
+const DAYS_OF_WEEK = Object.freeze(['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']);
+
+// =============================================================================
 // Calendar Component
 // =============================================================================
 
@@ -103,8 +109,6 @@ function MiniCalendar({
   onNextMonth,
   isSecondCalendar,
 }) {
-  const daysOfWeek = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-
   // Generate calendar days for the month
   const calendarDays = useMemo(() => {
     const days = [];
@@ -173,7 +177,7 @@ function MiniCalendar({
 
       {/* Days of week header */}
       <div className="grid grid-cols-7 gap-0.5 mb-1">
-        {daysOfWeek.map((day) => (
+        {DAYS_OF_WEEK.map((day) => (
           <div key={day} className="text-center text-xs text-slate-500 py-1">
             {day}
           </div>

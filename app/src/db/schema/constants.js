@@ -13,7 +13,7 @@
  * Current database schema version.
  * Increment when adding new migrations.
  */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 // ============================================
 // CLOUD DRIVE TYPES

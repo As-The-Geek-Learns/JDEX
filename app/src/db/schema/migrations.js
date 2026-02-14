@@ -169,6 +169,29 @@ export function migrationV7(db) {
   console.log('[JDex DB] Migration 7 complete');
 }
 
+/**
+ * Migration 8: Add performance indexes.
+ * These indexes improve query performance for common operations:
+ * - Category lookups by area (hierarchy navigation)
+ * - Organized files lookups by rule (rule statistics)
+ * - Watch activity lookups by rule (activity reporting)
+ * @param {Object} db - sql.js database instance
+ */
+export function migrationV8(db) {
+  console.log('[JDex DB] Running migration 8: Adding performance indexes...');
+
+  // Index for category-area joins (frequently used in hierarchy navigation)
+  db.run('CREATE INDEX IF NOT EXISTS idx_categories_area ON categories(area_id)');
+
+  // Index for organized files by rule (used in rule statistics and reports)
+  db.run('CREATE INDEX IF NOT EXISTS idx_organized_files_rule ON organized_files(matched_rule_id)');
+
+  // Index for watch activity by rule (used in activity reporting)
+  db.run('CREATE INDEX IF NOT EXISTS idx_watch_activity_rule ON watch_activity(matched_rule_id)');
+
+  console.log('[JDex DB] Migration 8 complete');
+}
+
 // ============================================
 // MIGRATION REGISTRY
 // ============================================
@@ -184,6 +207,7 @@ export const migrations = Object.freeze({
   5: migrationV5,
   6: migrationV6,
   7: migrationV7,
+  8: migrationV8,
 });
 
 /**

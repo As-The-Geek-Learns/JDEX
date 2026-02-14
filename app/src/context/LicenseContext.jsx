@@ -12,7 +12,7 @@
  *   const { isPremium, tier, activateLicense } = useLicense();
  */
 
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import {
   getLicenseState,
   activateLicense as doActivate,
@@ -94,6 +94,10 @@ export function LicenseProvider({ children }) {
     [refreshState]
   );
 
+  // Memoize helper functions to prevent new references on each render
+  const checkFeature = useCallback((featureId) => hasFeature(featureId), []);
+  const getQuota = useCallback((metric) => getRemainingQuota(metric), []);
+
   // Re-validate license periodically (every hour while app is open)
   useEffect(() => {
     if (state.license?.key) {
@@ -114,27 +118,42 @@ export function LicenseProvider({ children }) {
     }
   }, [state.license?.key, refreshState]);
 
-  const value = {
-    // State
-    ...state,
-    loading,
-    error,
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const value = useMemo(
+    () => ({
+      // State
+      ...state,
+      loading,
+      error,
 
-    // Actions
-    activateLicense,
-    deactivateLicense,
-    checkAction,
-    trackUsage,
-    refreshState,
+      // Actions
+      activateLicense,
+      deactivateLicense,
+      checkAction,
+      trackUsage,
+      refreshState,
 
-    // Helpers
-    hasFeature: (featureId) => hasFeature(featureId),
-    getRemainingQuota: (metric) => getRemainingQuota(metric),
+      // Helpers (memoized)
+      hasFeature: checkFeature,
+      getRemainingQuota: getQuota,
 
-    // Constants
-    LICENSE_TIERS,
-    FEATURE_INFO,
-  };
+      // Constants
+      LICENSE_TIERS,
+      FEATURE_INFO,
+    }),
+    [
+      state,
+      loading,
+      error,
+      activateLicense,
+      deactivateLicense,
+      checkAction,
+      trackUsage,
+      refreshState,
+      checkFeature,
+      getQuota,
+    ]
+  );
 
   return <LicenseContext.Provider value={value}>{children}</LicenseContext.Provider>;
 }

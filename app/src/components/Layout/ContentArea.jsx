@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { Search, FolderOpen, Plus, ArrowLeft, File } from 'lucide-react';
 import { Breadcrumb, QuickStatsOverview } from '../Common/index.js';
 import { FolderCard, ItemCard } from '../Cards/index.js';
@@ -22,6 +23,13 @@ function ContentArea({
   onNewItem,
   onRefresh,
 }) {
+  // Memoize the folder open handler to prevent unnecessary re-renders
+  // of FolderCard components when parent re-renders
+  const handleOpenFolder = useCallback((folder) => onNavigate('folder', folder), [onNavigate]);
+
+  // Memoize the back navigation handler
+  const handleBackToOverview = useCallback(() => onNavigate('home'), [onNavigate]);
+
   return (
     <div className="flex-1 overflow-y-auto p-6">
       {/* Breadcrumb */}
@@ -48,7 +56,7 @@ function ContentArea({
 
         {currentView !== 'home' && !searchQuery && (
           <button
-            onClick={() => onNavigate('home')}
+            onClick={handleBackToOverview}
             className="text-sm text-slate-400 hover:text-white flex items-center gap-1"
           >
             <ArrowLeft size={14} /> Back to Overview
@@ -70,7 +78,7 @@ function ContentArea({
                   folder={folder}
                   onEdit={onEditFolder}
                   onDelete={onDeleteFolder}
-                  onOpen={(f) => onNavigate('folder', f)}
+                  onOpen={handleOpenFolder}
                 />
               </DropZone>
             ))}

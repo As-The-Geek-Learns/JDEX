@@ -13,6 +13,7 @@ import {
   migrationV5,
   migrationV6,
   migrationV7,
+  migrationV8,
   migrations,
   getPendingMigrations,
   runMigrations,
@@ -143,6 +144,33 @@ describe('Individual Migrations', () => {
       expect(calls.some((sql) => sql.includes('idx_watch_activity_folder'))).toBe(true);
     });
   });
+
+  describe('migrationV8', () => {
+    it('creates performance indexes', () => {
+      migrationV8(mockDb);
+
+      const calls = mockDb.run.mock.calls.map((c) => c[0]);
+      expect(calls.some((sql) => sql.includes('idx_categories_area'))).toBe(true);
+      expect(calls.some((sql) => sql.includes('idx_organized_files_rule'))).toBe(true);
+      expect(calls.some((sql) => sql.includes('idx_watch_activity_rule'))).toBe(true);
+    });
+
+    it('creates index on categories.area_id', () => {
+      migrationV8(mockDb);
+
+      expect(mockDb.run).toHaveBeenCalledWith(
+        'CREATE INDEX IF NOT EXISTS idx_categories_area ON categories(area_id)'
+      );
+    });
+
+    it('creates index on organized_files.matched_rule_id', () => {
+      migrationV8(mockDb);
+
+      expect(mockDb.run).toHaveBeenCalledWith(
+        'CREATE INDEX IF NOT EXISTS idx_organized_files_rule ON organized_files(matched_rule_id)'
+      );
+    });
+  });
 });
 
 describe('Migration Registry', () => {
@@ -150,13 +178,14 @@ describe('Migration Registry', () => {
     expect(Object.isFrozen(migrations)).toBe(true);
   });
 
-  it('contains migrations 2 through 7', () => {
+  it('contains migrations 2 through 8', () => {
     expect(migrations[2]).toBeDefined();
     expect(migrations[3]).toBeDefined();
     expect(migrations[4]).toBeDefined();
     expect(migrations[5]).toBeDefined();
     expect(migrations[6]).toBeDefined();
     expect(migrations[7]).toBeDefined();
+    expect(migrations[8]).toBeDefined();
   });
 
   it('all migrations are functions', () => {
@@ -169,12 +198,12 @@ describe('Migration Registry', () => {
 describe('getPendingMigrations', () => {
   it('returns all migrations for version 1', () => {
     const pending = getPendingMigrations(1);
-    expect(pending).toEqual([2, 3, 4, 5, 6, 7]);
+    expect(pending).toEqual([2, 3, 4, 5, 6, 7, 8]);
   });
 
   it('returns remaining migrations for version 4', () => {
     const pending = getPendingMigrations(4);
-    expect(pending).toEqual([5, 6, 7]);
+    expect(pending).toEqual([5, 6, 7, 8]);
   });
 
   it('returns empty array for current version', () => {
@@ -220,7 +249,7 @@ describe('runMigrations', () => {
 
     expect(result.fromVersion).toBe(1);
     expect(result.toVersion).toBe(SCHEMA_VERSION);
-    expect(result.migrationsRun).toEqual([2, 3, 4, 5, 6, 7]);
+    expect(result.migrationsRun).toEqual([2, 3, 4, 5, 6, 7, 8]);
   });
 
   it('runs remaining migrations from version 5', () => {
@@ -230,7 +259,7 @@ describe('runMigrations', () => {
 
     expect(result.fromVersion).toBe(5);
     expect(result.toVersion).toBe(SCHEMA_VERSION);
-    expect(result.migrationsRun).toEqual([6, 7]);
+    expect(result.migrationsRun).toEqual([6, 7, 8]);
   });
 
   it('calls save callback after migrations', () => {
@@ -288,8 +317,8 @@ describe('getMigrationStatus', () => {
 
     expect(status.currentVersion).toBe(1);
     expect(status.targetVersion).toBe(SCHEMA_VERSION);
-    expect(status.pendingCount).toBe(6);
-    expect(status.pendingVersions).toEqual([2, 3, 4, 5, 6, 7]);
+    expect(status.pendingCount).toBe(7);
+    expect(status.pendingVersions).toEqual([2, 3, 4, 5, 6, 7, 8]);
   });
 
   it('returns zero pending for current version', () => {

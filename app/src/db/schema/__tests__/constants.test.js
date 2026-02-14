@@ -42,8 +42,8 @@ describe('Schema Constants', () => {
       expect(Number.isInteger(SCHEMA_VERSION)).toBe(true);
     });
 
-    it('is currently version 7', () => {
-      expect(SCHEMA_VERSION).toBe(7);
+    it('is currently version 8', () => {
+      expect(SCHEMA_VERSION).toBe(8);
     });
   });
 

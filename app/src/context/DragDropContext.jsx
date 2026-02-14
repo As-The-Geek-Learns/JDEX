@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 /**
  * DragDropContext
@@ -75,16 +75,29 @@ export function DragDropProvider({ children }) {
     setDragData(null);
   }, []);
 
-  const value = {
-    isDraggingFiles,
-    dragData,
-    handleDragEnter,
-    handleDragLeave,
-    handleDragOver,
-    handleDrop,
-    setHoverTarget,
-    clearHoverTarget,
-  };
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const value = useMemo(
+    () => ({
+      isDraggingFiles,
+      dragData,
+      handleDragEnter,
+      handleDragLeave,
+      handleDragOver,
+      handleDrop,
+      setHoverTarget,
+      clearHoverTarget,
+    }),
+    [
+      isDraggingFiles,
+      dragData,
+      handleDragEnter,
+      handleDragLeave,
+      handleDragOver,
+      handleDrop,
+      setHoverTarget,
+      clearHoverTarget,
+    ]
+  );
 
   return <DragDropContext.Provider value={value}>{children}</DragDropContext.Provider>;
 }

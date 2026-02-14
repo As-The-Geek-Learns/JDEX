@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   FolderTree,
   ChevronRight,
@@ -28,6 +28,18 @@ const areaIcons = {
 function CategoryTree({ areas, categories, selectedCategory, onSelectCategory, onSelectArea }) {
   const [expandedAreas, setExpandedAreas] = useState(new Set([1, 2, 3, 4, 5, 6, 7, 8]));
 
+  // Memoize categories grouped by area_id to avoid filtering on every render
+  const categoriesByArea = useMemo(() => {
+    const grouped = new Map();
+    for (const category of categories) {
+      if (!grouped.has(category.area_id)) {
+        grouped.set(category.area_id, []);
+      }
+      grouped.get(category.area_id).push(category);
+    }
+    return grouped;
+  }, [categories]);
+
   const toggleArea = (areaId, e) => {
     e.stopPropagation();
     const newExpanded = new Set(expandedAreas);
@@ -43,7 +55,7 @@ function CategoryTree({ areas, categories, selectedCategory, onSelectCategory, o
     <div className="space-y-1">
       {areas.map((area) => {
         const Icon = areaIcons[area.name] || FolderTree;
-        const areaCategories = categories.filter((c) => c.area_id === area.id);
+        const areaCategories = categoriesByArea.get(area.id) || [];
         const isExpanded = expandedAreas.has(area.id);
 
         return (
