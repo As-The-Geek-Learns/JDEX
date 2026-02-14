@@ -315,7 +315,6 @@ The project uses a dark theme with custom design tokens in `tailwind.config.js`:
 - No secrets in codebase; `.gitignore` covers `.env`, `*.db`, `*.sqlite`
 
 ### Known Technical Debt
-- **sql.js loaded from CDN** at runtime rather than bundled (external dependency risk)
 - **localStorage for database storage** has a ~5-10MB limit depending on browser/Electron
 
 ---
@@ -334,6 +333,7 @@ These are acknowledged issues, not bugs:
 - ~~No automated tests~~ → 3,135 tests across database layer (Feb 2026)
 - ~~Service layer tests~~ → 94.46% coverage, 98.56% function coverage (Feb 2026)
 - ~~Repository layer tests~~ → Full coverage with 415 tests across all repos (Feb 2026)
+- ~~sql.js loaded from CDN~~ → Bundled WASM in `public/sql-wasm.wasm` (Feb 2026)
 
 ---
 
