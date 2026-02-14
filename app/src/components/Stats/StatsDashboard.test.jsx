@@ -12,9 +12,21 @@ import StatsDashboard from './StatsDashboard.jsx';
 const OriginalResizeObserver = global.ResizeObserver;
 
 beforeAll(() => {
-  // Mock ResizeObserver for Recharts
+  // Mock ResizeObserver for Recharts with proper dimensions
+  // This prevents "width(0) and height(0)" warnings from ResponsiveContainer
   global.ResizeObserver = class ResizeObserver {
-    observe() {}
+    constructor(callback) {
+      this.callback = callback;
+    }
+    observe(element) {
+      // Trigger callback with mock dimensions to satisfy Recharts
+      this.callback([
+        {
+          contentRect: { width: 500, height: 300 },
+          target: element,
+        },
+      ]);
+    }
     unobserve() {}
     disconnect() {}
   };
@@ -196,7 +208,8 @@ describe('StatsDashboard', () => {
       await waitFor(() => {
         expect(screen.getByText('250')).toBeInTheDocument(); // totalOrganized
         expect(screen.getByText('45')).toBeInTheDocument(); // thisMonth
-        expect(screen.getByText('8')).toBeInTheDocument(); // activeRules
+        // Use getAllByText for values that may appear in both stat cards and charts
+        expect(screen.getAllByText('8').length).toBeGreaterThanOrEqual(1); // activeRules
         expect(screen.getByText('Finance')).toBeInTheDocument(); // topCategory
       });
     });
@@ -315,11 +328,12 @@ describe('StatsDashboard', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Active Folders')).toBeInTheDocument();
-        expect(screen.getByText('3')).toBeInTheDocument();
+        // Use getAllByText for values that may appear in both stat cards and charts
+        expect(screen.getAllByText('3').length).toBeGreaterThanOrEqual(1);
         expect(screen.getByText('Today')).toBeInTheDocument();
-        expect(screen.getByText('12')).toBeInTheDocument();
+        expect(screen.getAllByText('12').length).toBeGreaterThanOrEqual(1);
         expect(screen.getByText('Total Events')).toBeInTheDocument();
-        expect(screen.getByText('156')).toBeInTheDocument();
+        expect(screen.getAllByText('156').length).toBeGreaterThanOrEqual(1);
       });
     });
 

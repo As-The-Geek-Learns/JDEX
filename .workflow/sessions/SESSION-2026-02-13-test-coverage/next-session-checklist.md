@@ -18,6 +18,8 @@
 - [x] Fixed all ESLint warnings (8 → 0)
 - [x] Moved `getPreviousPeriodRange` to `utils/dateUtils.js`
 - [x] Added eslint-disable for context hook exports (standard React pattern)
+- [x] Fixed ResizeObserver mock for Recharts in StatsDashboard tests
+- [x] Updated safe dependencies (jsdom 26.1.0, lucide-react 0.564.0, msw 2.12.10, sql.js 1.14.0, @types/react 18.3.28)
 
 ## Suggested Focus Areas
 
@@ -36,11 +38,37 @@ Tasks:
 
 Tasks:
 - [x] ~~Address ESLint warnings~~ (Done: 0 warnings)
-- [ ] Review TODO comments in codebase
-- [ ] Update dependencies (check for security updates)
+- [x] ~~Review TODO comments~~ (None found)
+- [x] ~~Update safe dependencies~~ (5 packages updated)
+- [x] ~~Fix chart sizing warnings~~ (ResizeObserver mock fixed)
 - [ ] Improve error boundary coverage
 - [ ] Document complex algorithms
-- [ ] Fix chart sizing warnings in StatsDashboard tests
+
+#### Major Version Upgrades (Future Planning)
+
+These require careful migration planning:
+
+| Package | Current | Latest | Notes |
+|---------|---------|--------|-------|
+| React | 18.3.1 | 19.2.4 | Breaking: new compiler, concurrent features |
+| Electron | 35.7.5 | 40.4.1 | Multiple major versions; check breaking changes |
+| date-fns | 2.30.0 | 4.1.0 | API changes in v3+ |
+| ESLint | 9.39.2 | 10.0.0 | Config format changes |
+| Recharts | 2.15.4 | 3.7.0 | Component API changes |
+| Tailwind CSS | 3.4.19 | 4.1.18 | Significant architecture changes |
+| Vitest | 3.2.4 | 4.0.18 | Test API changes |
+| @electron/notarize | 2.5.0 | 3.1.1 | Notarization workflow changes |
+| @vitejs/plugin-react | 4.7.0 | 5.1.4 | Check React 19 compatibility |
+| concurrently | 8.2.2 | 9.2.1 | CLI changes |
+| lint-staged | 15.5.2 | 16.2.7 | Config format changes |
+| wait-on | 7.2.0 | 9.0.4 | API changes |
+
+**Recommended upgrade order:**
+1. ESLint + related plugins (isolated to tooling)
+2. date-fns (isolated utility)
+3. Recharts (isolated to Stats components)
+4. Vitest + coverage (test tooling)
+5. React 19 + related (major effort - needs testing)
 
 ### Option C: Platform Distribution
 **Goal:** Expand platform support
@@ -99,6 +127,7 @@ npm run electron:build   # Package for distribution
 
 | Date | Focus | Outcome |
 |------|-------|---------|
+| 2026-02-14 | Technical debt | Chart fix, safe deps updated, major upgrades documented |
 | 2026-02-14 | ESLint cleanup | Fixed all 8 warnings |
 | 2026-02-14 | Feature enhancements | File organizer, stats, watch folders |
 | 2026-02-13 | Repository tests | Full coverage across all repos |
