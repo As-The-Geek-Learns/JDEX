@@ -21,13 +21,152 @@ import { FileSystemError, Result } from '../utils/errors.js';
 import { addScannedFile, clearScannedFiles } from '../db.js';
 
 // =============================================================================
+// Types
+// =============================================================================
+
+/**
+ * File type category.
+ */
+export type FileType =
+  | 'document'
+  | 'spreadsheet'
+  | 'presentation'
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'archive'
+  | 'code'
+  | 'data'
+  | 'font'
+  | 'ebook'
+  | 'design'
+  | 'other';
+
+/**
+ * Scanned file information.
+ */
+export interface ScannedFileInfo {
+  filename: string;
+  path: string;
+  file_extension: string;
+  file_type: FileType;
+  file_size: number;
+  scan_session_id: string;
+}
+
+/**
+ * Scan progress error entry.
+ */
+export interface ScanError {
+  path: string;
+  error: string;
+}
+
+/**
+ * Scan progress information.
+ */
+export interface ScanProgress {
+  scannedFiles: number;
+  scannedDirs: number;
+  totalSize: number;
+  currentPath: string;
+  errors: ScanError[];
+}
+
+/**
+ * Scan options.
+ */
+export interface ScanOptions {
+  onProgress?: (progress: ScanProgress) => void;
+  onFile?: (fileInfo: ScannedFileInfo) => void;
+  maxDepth?: number;
+  saveToDb?: boolean;
+}
+
+/**
+ * Scan result statistics.
+ */
+export interface ScanStats {
+  totalFiles: number;
+  totalDirs: number;
+  totalSize: number;
+  errors: number;
+}
+
+/**
+ * Successful scan result.
+ */
+export interface ScanResult {
+  sessionId: string;
+  files: ScannedFileInfo[];
+  stats: ScanStats;
+}
+
+/**
+ * Quick count result.
+ */
+export interface QuickCountResult {
+  total: number;
+  byType: Record<string, number>;
+}
+
+/**
+ * Subdirectory info.
+ */
+export interface SubdirectoryInfo {
+  name: string;
+  path: string;
+}
+
+/**
+ * Node.js fs module type (simplified).
+ */
+interface NodeFs {
+  existsSync(path: string): boolean;
+  statSync(path: string): { isDirectory(): boolean; isFile(): boolean; size: number };
+  readdirSync(
+    path: string,
+    options: { withFileTypes: true }
+  ): Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>;
+}
+
+/**
+ * Node.js path module type (simplified).
+ */
+interface NodePath {
+  join(...paths: string[]): string;
+}
+
+/**
+ * Node.js modules container.
+ */
+interface NodeModules {
+  fs: NodeFs;
+  path: NodePath;
+}
+
+/**
+ * Node.js error with code.
+ */
+interface NodeError extends Error {
+  code?: string;
+}
+
+// Extend Window for Electron's require
+declare global {
+  interface Window {
+    require?: (module: string) => unknown;
+  }
+}
+
+// =============================================================================
 // File Type Mappings
 // =============================================================================
 
 /**
  * Maps file extensions to file types for categorization.
  */
-const EXTENSION_TO_TYPE = {
+const EXTENSION_TO_TYPE: Record<string, FileType> = {
   // Documents
   pdf: 'document',
   doc: 'document',
@@ -212,7 +351,7 @@ const SKIP_FILES = new Set([
 /**
  * Gets the file type based on extension.
  */
-export function getFileType(filename) {
+export function getFileType(filename: string): FileType {
   const ext = filename.split('.').pop()?.toLowerCase() || '';
   return EXTENSION_TO_TYPE[ext] || 'other';
 }
@@ -220,7 +359,7 @@ export function getFileType(filename) {
 /**
  * Gets the file extension from a filename.
  */
-export function getFileExtension(filename) {
+export function getFileExtension(filename: string): string {
   const parts = filename.split('.');
   if (parts.length < 2) return '';
   return parts.pop()?.toLowerCase() || '';
@@ -229,21 +368,21 @@ export function getFileExtension(filename) {
 /**
  * Checks if a directory should be skipped.
  */
-function shouldSkipDirectory(dirname) {
+function shouldSkipDirectory(dirname: string): boolean {
   return SKIP_DIRECTORIES.has(dirname) || dirname.startsWith('.');
 }
 
 /**
  * Checks if a file should be skipped.
  */
-function shouldSkipFile(filename) {
+function shouldSkipFile(filename: string): boolean {
   return SKIP_FILES.has(filename) || filename.startsWith('.');
 }
 
 /**
  * Formats bytes to human-readable size.
  */
-export function formatFileSize(bytes) {
+export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -259,11 +398,11 @@ export function formatFileSize(bytes) {
  * Gets Node.js fs and path modules in Electron environment.
  * Returns null if not in Electron.
  */
-function getNodeModules() {
+function getNodeModules(): NodeModules | null {
   if (typeof window !== 'undefined' && window.require) {
     try {
-      const fs = window.require('fs');
-      const path = window.require('path');
+      const fs = window.require('fs') as NodeFs;
+      const path = window.require('path') as NodePath;
       return { fs, path };
     } catch {
       return null;
@@ -275,7 +414,7 @@ function getNodeModules() {
 /**
  * Checks if we're running in Electron with file system access.
  */
-export function hasFileSystemAccess() {
+export function hasFileSystemAccess(): boolean {
   return getNodeModules() !== null;
 }
 
@@ -287,24 +426,22 @@ export function hasFileSystemAccess() {
  * File scanner with progress tracking and cancellation support.
  */
 export class FileScanner {
-  constructor() {
-    this.sessionId = null;
-    this.isScanning = false;
-    this.isCancelled = false;
-    this.progress = {
-      scannedFiles: 0,
-      scannedDirs: 0,
-      totalSize: 0,
-      currentPath: '',
-      errors: [],
-    };
-  }
+  sessionId: string | null = null;
+  isScanning: boolean = false;
+  isCancelled: boolean = false;
+  progress: ScanProgress = {
+    scannedFiles: 0,
+    scannedDirs: 0,
+    totalSize: 0,
+    currentPath: '',
+    errors: [],
+  };
 
   /**
    * Generates a new scan session ID.
    * Uses crypto.randomUUID if available, otherwise timestamp-based.
    */
-  generateSessionId() {
+  generateSessionId(): string {
     // Try native crypto.randomUUID (available in modern browsers and Node 19+)
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       return crypto.randomUUID();
@@ -323,7 +460,7 @@ export class FileScanner {
   /**
    * Resets the scanner state for a new scan.
    */
-  reset() {
+  reset(): void {
     this.sessionId = this.generateSessionId();
     this.isScanning = false;
     this.isCancelled = false;
@@ -339,33 +476,31 @@ export class FileScanner {
   /**
    * Cancels the current scan.
    */
-  cancel() {
+  cancel(): void {
     this.isCancelled = true;
   }
 
   /**
    * Scans a directory recursively.
    *
-   * @param {string} rootPath - The directory to scan
-   * @param {Object} options - Scan options
-   * @param {Function} options.onProgress - Progress callback (progress) => void
-   * @param {Function} options.onFile - File found callback (fileInfo) => void
-   * @param {number} options.maxDepth - Maximum recursion depth (default: 10)
-   * @param {boolean} options.saveToDb - Whether to save results to database (default: true)
-   * @returns {Promise<Result>} Scan result
+   * @param rootPath - The directory to scan
+   * @param options - Scan options
+   * @returns Scan result
    */
-  async scan(rootPath, options = {}) {
+  async scan(
+    rootPath: string,
+    options: ScanOptions = {}
+  ): Promise<ReturnType<typeof Result.ok<ScanResult>> | ReturnType<typeof Result.error>> {
     const { onProgress = () => {}, onFile = () => {}, maxDepth = 10, saveToDb = true } = options;
 
     // Validate path
-    let validatedPath;
+    let validatedPath: string;
     try {
       validatedPath = validateFilePath(rootPath, {
         allowHome: true,
-        allowSystemPaths: false,
       });
     } catch (error) {
-      return Result.error(error);
+      return Result.error(error as Error);
     }
 
     // Check file system access
@@ -389,8 +524,14 @@ export class FileScanner {
         return Result.error(new FileSystemError('Path is not a directory', 'scan', rootPath));
       }
     } catch (error) {
+      const nodeError = error as NodeError;
       return Result.error(
-        new FileSystemError(`Cannot access directory: ${error.message}`, 'scan', rootPath, error)
+        new FileSystemError(
+          `Cannot access directory: ${nodeError.message}`,
+          'scan',
+          rootPath,
+          nodeError
+        )
       );
     }
 
@@ -401,18 +542,18 @@ export class FileScanner {
     // Clear previous scan session from DB if saving
     if (saveToDb) {
       try {
-        clearScannedFiles(this.sessionId);
+        clearScannedFiles(this.sessionId!);
       } catch {
         // Ignore - session might not exist
       }
     }
 
-    const scannedFiles = [];
+    const scannedFiles: ScannedFileInfo[] = [];
 
     /**
      * Recursive scan function.
      */
-    const scanDirectory = async (dirPath, depth = 0) => {
+    const scanDirectory = async (dirPath: string, depth: number = 0): Promise<void> => {
       if (this.isCancelled || depth > maxDepth) {
         return;
       }
@@ -421,13 +562,14 @@ export class FileScanner {
       this.progress.scannedDirs++;
       onProgress({ ...this.progress });
 
-      let entries;
+      let entries: Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>;
       try {
         entries = fs.readdirSync(dirPath, { withFileTypes: true });
       } catch (error) {
+        const nodeError = error as NodeError;
         this.progress.errors.push({
           path: dirPath,
-          error: error.message,
+          error: nodeError.message,
         });
         return;
       }
@@ -448,13 +590,13 @@ export class FileScanner {
 
           try {
             const stats = fs.statSync(fullPath);
-            const fileInfo = {
+            const fileInfo: ScannedFileInfo = {
               filename: entry.name,
               path: fullPath,
               file_extension: getFileExtension(entry.name),
               file_type: getFileType(entry.name),
               file_size: stats.size,
-              scan_session_id: this.sessionId,
+              scan_session_id: this.sessionId!,
             };
 
             scannedFiles.push(fileInfo);
@@ -469,9 +611,10 @@ export class FileScanner {
               try {
                 addScannedFile(fileInfo);
               } catch (dbError) {
+                const dbNodeError = dbError as NodeError;
                 this.progress.errors.push({
                   path: fullPath,
-                  error: `DB save failed: ${dbError.message}`,
+                  error: `DB save failed: ${dbNodeError.message}`,
                 });
               }
             }
@@ -481,9 +624,10 @@ export class FileScanner {
               onProgress({ ...this.progress });
             }
           } catch (error) {
+            const nodeError = error as NodeError;
             this.progress.errors.push({
               path: fullPath,
-              error: error.message,
+              error: nodeError.message,
             });
           }
         }
@@ -495,15 +639,15 @@ export class FileScanner {
       await scanDirectory(validatedPath);
     } catch (error) {
       this.isScanning = false;
-      return Result.error(new FileSystemError('Scan failed', 'scan', rootPath, error));
+      return Result.error(new FileSystemError('Scan failed', 'scan', rootPath, error as Error));
     }
 
     this.isScanning = false;
     this.progress.currentPath = '';
     onProgress({ ...this.progress });
 
-    return Result.ok({
-      sessionId: this.sessionId,
+    return Result.ok<ScanResult>({
+      sessionId: this.sessionId!,
       files: scannedFiles,
       stats: {
         totalFiles: this.progress.scannedFiles,
@@ -517,14 +661,14 @@ export class FileScanner {
   /**
    * Gets the current progress.
    */
-  getProgress() {
+  getProgress(): ScanProgress {
     return { ...this.progress };
   }
 
   /**
    * Checks if a scan is currently running.
    */
-  isRunning() {
+  isRunning(): boolean {
     return this.isScanning;
   }
 }
@@ -533,12 +677,12 @@ export class FileScanner {
 // Singleton Scanner Instance
 // =============================================================================
 
-let scannerInstance = null;
+let scannerInstance: FileScanner | null = null;
 
 /**
  * Gets the singleton scanner instance.
  */
-export function getScanner() {
+export function getScanner(): FileScanner {
   if (!scannerInstance) {
     scannerInstance = new FileScanner();
   }
@@ -552,17 +696,17 @@ export function getScanner() {
 /**
  * Performs a quick count of files in a directory (non-recursive, fast).
  *
- * @param {string} dirPath - Directory to count
- * @returns {Object} Count of files by type
+ * @param dirPath - Directory to count
+ * @returns Count of files by type
  */
-export function quickCount(dirPath) {
+export function quickCount(dirPath: string): QuickCountResult {
   const modules = getNodeModules();
   if (!modules) {
     return { total: 0, byType: {} };
   }
 
   const { fs } = modules;
-  const counts = { total: 0, byType: {} };
+  const counts: QuickCountResult = { total: 0, byType: {} };
 
   try {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -584,17 +728,17 @@ export function quickCount(dirPath) {
 /**
  * Lists immediate subdirectories of a path.
  *
- * @param {string} dirPath - Directory to list
- * @returns {Array} Array of { name, path } objects
+ * @param dirPath - Directory to list
+ * @returns Array of subdirectory info objects
  */
-export function listSubdirectories(dirPath) {
+export function listSubdirectories(dirPath: string): SubdirectoryInfo[] {
   const modules = getNodeModules();
   if (!modules) {
     return [];
   }
 
   const { fs, path } = modules;
-  const dirs = [];
+  const dirs: SubdirectoryInfo[] = [];
 
   try {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });

@@ -1,12 +1,77 @@
 import { useEffect, useCallback } from 'react';
+import type { ModalName } from './useModalState.js';
+
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
 
 /**
- * Keyboard Shortcuts Configuration
- * =================================
- * Centralized definition of all keyboard shortcuts.
- * Format: { key, modifiers, action, description }
+ * Modifier keys for shortcuts.
  */
-export const KEYBOARD_SHORTCUTS = Object.freeze([
+export type ModifierKey = 'mod' | 'shift' | 'alt';
+
+/**
+ * Keyboard shortcut action names.
+ */
+export type ShortcutAction =
+  | 'newFolder'
+  | 'newItem'
+  | 'settings'
+  | 'fileOrganizer'
+  | 'statsDashboard'
+  | 'batchRename'
+  | 'commandPalette'
+  | 'focusSearch'
+  | 'toggleSidebar'
+  | 'closeModal'
+  | 'undo'
+  | 'redo';
+
+/**
+ * Keyboard shortcut definition.
+ */
+export interface KeyboardShortcut {
+  key: string;
+  modifiers: ModifierKey[];
+  action: ShortcutAction;
+  description: string;
+  allowInInput?: boolean;
+}
+
+/**
+ * Modal state for checking if modals are open.
+ */
+export interface ModalStateForShortcuts {
+  showNewFolderModal?: boolean;
+  showNewItemModal?: boolean;
+  showSettings?: boolean;
+  showFileOrganizer?: boolean;
+  showStatsDashboard?: boolean;
+  showBatchRename?: boolean;
+  showCommandPalette?: boolean;
+}
+
+/**
+ * Handlers for keyboard shortcut actions.
+ */
+export interface ShortcutHandlers {
+  openModal?: (modalName: ModalName) => void;
+  closeAllModals?: () => void;
+  toggleSidebar?: () => void;
+  focusSearch?: () => void;
+  openCommandPalette?: () => void;
+  undo?: () => void;
+  redo?: () => void;
+}
+
+// ============================================
+// KEYBOARD SHORTCUTS CONFIGURATION
+// ============================================
+
+/**
+ * Centralized definition of all keyboard shortcuts.
+ */
+export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcut[] = Object.freeze([
   // Modal shortcuts
   {
     key: 'n',
@@ -90,30 +155,29 @@ export const KEYBOARD_SHORTCUTS = Object.freeze([
   },
 ]);
 
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
 /**
  * Check if the user is on macOS
- * @returns {boolean} True if on macOS
  */
-function isMac() {
+function isMac(): boolean {
   return typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 }
 
 /**
  * Check if the modifier key is pressed based on platform
- * @param {KeyboardEvent} event - The keyboard event
- * @returns {boolean} True if the platform modifier is pressed
  */
-function isModifierPressed(event) {
+function isModifierPressed(event: KeyboardEvent): boolean {
   return isMac() ? event.metaKey : event.ctrlKey;
 }
 
 /**
  * Check if the event target is an input element
- * @param {EventTarget} target - The event target
- * @returns {boolean} True if target is an input element
  */
-function isInputElement(target) {
-  if (!target || !target.tagName) return false;
+function isInputElement(target: EventTarget | null): boolean {
+  if (!target || !(target instanceof HTMLElement)) return false;
   const tagName = target.tagName.toUpperCase();
   return (
     tagName === 'INPUT' ||
@@ -125,11 +189,8 @@ function isInputElement(target) {
 
 /**
  * Check if event matches a shortcut definition
- * @param {KeyboardEvent} event - The keyboard event
- * @param {Object} shortcut - The shortcut definition
- * @returns {boolean} True if event matches the shortcut
  */
-function matchesShortcut(event, shortcut) {
+function matchesShortcut(event: KeyboardEvent, shortcut: KeyboardShortcut): boolean {
   // Check key (case-insensitive for letters)
   const eventKey = event.key.toLowerCase();
   const shortcutKey = shortcut.key.toLowerCase();
@@ -150,12 +211,10 @@ function matchesShortcut(event, shortcut) {
 
 /**
  * Get the display string for a shortcut (e.g., "Cmd+Shift+N" or "Ctrl+Shift+N")
- * @param {Object} shortcut - The shortcut definition
- * @returns {string} Human-readable shortcut string
  */
-export function getShortcutDisplay(shortcut) {
+export function getShortcutDisplay(shortcut: KeyboardShortcut): string {
   const modKey = isMac() ? 'Cmd' : 'Ctrl';
-  const parts = [];
+  const parts: string[] = [];
 
   if (shortcut.modifiers.includes('mod')) {
     parts.push(modKey);
@@ -178,13 +237,15 @@ export function getShortcutDisplay(shortcut) {
 
 /**
  * Get shortcut display for a specific action
- * @param {string} action - The action name
- * @returns {string|null} Shortcut display string or null if not found
  */
-export function getShortcutForAction(action) {
+export function getShortcutForAction(action: ShortcutAction): string | null {
   const shortcut = KEYBOARD_SHORTCUTS.find((s) => s.action === action);
   return shortcut ? getShortcutDisplay(shortcut) : null;
 }
+
+// ============================================
+// HOOK IMPLEMENTATION
+// ============================================
 
 /**
  * useKeyboardShortcuts - Global keyboard shortcut handler
@@ -193,15 +254,11 @@ export function getShortcutForAction(action) {
  *
  * WHY: Provides consistent keyboard navigation throughout the app,
  *      improving accessibility and power-user experience.
- *
- * @param {Object} handlers - Object containing action handlers
- * @param {Function} handlers.openModal - Function to open a modal by name
- * @param {Function} handlers.closeAllModals - Function to close all modals
- * @param {Function} handlers.toggleSidebar - Function to toggle sidebar
- * @param {Function} handlers.focusSearch - Function to focus search input
- * @param {Object} modalState - Object containing current modal states
  */
-export function useKeyboardShortcuts(handlers, modalState = {}) {
+export function useKeyboardShortcuts(
+  handlers: ShortcutHandlers,
+  modalState: ModalStateForShortcuts = {}
+): void {
   const { openModal, closeAllModals, toggleSidebar, focusSearch, openCommandPalette, undo, redo } =
     handlers;
 
@@ -220,7 +277,7 @@ export function useKeyboardShortcuts(handlers, modalState = {}) {
   }, [modalState]);
 
   useEffect(() => {
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       const targetIsInput = isInputElement(event.target);
 
       // Find matching shortcut

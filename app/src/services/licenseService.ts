@@ -16,6 +16,128 @@
  */
 
 // =============================================================================
+// Types
+// =============================================================================
+
+/**
+ * License tier limits.
+ */
+export interface TierLimits {
+  filesPerMonth: number;
+  rulesCount: number;
+  cloudDrives: number;
+  scanDepth: number;
+  watchFolders?: number;
+}
+
+/**
+ * License tier features.
+ */
+export interface TierFeatures {
+  fileOrganizer: boolean;
+  cloudSync: boolean;
+  advancedRules: boolean;
+  batchOperations: boolean;
+  rollback: boolean;
+  watchFolders: boolean;
+  prioritySupport: boolean;
+}
+
+/**
+ * License tier definition.
+ */
+export interface LicenseTier {
+  id: string;
+  name: string;
+  limits: TierLimits;
+  features: TierFeatures;
+}
+
+/**
+ * Feature info for upgrade prompts.
+ */
+export interface FeatureInfo {
+  name: string;
+  description: string;
+  freeLimit: string;
+  premiumLimit?: string;
+}
+
+/**
+ * Stored license data.
+ */
+export interface StoredLicense {
+  key: string;
+  email: string;
+  productName: string;
+  createdAt: string;
+  refunded: boolean;
+  disputed: boolean;
+  chargebacked: boolean;
+  tier: string;
+  validatedAt: string;
+  activatedAt?: string;
+}
+
+/**
+ * License validation result.
+ */
+export interface ValidationResult {
+  valid: boolean;
+  error?: string;
+  offline?: boolean;
+  license?: StoredLicense;
+}
+
+/**
+ * Usage tracking data.
+ */
+export interface UsageData {
+  month: string;
+  filesOrganized: number;
+  scansPerformed: number;
+  rulesCreated: number;
+  [key: string]: string | number;
+}
+
+/**
+ * Action permission result.
+ */
+export interface ActionPermission {
+  allowed: boolean;
+  reason?: string | null;
+  limit?: number;
+  remaining?: number;
+}
+
+/**
+ * License state for React components.
+ */
+export interface LicenseState {
+  isPremium: boolean;
+  tier: LicenseTier;
+  license: StoredLicense | null;
+  usage: UsageData;
+  limits: TierLimits;
+  features: TierFeatures;
+}
+
+/**
+ * Usage metrics that can be tracked.
+ */
+export type UsageMetric = 'filesOrganized' | 'scansPerformed' | 'rulesCreated';
+
+/**
+ * Actions that can be permission-checked.
+ */
+export type ActionType = 'organizeFiles' | 'createRule' | 'addCloudDrive' | 'rollback';
+
+/**
+ * Feature IDs.
+ */
+export type FeatureId = keyof TierFeatures;
+
+// =============================================================================
 // Constants
 // =============================================================================
 
@@ -26,7 +148,7 @@ const GUMROAD_PRODUCT_ID = 'jdex-premium'; // Gumroad product: https://astgl.gum
 /**
  * License tiers with their limits.
  */
-export const LICENSE_TIERS = {
+export const LICENSE_TIERS: { FREE: LicenseTier; PREMIUM: LicenseTier } = {
   FREE: {
     id: 'free',
     name: 'Free',
@@ -71,7 +193,7 @@ export const LICENSE_TIERS = {
 /**
  * Feature descriptions for upgrade prompts.
  */
-export const FEATURE_INFO = {
+export const FEATURE_INFO: Record<string, FeatureInfo> = {
   fileOrganizer: {
     name: 'File Organizer',
     description: 'Scan and organize files into JD folders',
@@ -117,10 +239,10 @@ export const FEATURE_INFO = {
 /**
  * Gets data from localStorage.
  */
-function getStoredData(key) {
+function getStoredData<T>(key: string): T | null {
   try {
     const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : null;
+    return data ? (JSON.parse(data) as T) : null;
   } catch {
     return null;
   }
@@ -129,7 +251,7 @@ function getStoredData(key) {
 /**
  * Saves data to localStorage.
  */
-function setStoredData(key, data) {
+function setStoredData<T>(key: string, data: T): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(data));
     return true;
@@ -141,7 +263,7 @@ function setStoredData(key, data) {
 /**
  * Removes data from localStorage.
  */
-function removeStoredData(key) {
+function removeStoredData(key: string): boolean {
   try {
     localStorage.removeItem(key);
     return true;
@@ -155,12 +277,28 @@ function removeStoredData(key) {
 // =============================================================================
 
 /**
+ * Gumroad API response structure.
+ */
+interface GumroadResponse {
+  success: boolean;
+  message?: string;
+  purchase?: {
+    email: string;
+    product_name: string;
+    created_at: string;
+    refunded: boolean;
+    disputed: boolean;
+    chargebacked: boolean;
+  };
+}
+
+/**
  * Validates a Gumroad license key.
  *
- * @param {string} licenseKey - The license key to validate
- * @returns {Promise<Object>} Validation result
+ * @param licenseKey - The license key to validate
+ * @returns Validation result
  */
-export async function validateLicenseKey(licenseKey) {
+export async function validateLicenseKey(licenseKey: string): Promise<ValidationResult> {
   if (!licenseKey || typeof licenseKey !== 'string') {
     return {
       valid: false,
@@ -185,9 +323,9 @@ export async function validateLicenseKey(licenseKey) {
       }),
     });
 
-    const data = await response.json();
+    const data = (await response.json()) as GumroadResponse;
 
-    if (data.success) {
+    if (data.success && data.purchase) {
       const purchase = data.purchase;
 
       return {
@@ -201,6 +339,7 @@ export async function validateLicenseKey(licenseKey) {
           disputed: purchase.disputed,
           chargebacked: purchase.chargebacked,
           tier: 'premium',
+          validatedAt: new Date().toISOString(),
         },
       };
     } else {
@@ -237,13 +376,13 @@ export async function validateLicenseKey(licenseKey) {
 /**
  * Activates a license key and stores it locally.
  *
- * @param {string} licenseKey - The license key to activate
- * @returns {Promise<Object>} Activation result
+ * @param licenseKey - The license key to activate
+ * @returns Activation result
  */
-export async function activateLicense(licenseKey) {
+export async function activateLicense(licenseKey: string): Promise<ValidationResult> {
   const validation = await validateLicenseKey(licenseKey);
 
-  if (!validation.valid) {
+  if (!validation.valid || !validation.license) {
     return validation;
   }
 
@@ -260,9 +399,8 @@ export async function activateLicense(licenseKey) {
   }
 
   // Store the license locally
-  const licenseData = {
+  const licenseData: StoredLicense = {
     ...validation.license,
-    validatedAt: new Date().toISOString(),
     activatedAt: new Date().toISOString(),
   };
 
@@ -277,7 +415,7 @@ export async function activateLicense(licenseKey) {
 /**
  * Deactivates the current license.
  */
-export function deactivateLicense() {
+export function deactivateLicense(): { success: boolean } {
   removeStoredData(STORAGE_KEY);
   return { success: true };
 }
@@ -285,14 +423,14 @@ export function deactivateLicense() {
 /**
  * Gets the stored license data.
  */
-export function getStoredLicense() {
-  return getStoredData(STORAGE_KEY);
+export function getStoredLicense(): StoredLicense | null {
+  return getStoredData<StoredLicense>(STORAGE_KEY);
 }
 
 /**
  * Checks if user has an active premium license.
  */
-export function isPremium() {
+export function isPremium(): boolean {
   const license = getStoredLicense();
   if (!license) return false;
 
@@ -311,7 +449,7 @@ export function isPremium() {
 /**
  * Gets the current license tier.
  */
-export function getCurrentTier() {
+export function getCurrentTier(): LicenseTier {
   return isPremium() ? LICENSE_TIERS.PREMIUM : LICENSE_TIERS.FREE;
 }
 
@@ -322,8 +460,8 @@ export function getCurrentTier() {
 /**
  * Gets the current month's usage data.
  */
-export function getUsage() {
-  const usage = getStoredData(USAGE_KEY) || {};
+export function getUsage(): UsageData {
+  const usage = getStoredData<UsageData>(USAGE_KEY) || ({} as UsageData);
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
 
   if (usage.month !== currentMonth) {
@@ -342,9 +480,9 @@ export function getUsage() {
 /**
  * Increments a usage counter.
  */
-export function incrementUsage(metric, amount = 1) {
+export function incrementUsage(metric: UsageMetric, amount: number = 1): UsageData {
   const usage = getUsage();
-  usage[metric] = (usage[metric] || 0) + amount;
+  usage[metric] = ((usage[metric] as number) || 0) + amount;
   setStoredData(USAGE_KEY, usage);
   return usage;
 }
@@ -352,17 +490,18 @@ export function incrementUsage(metric, amount = 1) {
 /**
  * Checks if a usage limit has been reached.
  */
-export function isLimitReached(metric) {
+export function isLimitReached(metric: UsageMetric): boolean {
   const tier = getCurrentTier();
   const usage = getUsage();
 
-  const limitMap = {
+  const limitMap: Record<UsageMetric, number> = {
     filesOrganized: tier.limits.filesPerMonth,
     rulesCreated: tier.limits.rulesCount,
+    scansPerformed: Infinity, // No limit on scans
   };
 
   const limit = limitMap[metric];
-  const current = usage[metric] || 0;
+  const current = (usage[metric] as number) || 0;
 
   return limit !== Infinity && current >= limit;
 }
@@ -370,17 +509,18 @@ export function isLimitReached(metric) {
 /**
  * Gets remaining quota for a metric.
  */
-export function getRemainingQuota(metric) {
+export function getRemainingQuota(metric: UsageMetric): number {
   const tier = getCurrentTier();
   const usage = getUsage();
 
-  const limitMap = {
+  const limitMap: Record<UsageMetric, number> = {
     filesOrganized: tier.limits.filesPerMonth,
     rulesCreated: tier.limits.rulesCount,
+    scansPerformed: Infinity,
   };
 
   const limit = limitMap[metric];
-  const current = usage[metric] || 0;
+  const current = (usage[metric] as number) || 0;
 
   if (limit === Infinity) return Infinity;
   return Math.max(0, limit - current);
@@ -393,7 +533,7 @@ export function getRemainingQuota(metric) {
 /**
  * Checks if a feature is available in the current tier.
  */
-export function hasFeature(featureId) {
+export function hasFeature(featureId: FeatureId): boolean {
   const tier = getCurrentTier();
   return tier.features[featureId] === true;
 }
@@ -401,7 +541,7 @@ export function hasFeature(featureId) {
 /**
  * Checks if user can perform an action (considering both feature and limits).
  */
-export function canPerformAction(action, count = 1) {
+export function canPerformAction(action: ActionType, count: number = 1): ActionPermission {
   const tier = getCurrentTier();
 
   switch (action) {
@@ -465,7 +605,7 @@ export function canPerformAction(action, count = 1) {
 /**
  * Gets the current license state for React components.
  */
-export function getLicenseState() {
+export function getLicenseState(): LicenseState {
   const license = getStoredLicense();
   const tier = getCurrentTier();
   const usage = getUsage();
@@ -481,7 +621,7 @@ export function getLicenseState() {
 }
 
 // =============================================================================
-// Exports
+// Default Export
 // =============================================================================
 
 export default {

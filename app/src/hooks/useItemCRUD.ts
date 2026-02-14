@@ -1,6 +1,79 @@
 import { useState, useCallback } from 'react';
 import { createItem, updateItem, deleteItem, getItems, getItem } from '../db.js';
 import { useUndo, ACTION_TYPES, ENTITY_TYPES } from '../context/UndoContext.jsx';
+import type { Folder, Item } from '../types/index.js';
+
+// Type for undo actions (UndoContext.jsx is not typed)
+interface UndoAction {
+  type: string;
+  entityType: string;
+  entityId: number;
+  entityData?: Record<string, unknown>;
+  previousState?: Item | null;
+  newState?: Record<string, unknown>;
+  deletedEntity?: Item | null;
+  description: string;
+}
+
+interface UseUndoReturn {
+  pushAction: (action: UndoAction) => void;
+}
+
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
+
+/**
+ * Item data for creating a new item.
+ */
+export interface CreateItemData {
+  item_number: string;
+  name: string;
+  folder_id: number;
+  sequence: number;
+  description?: string;
+  file_type?: string;
+  sensitivity?: string;
+  location?: string;
+  storage_path?: string;
+  file_size?: number;
+  keywords?: string;
+  notes?: string;
+}
+
+/**
+ * Item data for updating an existing item.
+ */
+export interface UpdateItemData extends Partial<CreateItemData> {
+  id: number;
+}
+
+/**
+ * Options for the useItemCRUD hook.
+ */
+export interface UseItemCRUDOptions {
+  triggerRefresh: () => void;
+  selectedFolder: Folder | null;
+  setItems: (items: Item[]) => void;
+}
+
+/**
+ * Return type for the useItemCRUD hook.
+ */
+export interface UseItemCRUDReturn {
+  // State
+  editingItem: Item | null;
+  setEditingItem: (item: Item | null) => void;
+
+  // Actions
+  handleCreateItem: (itemData: CreateItemData) => void;
+  handleUpdateItem: (itemData: UpdateItemData) => void;
+  handleDeleteItem: (item: Item) => void;
+}
+
+// ============================================
+// HOOK IMPLEMENTATION
+// ============================================
 
 /**
  * useItemCRUD - Manages item CRUD operations and editing state
@@ -10,36 +83,33 @@ import { useUndo, ACTION_TYPES, ENTITY_TYPES } from '../context/UndoContext.jsx'
  *
  * WHY: Extracted from App.jsx to separate item mutation concerns.
  *      Handlers automatically refresh the items list for the current folder.
- *
- * @param {Object} options - Configuration options
- * @param {Function} options.triggerRefresh - Function to refresh app data after mutations
- * @param {Object|null} options.selectedFolder - Currently selected folder
- * @param {Function} options.setItems - Function to update items state
- * @returns {Object} Item CRUD handlers and editing state
  */
-export function useItemCRUD({ triggerRefresh, selectedFolder, setItems }) {
+export function useItemCRUD({
+  triggerRefresh,
+  selectedFolder,
+  setItems,
+}: UseItemCRUDOptions): UseItemCRUDReturn {
   // Editing state
-  const [editingItem, setEditingItem] = useState(null);
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
 
-  // Undo context
-  const { pushAction } = useUndo();
+  // Undo context (cast since UndoContext.jsx is not typed)
+  const { pushAction } = useUndo() as UseUndoReturn;
 
   /**
    * Refresh items for the current folder view
    */
   const refreshItems = useCallback(() => {
     if (selectedFolder) {
-      setItems(getItems(selectedFolder.id));
+      setItems(getItems(selectedFolder.id) as Item[]);
     }
   }, [selectedFolder, setItems]);
 
   /**
    * Create a new item
-   * @param {Object} itemData - Item data to create
    */
   const handleCreateItem = useCallback(
-    (itemData) => {
-      const newId = createItem(itemData);
+    (itemData: CreateItemData) => {
+      const newId = createItem(itemData) as number;
 
       // Push to undo stack
       pushAction({
@@ -58,12 +128,11 @@ export function useItemCRUD({ triggerRefresh, selectedFolder, setItems }) {
 
   /**
    * Update an existing item
-   * @param {Object} itemData - Item data with id
    */
   const handleUpdateItem = useCallback(
-    (itemData) => {
+    (itemData: UpdateItemData) => {
       // Capture before state for undo
-      const beforeState = getItem(itemData.id);
+      const beforeState = getItem(itemData.id) as Item | null;
 
       updateItem(itemData.id, itemData);
 
@@ -85,13 +154,12 @@ export function useItemCRUD({ triggerRefresh, selectedFolder, setItems }) {
 
   /**
    * Delete an item with confirmation
-   * @param {Object} item - Item to delete
    */
   const handleDeleteItem = useCallback(
-    (item) => {
+    (item: Item) => {
       if (confirm(`Delete item "${item.item_number} ${item.name}"?`)) {
         // Capture full state before delete for undo
-        const fullItem = getItem(item.id);
+        const fullItem = getItem(item.id) as Item | null;
 
         deleteItem(item.id);
 

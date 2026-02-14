@@ -138,7 +138,7 @@ export interface AreaStorage {
 /**
  * Rule types for file matching.
  */
-export type RuleType = 'extension' | 'keyword' | 'path' | 'regex';
+export type RuleType = 'extension' | 'keyword' | 'path' | 'regex' | 'date' | 'compound';
 
 /**
  * Target types for organization rules.
@@ -251,9 +251,7 @@ export interface WatchedFolder {
  * Generic result type for operations that can fail.
  * Use this pattern for functions that return success/failure.
  */
-export type Result<T, E = Error> =
-  | { success: true; data: T }
-  | { success: false; error: E };
+export type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E };
 
 /**
  * Pagination parameters for list operations.

@@ -19,11 +19,204 @@ import {
   logWatchActivity,
   incrementWatchedFolderStats,
 } from '../db.js';
-import { getMatchingEngine, CONFIDENCE } from './matchingEngine.js';
-import { moveFile, buildDestinationPath } from './fileOperations.js';
+import { getMatchingEngine, CONFIDENCE, FileSuggestion } from './matchingEngine.js';
+import { moveFile } from './fileOperations.js';
 
-// File type detection based on extension
-const FILE_TYPE_MAP = {
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
+
+/**
+ * Node.js fs module interface for Electron.
+ */
+interface FsModule {
+  existsSync(path: string): boolean;
+  statSync(path: string): FsStats;
+  readdirSync(path: string): string[];
+  watch(
+    path: string,
+    options: { recursive: boolean },
+    callback: (eventType: string, filename: string | null) => void
+  ): FsWatcher;
+}
+
+/**
+ * File stats from fs.statSync.
+ */
+interface FsStats {
+  size: number;
+  isDirectory(): boolean;
+}
+
+/**
+ * File system watcher instance.
+ */
+interface FsWatcher {
+  close(): void;
+  on(event: 'error', callback: (error: Error) => void): void;
+}
+
+/**
+ * Node.js path module interface.
+ */
+interface PathModule {
+  join(...paths: string[]): string;
+  extname(path: string): string;
+}
+
+/**
+ * File types mapped from extensions.
+ */
+type FileType =
+  | 'document'
+  | 'spreadsheet'
+  | 'data'
+  | 'image'
+  | 'code'
+  | 'archive'
+  | 'audio'
+  | 'video'
+  | 'other';
+
+/**
+ * Watched folder from database.
+ */
+interface WatchedFolder {
+  id: number;
+  name: string;
+  path: string;
+  is_active: number;
+  include_subdirs: number;
+  file_types?: string[];
+  auto_organize: boolean;
+  confidence_threshold: string;
+  notify_on_organize: boolean;
+  last_checked_at?: string;
+}
+
+/**
+ * Pending file entry (for debouncing).
+ */
+interface PendingFile {
+  timeout: ReturnType<typeof setTimeout>;
+  folderId: number;
+  stats: FsStats;
+}
+
+/**
+ * Match suggestion from matching engine.
+ */
+interface MatchResult {
+  confidence: string;
+  targetFolder?: string;
+  ruleId?: number;
+  ruleName?: string;
+  folder?: {
+    folder_number: string;
+    name: string;
+  };
+  rule?: {
+    id: number;
+    name: string;
+  } | null;
+}
+
+/**
+ * Watch event types.
+ */
+export type WatchEventType = 'file_queued' | 'file_organized' | 'file_error';
+
+/**
+ * Event data for file_queued.
+ */
+export interface FileQueuedEvent {
+  folderId: number;
+  filename: string;
+  path: string;
+  suggestion?: MatchResult;
+}
+
+/**
+ * Event data for file_organized.
+ */
+export interface FileOrganizedEvent {
+  folderId: number;
+  filename: string;
+  targetFolder: string;
+  ruleName: string;
+}
+
+/**
+ * Event data for file_error.
+ */
+export interface FileErrorEvent {
+  folderId: number;
+  filename: string;
+  error: string;
+}
+
+/**
+ * Union type for all event data.
+ */
+export type WatchEventData = FileQueuedEvent | FileOrganizedEvent | FileErrorEvent;
+
+/**
+ * Event callback function.
+ */
+export type WatchEventCallback = (data: WatchEventData) => void;
+
+/**
+ * Watcher status for a folder.
+ */
+export interface WatcherStatus extends WatchedFolder {
+  is_running: boolean;
+  can_run: boolean;
+}
+
+/**
+ * Results from processing existing files.
+ */
+export interface ProcessingResults {
+  processed: number;
+  organized: number;
+  queued: number;
+  skipped: number;
+  errors: number;
+}
+
+/**
+ * Result of processExistingFiles.
+ */
+export interface ProcessExistingResult {
+  success: boolean;
+  error?: string;
+  results?: ProcessingResults;
+}
+
+/**
+ * Activity log parameters.
+ */
+interface ActivityLogParams {
+  watched_folder_id: number;
+  filename: string;
+  path: string;
+  file_extension?: string;
+  file_type?: string;
+  file_size?: number;
+  action: string;
+  matched_rule_id?: number;
+  target_folder?: string;
+  error_message?: string;
+}
+
+// ============================================
+// CONSTANTS
+// ============================================
+
+/**
+ * File type detection based on extension.
+ */
+const FILE_TYPE_MAP: Record<string, FileType> = {
   // Documents
   pdf: 'document',
   doc: 'document',
@@ -78,53 +271,78 @@ const FILE_TYPE_MAP = {
 };
 
 /**
+ * Debounce delay in milliseconds.
+ */
+const DEBOUNCE_MS = 2000;
+
+// ============================================
+// MODULE STATE
+// ============================================
+
+const activeWatchers = new Map<number, FsWatcher>();
+const pendingFiles = new Map<string, PendingFile>();
+let isElectron = false;
+let fs: FsModule | null = null;
+let path: PathModule | null = null;
+
+// ============================================
+// EVENT LISTENERS
+// ============================================
+
+const eventListeners = new Map<WatchEventType, Set<WatchEventCallback>>();
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+/**
  * Get file type from extension.
  */
-function getFileType(extension) {
-  return FILE_TYPE_MAP[extension?.toLowerCase()] || 'other';
+function getFileType(extension: string | undefined): FileType {
+  return FILE_TYPE_MAP[extension?.toLowerCase() ?? ''] || 'other';
 }
 
-// =============================================================================
-// Module State
-// =============================================================================
+/**
+ * Convert confidence level to numeric value for comparison.
+ */
+function confidenceToNumber(conf: string | undefined): number {
+  if (conf === CONFIDENCE.HIGH || conf === 'high') return 3;
+  if (conf === CONFIDENCE.MEDIUM || conf === 'medium') return 2;
+  if (conf === CONFIDENCE.LOW || conf === 'low') return 1;
+  return 0;
+}
 
-const activeWatchers = new Map(); // folderId -> watcher instance
-const pendingFiles = new Map(); // filePath -> { timeout, folderId, stats }
-let isElectron = false;
-let fs = null;
-let path = null;
-
-// Configuration
-const DEBOUNCE_MS = 2000; // Wait 2 seconds after file stops changing
-const _POLL_INTERVAL_MS = 5000; // Fallback polling interval
-
-// =============================================================================
-// Initialization
-// =============================================================================
+// ============================================
+// INITIALIZATION
+// ============================================
 
 /**
  * Initialize the watcher service.
  * Loads fs and path modules if running in Electron.
- *
- * @returns {boolean} True if running in Electron with file access
  */
-export function initWatcherService() {
+export function initWatcherService(): boolean {
   try {
+    const windowWithProcess = window as Window & {
+      process?: { type?: string };
+      require?: NodeRequire;
+    };
+
     // Check if we're in Electron
-    if (typeof window !== 'undefined' && window.process?.type === 'renderer') {
+    if (typeof window !== 'undefined' && windowWithProcess.process?.type === 'renderer') {
       // Running in Electron renderer
-      const { ipcRenderer: _ipcRenderer } = window.require('electron');
-      fs = window.require('fs');
-      path = window.require('path');
+      fs = windowWithProcess.require?.('fs') as FsModule;
+      path = windowWithProcess.require?.('path') as PathModule;
       isElectron = true;
       console.log('[WatcherService] Initialized in Electron environment');
       return true;
     }
 
     // Try Node.js environment (for testing)
-    if (typeof process !== 'undefined' && process.versions?.node) {
-      fs = require('fs');
-      path = require('path');
+    if (typeof process !== 'undefined' && (process as NodeJS.Process).versions?.node) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      fs = require('fs') as FsModule;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      path = require('path') as PathModule;
       isElectron = true;
       console.log('[WatcherService] Initialized in Node.js environment');
       return true;
@@ -133,35 +351,32 @@ export function initWatcherService() {
     console.log('[WatcherService] Browser environment - file watching disabled');
     return false;
   } catch (error) {
-    console.log('[WatcherService] Not in Electron environment:', error.message);
+    console.log('[WatcherService] Not in Electron environment:', (error as Error).message);
     return false;
   }
 }
 
 /**
  * Check if the watcher service is available.
- *
- * @returns {boolean} True if file watching is available
  */
-export function isWatcherAvailable() {
+export function isWatcherAvailable(): boolean {
   return isElectron && fs !== null;
 }
 
-// =============================================================================
-// Core Watcher Functions
-// =============================================================================
+// ============================================
+// CORE WATCHER FUNCTIONS
+// ============================================
 
 /**
  * Start watching all active folders.
- * Called when the app starts.
  */
-export function startAllWatchers() {
+export function startAllWatchers(): void {
   if (!isWatcherAvailable()) {
     console.log('[WatcherService] Watchers not available (browser mode)');
     return;
   }
 
-  const folders = getWatchedFolders({ activeOnly: true });
+  const folders = getWatchedFolders({ activeOnly: true }) as WatchedFolder[];
   console.log(`[WatcherService] Starting ${folders.length} watchers...`);
 
   for (const folder of folders) {
@@ -171,9 +386,8 @@ export function startAllWatchers() {
 
 /**
  * Stop all active watchers.
- * Called when the app closes.
  */
-export function stopAllWatchers() {
+export function stopAllWatchers(): void {
   console.log(`[WatcherService] Stopping ${activeWatchers.size} watchers...`);
 
   for (const [folderId] of activeWatchers) {
@@ -189,12 +403,9 @@ export function stopAllWatchers() {
 
 /**
  * Start watching a specific folder.
- *
- * @param {number} folderId - The watched folder ID
- * @returns {boolean} True if watcher started successfully
  */
-export function startWatcher(folderId) {
-  if (!isWatcherAvailable()) {
+export function startWatcher(folderId: number): boolean {
+  if (!isWatcherAvailable() || !fs || !path) {
     console.log('[WatcherService] Cannot start watcher - not in Electron');
     return false;
   }
@@ -204,7 +415,7 @@ export function startWatcher(folderId) {
     stopWatcher(folderId);
   }
 
-  const folder = getWatchedFolder(folderId);
+  const folder = getWatchedFolder(folderId) as WatchedFolder | null;
   if (!folder) {
     console.error(`[WatcherService] Folder ${folderId} not found`);
     return false;
@@ -226,14 +437,14 @@ export function startWatcher(folderId) {
     const watcher = fs.watch(
       folder.path,
       { recursive: folder.include_subdirs === 1 },
-      (eventType, filename) => {
+      (eventType: string, filename: string | null) => {
         if (eventType === 'rename' && filename) {
           handleFileEvent(folderId, folder.path, filename);
         }
       }
     );
 
-    watcher.on('error', (error) => {
+    watcher.on('error', (error: Error) => {
       console.error(`[WatcherService] Watcher error for ${folder.name}:`, error);
       // Try to restart the watcher
       setTimeout(() => startWatcher(folderId), 5000);
@@ -251,10 +462,8 @@ export function startWatcher(folderId) {
 
 /**
  * Stop watching a specific folder.
- *
- * @param {number} folderId - The watched folder ID
  */
-export function stopWatcher(folderId) {
+export function stopWatcher(folderId: number): void {
   const watcher = activeWatchers.get(folderId);
   if (watcher) {
     watcher.close();
@@ -265,32 +474,27 @@ export function stopWatcher(folderId) {
 
 /**
  * Get the status of all watchers.
- *
- * @returns {Array} Array of watcher status objects
  */
-export function getWatcherStatus() {
-  const folders = getWatchedFolders();
+export function getWatcherStatus(): WatcherStatus[] {
+  const folders = getWatchedFolders() as WatchedFolder[];
 
   return folders.map((folder) => ({
     ...folder,
     is_running: activeWatchers.has(folder.id),
-    can_run: isWatcherAvailable() && fs?.existsSync(folder.path),
+    can_run: isWatcherAvailable() && (fs?.existsSync(folder.path) ?? false),
   }));
 }
 
-// =============================================================================
-// File Event Handling
-// =============================================================================
+// ============================================
+// FILE EVENT HANDLING
+// ============================================
 
 /**
  * Handle a file system event.
- * Uses debouncing to wait for files to finish writing.
- *
- * @param {number} folderId - The watched folder ID
- * @param {string} folderPath - The watched folder path
- * @param {string} filename - The detected filename
  */
-function handleFileEvent(folderId, folderPath, filename) {
+function handleFileEvent(folderId: number, folderPath: string, filename: string): void {
+  if (!fs || !path) return;
+
   const fullPath = path.join(folderPath, filename);
 
   // Skip hidden files and system files
@@ -302,8 +506,9 @@ function handleFileEvent(folderId, folderPath, filename) {
   try {
     if (!fs.existsSync(fullPath)) {
       // File was deleted, clear any pending operations
-      if (pendingFiles.has(fullPath)) {
-        clearTimeout(pendingFiles.get(fullPath).timeout);
+      const pending = pendingFiles.get(fullPath);
+      if (pending) {
+        clearTimeout(pending.timeout);
         pendingFiles.delete(fullPath);
       }
       return;
@@ -315,8 +520,9 @@ function handleFileEvent(folderId, folderPath, filename) {
     }
 
     // Clear existing debounce timer
-    if (pendingFiles.has(fullPath)) {
-      clearTimeout(pendingFiles.get(fullPath).timeout);
+    const existingPending = pendingFiles.get(fullPath);
+    if (existingPending) {
+      clearTimeout(existingPending.timeout);
     }
 
     // Set new debounce timer
@@ -337,13 +543,11 @@ function handleFileEvent(folderId, folderPath, filename) {
 
 /**
  * Process a detected file through the matching engine.
- *
- * @param {number} folderId - The watched folder ID
- * @param {string} fullPath - Full path to the file
- * @param {string} filename - The filename
  */
-async function processFile(folderId, fullPath, filename) {
-  const folder = getWatchedFolder(folderId);
+async function processFile(folderId: number, fullPath: string, filename: string): Promise<void> {
+  if (!fs || !path) return;
+
+  const folder = getWatchedFolder(folderId) as WatchedFolder | null;
   if (!folder) return;
 
   console.log(`[WatcherService] Processing file: ${filename}`);
@@ -366,7 +570,7 @@ async function processFile(folderId, fullPath, filename) {
           file_type: fileType,
           file_size: stats.size,
           action: 'skipped',
-        });
+        } as ActivityLogParams);
         return;
       }
     }
@@ -380,7 +584,7 @@ async function processFile(folderId, fullPath, filename) {
       file_type: fileType,
       file_size: stats.size,
       action: 'detected',
-    });
+    } as ActivityLogParams);
 
     // Find matching rule using the matching engine
     const engine = getMatchingEngine();
@@ -389,10 +593,20 @@ async function processFile(folderId, fullPath, filename) {
       path: fullPath,
       file_extension: extension,
       file_type: fileType,
-    });
+    }) as FileSuggestion[];
 
     // Get best match (first suggestion, if any)
-    const match = suggestions.length > 0 ? suggestions[0] : null;
+    const match: MatchResult | null =
+      suggestions.length > 0
+        ? {
+            confidence: suggestions[0].confidence,
+            targetFolder: suggestions[0].folder?.folder_number,
+            ruleId: suggestions[0].rule?.id,
+            ruleName: suggestions[0].rule?.name,
+            folder: suggestions[0].folder,
+            rule: suggestions[0].rule,
+          }
+        : null;
 
     if (!match || !match.targetFolder) {
       console.log(`[WatcherService] No matching rule for: ${filename}`);
@@ -404,7 +618,7 @@ async function processFile(folderId, fullPath, filename) {
         file_type: fileType,
         file_size: stats.size,
         action: 'queued',
-      });
+      } as ActivityLogParams);
       incrementWatchedFolderStats(folderId, false);
 
       // Emit event for UI notification
@@ -413,14 +627,6 @@ async function processFile(folderId, fullPath, filename) {
     }
 
     // Check confidence threshold
-    // Convert confidence level to comparable value
-    const confidenceToNumber = (conf) => {
-      if (conf === CONFIDENCE.HIGH || conf === 'high') return 3;
-      if (conf === CONFIDENCE.MEDIUM || conf === 'medium') return 2;
-      if (conf === CONFIDENCE.LOW || conf === 'low') return 1;
-      return 0;
-    };
-
     const matchConfidence = confidenceToNumber(match.confidence);
     const thresholdConfidence = confidenceToNumber(folder.confidence_threshold);
 
@@ -436,9 +642,9 @@ async function processFile(folderId, fullPath, filename) {
         file_type: fileType,
         file_size: stats.size,
         action: 'queued',
-        matched_rule_id: match.ruleId || null,
+        matched_rule_id: match.ruleId,
         target_folder: match.targetFolder,
-      });
+      } as ActivityLogParams);
       incrementWatchedFolderStats(folderId, false);
 
       emitWatchEvent('file_queued', { folderId, filename, path: fullPath, suggestion: match });
@@ -448,11 +654,9 @@ async function processFile(folderId, fullPath, filename) {
     // Auto-organize if enabled
     if (folder.auto_organize) {
       try {
-        // Build destination path and move the file
-        const destPath = buildDestinationPath(match.targetFolder, filename);
+        // Move the file (destPath is built internally by moveFile)
         const result = moveFile({
           sourcePath: fullPath,
-          destPath: destPath,
           folderNumber: match.targetFolder,
         });
 
@@ -465,9 +669,9 @@ async function processFile(folderId, fullPath, filename) {
             file_type: fileType,
             file_size: stats.size,
             action: 'auto_organized',
-            matched_rule_id: match.ruleId || null,
+            matched_rule_id: match.ruleId,
             target_folder: match.targetFolder,
-          });
+          } as ActivityLogParams);
           incrementWatchedFolderStats(folderId, true);
 
           console.log(`[WatcherService] Auto-organized: ${filename} → ${match.targetFolder}`);
@@ -482,7 +686,7 @@ async function processFile(folderId, fullPath, filename) {
             });
           }
         } else {
-          throw new Error(result.error || 'Move failed');
+          throw result.error ?? new Error('Move failed');
         }
       } catch (error) {
         console.error(`[WatcherService] Auto-organize failed:`, error);
@@ -494,12 +698,12 @@ async function processFile(folderId, fullPath, filename) {
           file_type: fileType,
           file_size: stats.size,
           action: 'error',
-          matched_rule_id: match.ruleId || null,
+          matched_rule_id: match.ruleId,
           target_folder: match.targetFolder,
-          error_message: error.message,
-        });
+          error_message: (error as Error).message,
+        } as ActivityLogParams);
 
-        emitWatchEvent('file_error', { folderId, filename, error: error.message });
+        emitWatchEvent('file_error', { folderId, filename, error: (error as Error).message });
       }
     } else {
       // Queue for manual review
@@ -511,9 +715,9 @@ async function processFile(folderId, fullPath, filename) {
         file_type: fileType,
         file_size: stats.size,
         action: 'queued',
-        matched_rule_id: match.ruleId || null,
+        matched_rule_id: match.ruleId,
         target_folder: match.targetFolder,
-      });
+      } as ActivityLogParams);
       incrementWatchedFolderStats(folderId, false);
 
       console.log(
@@ -529,42 +733,33 @@ async function processFile(folderId, fullPath, filename) {
       filename,
       path: fullPath,
       action: 'error',
-      error_message: error.message,
-    });
+      error_message: (error as Error).message,
+    } as ActivityLogParams);
   }
 }
 
-// =============================================================================
-// Event Emission (for UI Updates)
-// =============================================================================
-
-const eventListeners = new Map();
+// ============================================
+// EVENT EMISSION
+// ============================================
 
 /**
  * Subscribe to watch events.
- *
- * @param {string} eventType - The event type
- * @param {Function} callback - The callback function
- * @returns {Function} Unsubscribe function
  */
-export function onWatchEvent(eventType, callback) {
+export function onWatchEvent(eventType: WatchEventType, callback: WatchEventCallback): () => void {
   if (!eventListeners.has(eventType)) {
     eventListeners.set(eventType, new Set());
   }
-  eventListeners.get(eventType).add(callback);
+  eventListeners.get(eventType)!.add(callback);
 
   return () => {
-    eventListeners.get(eventType).delete(callback);
+    eventListeners.get(eventType)?.delete(callback);
   };
 }
 
 /**
  * Emit a watch event to all subscribers.
- *
- * @param {string} eventType - The event type
- * @param {Object} data - The event data
  */
-function emitWatchEvent(eventType, data) {
+function emitWatchEvent(eventType: WatchEventType, data: WatchEventData): void {
   const listeners = eventListeners.get(eventType);
   if (listeners) {
     for (const callback of listeners) {
@@ -577,23 +772,19 @@ function emitWatchEvent(eventType, data) {
   }
 }
 
-// =============================================================================
-// Manual Operations
-// =============================================================================
+// ============================================
+// MANUAL OPERATIONS
+// ============================================
 
 /**
  * Manually process all files in a watched folder.
- * Useful for initial setup or catching up after being offline.
- *
- * @param {number} folderId - The watched folder ID
- * @returns {Object} Results of the processing
  */
-export async function processExistingFiles(folderId) {
-  if (!isWatcherAvailable()) {
+export async function processExistingFiles(folderId: number): Promise<ProcessExistingResult> {
+  if (!isWatcherAvailable() || !fs || !path) {
     return { success: false, error: 'Watcher not available' };
   }
 
-  const folder = getWatchedFolder(folderId);
+  const folder = getWatchedFolder(folderId) as WatchedFolder | null;
   if (!folder) {
     return { success: false, error: 'Folder not found' };
   }
@@ -602,7 +793,7 @@ export async function processExistingFiles(folderId) {
     return { success: false, error: 'Folder path does not exist' };
   }
 
-  const results = {
+  const results: ProcessingResults = {
     processed: 0,
     organized: 0,
     queued: 0,
@@ -638,13 +829,13 @@ export async function processExistingFiles(folderId) {
     return { success: true, results };
   } catch (error) {
     console.error(`[WatcherService] Error processing existing files:`, error);
-    return { success: false, error: error.message, results };
+    return { success: false, error: (error as Error).message, results };
   }
 }
 
-// =============================================================================
-// Export Default Service Object
-// =============================================================================
+// ============================================
+// DEFAULT EXPORT
+// ============================================
 
 export default {
   initWatcherService,

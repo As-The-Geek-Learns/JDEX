@@ -1,5 +1,55 @@
 import { useState, useCallback } from 'react';
 import { getFolders, getCategories, getItems } from '../db.js';
+import type { Area, Category, Folder, Item } from '../types/index.js';
+
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
+
+/**
+ * Navigation view types in the JD hierarchy.
+ */
+export type ViewType = 'home' | 'area' | 'category' | 'folder';
+
+/**
+ * Breadcrumb item for navigation trail.
+ */
+export interface BreadcrumbItem {
+  type: ViewType;
+  data: Area | Category | Folder | null | undefined;
+  label: string;
+}
+
+/**
+ * Options for the useNavigation hook.
+ */
+export interface UseNavigationOptions {
+  areas: Area[];
+  setFolders: (folders: Folder[]) => void;
+  setCategories: (categories: Category[]) => void;
+  setItems: (items: Item[]) => void;
+  clearSearch?: () => void;
+}
+
+/**
+ * Return type for the useNavigation hook.
+ */
+export interface UseNavigationReturn {
+  // State
+  currentView: ViewType;
+  selectedArea: Area | null;
+  selectedCategory: Category | null;
+  selectedFolder: Folder | null;
+  breadcrumbPath: BreadcrumbItem[];
+
+  // Actions
+  navigateTo: (type: ViewType, data?: Area | Category | Folder | null) => void;
+  goHome: () => void;
+}
+
+// ============================================
+// HOOK IMPLEMENTATION
+// ============================================
 
 /**
  * useNavigation - Manages navigation state and breadcrumb trail
@@ -9,36 +59,32 @@ import { getFolders, getCategories, getItems } from '../db.js';
  *
  * WHY: Extracted from App.jsx to separate navigation concerns from data management.
  *      The navigateTo function is complex with breadcrumb building logic.
- *
- * @param {Object} options - Configuration options
- * @param {Array} options.areas - Areas data for breadcrumb building
- * @param {Function} options.setFolders - Setter to update folders state
- * @param {Function} options.setCategories - Setter to update categories state
- * @param {Function} options.setItems - Setter to update items state
- * @param {Function} options.clearSearch - Callback to clear search query
- * @returns {Object} Navigation state and control functions
  */
-export function useNavigation({ areas, setFolders, setCategories, setItems, clearSearch }) {
+export function useNavigation({
+  areas,
+  setFolders,
+  setCategories,
+  setItems,
+  clearSearch,
+}: UseNavigationOptions): UseNavigationReturn {
   // Navigation state
-  const [currentView, setCurrentView] = useState('home'); // home, area, category, folder
-  const [selectedArea, setSelectedArea] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [selectedFolder, setSelectedFolder] = useState(null);
-  const [breadcrumbPath, setBreadcrumbPath] = useState([]);
+  const [currentView, setCurrentView] = useState<ViewType>('home');
+  const [selectedArea, setSelectedArea] = useState<Area | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
+  const [breadcrumbPath, setBreadcrumbPath] = useState<BreadcrumbItem[]>([]);
 
   /**
    * Navigate to a specific view in the JD hierarchy
-   * @param {string} type - 'home' | 'area' | 'category' | 'folder'
-   * @param {Object|null} data - The data object for the target view
    */
   const navigateTo = useCallback(
-    (type, data = null) => {
+    (type: ViewType, data: Area | Category | Folder | null = null) => {
       // Clear search when navigating
       clearSearch?.();
 
       // Ensure data is fresh before navigating
-      const freshFolders = getFolders();
-      const freshCategories = getCategories();
+      const freshFolders = getFolders() as Folder[];
+      const freshCategories = getCategories() as Category[];
       setFolders(freshFolders);
       setCategories(freshCategories);
 
@@ -51,28 +97,31 @@ export function useNavigation({ areas, setFolders, setCategories, setItems, clea
           setBreadcrumbPath([]);
           break;
 
-        case 'area':
+        case 'area': {
           if (!data) return; // Guard against null data
+          const areaData = data as Area;
           setCurrentView('area');
-          setSelectedArea(data);
+          setSelectedArea(areaData);
           setSelectedCategory(null);
           setSelectedFolder(null);
           setBreadcrumbPath([
             {
               type: 'area',
-              data,
-              label: `${data.range_start}-${data.range_end} ${data.name}`,
+              data: areaData,
+              label: `${areaData.range_start}-${areaData.range_end} ${areaData.name}`,
             },
           ]);
           break;
+        }
 
         case 'category': {
           if (!data) return; // Guard against null data
+          const categoryData = data as Category;
           setCurrentView('category');
-          setSelectedCategory(data);
+          setSelectedCategory(categoryData);
           setSelectedFolder(null);
           // Find area for breadcrumb
-          const area = areas.find((a) => a.id === data.area_id);
+          const area = areas.find((a) => a.id === categoryData.area_id);
           setBreadcrumbPath([
             {
               type: 'area',
@@ -81,8 +130,8 @@ export function useNavigation({ areas, setFolders, setCategories, setItems, clea
             },
             {
               type: 'category',
-              data,
-              label: `${data.number?.toString().padStart(2, '0') ?? '??'} ${data.name ?? ''}`,
+              data: categoryData,
+              label: `${categoryData.number?.toString().padStart(2, '0') ?? '??'} ${categoryData.name ?? ''}`,
             },
           ]);
           break;
@@ -90,13 +139,13 @@ export function useNavigation({ areas, setFolders, setCategories, setItems, clea
 
         case 'folder': {
           if (!data) return; // Guard against null data
+          const folderData = data as Folder;
           setCurrentView('folder');
-          setSelectedFolder(data);
+          setSelectedFolder(folderData);
           // Refresh items for this folder
-          setItems(getItems(data.id));
+          setItems(getItems(folderData.id) as Item[]);
           // Build full breadcrumb using fresh categories data
-          const folder = data;
-          const cat = freshCategories.find((c) => c.id === folder.category_id);
+          const cat = freshCategories.find((c) => c.id === folderData.category_id);
           const ar = areas.find((a) => a.id === cat?.area_id);
           setBreadcrumbPath([
             {
@@ -111,8 +160,8 @@ export function useNavigation({ areas, setFolders, setCategories, setItems, clea
             },
             {
               type: 'folder',
-              data: folder,
-              label: `${folder.folder_number ?? ''} ${folder.name ?? ''}`,
+              data: folderData,
+              label: `${folderData.folder_number ?? ''} ${folderData.name ?? ''}`,
             },
           ]);
           break;

@@ -29,6 +29,124 @@ import {
   getCategories,
   getAreas,
 } from '../db.js';
+import type {
+  OrganizationRule,
+  Folder,
+  Category,
+  Area,
+  RuleType,
+  TargetType,
+  ConfidenceLevel,
+} from '../types/index.js';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/**
+ * File info input for matching.
+ */
+export interface FileInfo {
+  filename: string;
+  path?: string;
+  file_extension?: string;
+  file_type?: string;
+}
+
+/**
+ * Extended folder with hierarchy context.
+ */
+export interface FolderWithContext extends Folder {
+  category?: Category;
+  area?: Area | null;
+  fullPath: string;
+}
+
+/**
+ * Match result from a rule.
+ */
+export interface RuleMatch {
+  confidence: ConfidenceLevel;
+  reason: string;
+}
+
+/**
+ * Suggestion for file organization.
+ */
+export interface FileSuggestion {
+  folder: FolderWithContext;
+  rule: OrganizationRule | null;
+  confidence: ConfidenceLevel;
+  reason: string;
+}
+
+/**
+ * Batch match result.
+ */
+export interface BatchMatchResult {
+  file: FileInfo;
+  suggestions: FileSuggestion[];
+}
+
+/**
+ * Date extraction result.
+ */
+export interface DateExtractionResult {
+  match: string;
+  format: string;
+  confidence: string;
+  groups: string[];
+}
+
+/**
+ * Extension suggestion info.
+ */
+interface ExtensionInfo {
+  type: string;
+  keywords: string[];
+}
+
+/**
+ * Date pattern configuration.
+ */
+interface DatePattern {
+  regex: RegExp;
+  format: string;
+  confidence: string;
+}
+
+/**
+ * Rule suggestion for a folder.
+ */
+export interface RuleSuggestion {
+  type: 'extension' | 'keyword';
+  pattern: string;
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+/**
+ * Date match criteria.
+ */
+export interface DateMatchCriteria {
+  year?: string;
+  month?: string;
+  quarter?: string;
+  any?: boolean;
+}
+
+/**
+ * Rule creation data.
+ */
+export interface RuleCreateData {
+  name: string;
+  rule_type: RuleType;
+  pattern: string;
+  target_type: TargetType;
+  target_id: string;
+  priority: number;
+  exclude_pattern?: string | null;
+}
 
 // =============================================================================
 // Constants
@@ -38,17 +156,17 @@ import {
  * Confidence levels for suggestions.
  */
 export const CONFIDENCE = {
-  HIGH: 'high', // Strong match (exact extension, keyword in filename)
-  MEDIUM: 'medium', // Partial match (keyword in path, similar extension)
-  LOW: 'low', // Weak match (regex, heuristic)
-  NONE: 'none', // No match found
-};
+  HIGH: 'high' as ConfidenceLevel,
+  MEDIUM: 'medium' as ConfidenceLevel,
+  LOW: 'low' as ConfidenceLevel,
+  NONE: 'none' as ConfidenceLevel,
+} as const;
 
 /**
  * Default extension-to-folder mappings.
  * These serve as fallback suggestions when no custom rules match.
  */
-const DEFAULT_EXTENSION_SUGGESTIONS = {
+const DEFAULT_EXTENSION_SUGGESTIONS: Record<string, ExtensionInfo> = {
   // Documents
   pdf: { type: 'document', keywords: ['document', 'reference', 'manual'] },
   doc: { type: 'document', keywords: ['document', 'word'] },
@@ -83,8 +201,9 @@ const DEFAULT_EXTENSION_SUGGESTIONS = {
 
 /**
  * Common keywords that might indicate folder destinations.
+ * Exported for potential future use in keyword-based matching enhancements.
  */
-const _KEYWORD_INDICATORS = {
+export const KEYWORD_INDICATORS: Record<string, string[]> = {
   // Finance
   invoice: ['finance', 'invoice', 'billing'],
   receipt: ['finance', 'receipt', 'expense'],
@@ -117,7 +236,7 @@ const _KEYWORD_INDICATORS = {
  * Common date patterns in filenames.
  * Used for automatic date-based organization.
  */
-const DATE_PATTERNS = [
+const DATE_PATTERNS: DatePattern[] = [
   // ISO format: 2024-01-15, 2024-01-15T10:30
   { regex: /(\d{4})-(\d{2})-(\d{2})/, format: 'YYYY-MM-DD', confidence: 'high' },
   // US format: 01-15-2024, 01/15/2024
@@ -143,10 +262,8 @@ const DATE_PATTERNS = [
 
 /**
  * Extracts date information from a filename.
- * @param {string} filename - The filename to analyze
- * @returns {Object|null} Date info or null if no date found
  */
-export function extractDateFromFilename(filename) {
+export function extractDateFromFilename(filename: string): DateExtractionResult | null {
   for (const pattern of DATE_PATTERNS) {
     const match = filename.match(pattern.regex);
     if (match) {
@@ -154,7 +271,7 @@ export function extractDateFromFilename(filename) {
         match: match[0],
         format: pattern.format,
         confidence: pattern.confidence,
-        groups: match.slice(1),
+        groups: match.slice(1).filter((g) => g !== undefined),
       };
     }
   }
@@ -168,7 +285,7 @@ export function extractDateFromFilename(filename) {
 /**
  * Safely executes a regex with timeout protection.
  */
-function safeRegexTest(pattern, text, timeoutMs = 100) {
+function safeRegexTest(pattern: string, text: string, timeoutMs: number = 100): boolean {
   try {
     const regex = new RegExp(pattern, 'i');
     const start = Date.now();
@@ -185,7 +302,7 @@ function safeRegexTest(pattern, text, timeoutMs = 100) {
 /**
  * Extracts keywords from a filename.
  */
-function extractKeywords(filename) {
+function extractKeywords(filename: string): string[] {
   // Remove extension
   const nameWithoutExt = filename.replace(/\.[^.]+$/, '');
 
@@ -201,7 +318,7 @@ function extractKeywords(filename) {
 /**
  * Calculates similarity score between two strings (0-1).
  */
-function stringSimilarity(str1, str2) {
+function stringSimilarity(str1: string, str2: string): number {
   const s1 = str1.toLowerCase();
   const s2 = str2.toLowerCase();
 
@@ -225,54 +342,52 @@ function stringSimilarity(str1, str2) {
  * Main matching engine for suggesting file destinations.
  */
 export class MatchingEngine {
-  constructor() {
-    this.rulesCache = null;
-    this.foldersCache = null;
-    this.categoriesCache = null;
-    this.areasCache = null;
-    this.lastCacheRefresh = 0;
-    this.cacheLifetime = 30000; // 30 seconds
-  }
+  private rulesCache: OrganizationRule[] | null = null;
+  private foldersCache: Folder[] | null = null;
+  private categoriesCache: Category[] | null = null;
+  private areasCache: Area[] | null = null;
+  private lastCacheRefresh: number = 0;
+  private cacheLifetime: number = 30000; // 30 seconds
 
   /**
    * Refreshes the rules and folder cache.
    */
-  refreshCache() {
+  refreshCache(): void {
     const now = Date.now();
     if (now - this.lastCacheRefresh < this.cacheLifetime && this.rulesCache) {
       return;
     }
 
-    this.rulesCache = getOrganizationRules({ activeOnly: true });
-    this.foldersCache = getFolders();
-    this.categoriesCache = getCategories();
-    this.areasCache = getAreas();
+    this.rulesCache = getOrganizationRules({ activeOnly: true }) as OrganizationRule[];
+    this.foldersCache = getFolders() as Folder[];
+    this.categoriesCache = getCategories() as Category[];
+    this.areasCache = getAreas() as Area[];
     this.lastCacheRefresh = now;
   }
 
   /**
    * Forces a cache refresh on next operation.
    */
-  invalidateCache() {
+  invalidateCache(): void {
     this.lastCacheRefresh = 0;
   }
 
   /**
    * Gets all active rules, sorted by priority.
    */
-  getRules() {
+  getRules(): OrganizationRule[] {
     this.refreshCache();
-    return [...this.rulesCache].sort((a, b) => b.priority - a.priority);
+    return [...(this.rulesCache || [])].sort((a, b) => b.priority - a.priority);
   }
 
   /**
    * Gets all folders with their full hierarchy info.
    */
-  getFoldersWithContext() {
+  getFoldersWithContext(): FolderWithContext[] {
     this.refreshCache();
-    return this.foldersCache.map((folder) => {
-      const category = this.categoriesCache.find((c) => c.id === folder.category_id);
-      const area = category ? this.areasCache.find((a) => a.id === category.area_id) : null;
+    return (this.foldersCache || []).map((folder) => {
+      const category = this.categoriesCache?.find((c) => c.id === folder.category_id);
+      const area = category ? this.areasCache?.find((a) => a.id === category.area_id) : null;
 
       return {
         ...folder,
@@ -286,16 +401,9 @@ export class MatchingEngine {
 
   /**
    * Matches a file against all rules and returns suggestions.
-   *
-   * @param {Object} file - File info from scanner
-   * @param {string} file.filename - Name of the file
-   * @param {string} file.path - Full path to file
-   * @param {string} file.file_extension - File extension
-   * @param {string} file.file_type - Detected file type
-   * @returns {Array} Array of suggestions sorted by confidence
    */
-  matchFile(file) {
-    const suggestions = [];
+  matchFile(file: FileInfo): FileSuggestion[] {
+    const suggestions: FileSuggestion[] = [];
     const rules = this.getRules();
     const folders = this.getFoldersWithContext();
 
@@ -324,7 +432,7 @@ export class MatchingEngine {
 
     // Sort by confidence and priority
     return suggestions.sort((a, b) => {
-      const confOrder = { high: 3, medium: 2, low: 1, none: 0 };
+      const confOrder: Record<ConfidenceLevel, number> = { high: 3, medium: 2, low: 1, none: 0 };
       const confDiff = confOrder[b.confidence] - confOrder[a.confidence];
       if (confDiff !== 0) return confDiff;
       return (b.rule?.priority || 0) - (a.rule?.priority || 0);
@@ -333,11 +441,8 @@ export class MatchingEngine {
 
   /**
    * Checks if a file should be excluded based on rule's exclude pattern.
-   * @param {Object} rule - The rule with optional exclude_pattern
-   * @param {Object} file - The file to check
-   * @returns {boolean} True if file should be excluded
    */
-  shouldExclude(rule, file) {
+  shouldExclude(rule: OrganizationRule & { exclude_pattern?: string }, file: FileInfo): boolean {
     if (!rule.exclude_pattern) return false;
 
     const patterns = rule.exclude_pattern
@@ -371,9 +476,9 @@ export class MatchingEngine {
   /**
    * Matches a single rule against a file.
    */
-  matchRule(rule, file) {
+  matchRule(rule: OrganizationRule, file: FileInfo): RuleMatch | null {
     // Check exclusions first
-    if (this.shouldExclude(rule, file)) {
+    if (this.shouldExclude(rule as OrganizationRule & { exclude_pattern?: string }, file)) {
       return null;
     }
 
@@ -386,11 +491,14 @@ export class MatchingEngine {
         return this.matchPathRule(rule, file);
       case 'regex':
         return this.matchRegexRule(rule, file);
-      case 'compound':
-        return this.matchCompoundRule(rule, file);
-      case 'date':
-        return this.matchDateRule(rule, file);
       default:
+        // Handle additional rule types
+        if ((rule.rule_type as string) === 'compound') {
+          return this.matchCompoundRule(rule, file);
+        }
+        if ((rule.rule_type as string) === 'date') {
+          return this.matchDateRule(rule, file);
+        }
         return null;
     }
   }
@@ -398,7 +506,7 @@ export class MatchingEngine {
   /**
    * Matches extension-based rule.
    */
-  matchExtensionRule(rule, file) {
+  matchExtensionRule(rule: OrganizationRule, file: FileInfo): RuleMatch | null {
     const pattern = rule.pattern.toLowerCase().replace(/^\./, '');
     const ext = (file.file_extension || '').toLowerCase();
 
@@ -414,7 +522,7 @@ export class MatchingEngine {
   /**
    * Matches keyword-based rule.
    */
-  matchKeywordRule(rule, file) {
+  matchKeywordRule(rule: OrganizationRule, file: FileInfo): RuleMatch | null {
     const keywords = rule.pattern
       .toLowerCase()
       .split(',')
@@ -442,7 +550,7 @@ export class MatchingEngine {
   /**
    * Matches path-based rule.
    */
-  matchPathRule(rule, file) {
+  matchPathRule(rule: OrganizationRule, file: FileInfo): RuleMatch | null {
     const pattern = rule.pattern.toLowerCase();
     const path = (file.path || '').toLowerCase();
 
@@ -458,7 +566,7 @@ export class MatchingEngine {
   /**
    * Matches regex-based rule.
    */
-  matchRegexRule(rule, file) {
+  matchRegexRule(rule: OrganizationRule, file: FileInfo): RuleMatch | null {
     const testString = `${file.filename} ${file.path || ''}`;
 
     if (safeRegexTest(rule.pattern, testString)) {
@@ -474,7 +582,7 @@ export class MatchingEngine {
    * Matches compound rule (extension + keyword together).
    * Pattern format: "ext:pdf,keyword:invoice" or "ext:xlsx,keyword:budget,report"
    */
-  matchCompoundRule(rule, file) {
+  matchCompoundRule(rule: OrganizationRule, file: FileInfo): RuleMatch | null {
     const conditions = rule.pattern.split(',').map((c) => c.trim());
     let extensionMatch = false;
     let keywordMatch = false;
@@ -516,7 +624,7 @@ export class MatchingEngine {
    * Matches date-based rule.
    * Pattern format: "year:2024" or "month:01" or "quarter:Q1" or "range:2024-01,2024-03"
    */
-  matchDateRule(rule, file) {
+  matchDateRule(rule: OrganizationRule, file: FileInfo): RuleMatch | null {
     const dateInfo = extractDateFromFilename(file.filename);
     if (!dateInfo) return null;
 
@@ -566,7 +674,10 @@ export class MatchingEngine {
   /**
    * Finds the target folder for a rule.
    */
-  findTargetFolder(rule, folders) {
+  findTargetFolder(
+    rule: OrganizationRule,
+    folders: FolderWithContext[]
+  ): FolderWithContext | undefined | null {
     switch (rule.target_type) {
       case 'folder':
         return folders.find((f) => f.folder_number === rule.target_id);
@@ -576,17 +687,19 @@ export class MatchingEngine {
         const categoryFolders = folders.filter(
           (f) => f.category?.number?.toString().padStart(2, '0') === rule.target_id
         );
-        return categoryFolders[0] || null;
+        return categoryFolders[0];
       }
 
       case 'area': {
         // Find first folder in this area
-        const [start, end] = rule.target_id.split('-').map((n) => parseInt(n));
+        const parts = rule.target_id.split('-');
+        const start = parseInt(parts[0]);
+        const end = parseInt(parts[1]);
         const areaFolders = folders.filter((f) => {
           const catNum = f.category?.number || 0;
           return catNum >= start && catNum <= end;
         });
-        return areaFolders[0] || null;
+        return areaFolders[0];
       }
 
       default:
@@ -597,10 +710,9 @@ export class MatchingEngine {
   /**
    * Performs heuristic matching when no rules match.
    */
-  heuristicMatch(file, folders) {
-    const suggestions = [];
+  heuristicMatch(file: FileInfo, folders: FolderWithContext[]): FileSuggestion[] {
+    const suggestions: FileSuggestion[] = [];
     const ext = (file.file_extension || '').toLowerCase();
-    const _filename = file.filename.toLowerCase();
     const fileKeywords = extractKeywords(file.filename);
 
     // Try extension-based default suggestions
@@ -661,7 +773,7 @@ export class MatchingEngine {
     }
 
     // Deduplicate by folder
-    const seen = new Set();
+    const seen = new Set<number>();
     return suggestions.filter((s) => {
       if (seen.has(s.folder.id)) return false;
       seen.add(s.folder.id);
@@ -671,11 +783,8 @@ export class MatchingEngine {
 
   /**
    * Batch matches multiple files.
-   *
-   * @param {Array} files - Array of file objects
-   * @returns {Array} Array of { file, suggestions } objects
    */
-  batchMatch(files) {
+  batchMatch(files: FileInfo[]): BatchMatchResult[] {
     this.refreshCache();
 
     return files.map((file) => ({
@@ -687,8 +796,8 @@ export class MatchingEngine {
   /**
    * Creates a new rule and invalidates cache.
    */
-  createRule(ruleData) {
-    const result = createOrganizationRule(ruleData);
+  createRule(ruleData: RuleCreateData): number {
+    const result = createOrganizationRule(ruleData) as number;
     this.invalidateCache();
     return result;
   }
@@ -696,16 +805,15 @@ export class MatchingEngine {
   /**
    * Updates a rule and invalidates cache.
    */
-  updateRule(id, updates) {
-    const result = updateOrganizationRule(id, updates);
+  updateRule(id: number, updates: Partial<OrganizationRule>): void {
+    updateOrganizationRule(id, updates);
     this.invalidateCache();
-    return result;
   }
 
   /**
    * Records that a rule successfully matched (for analytics).
    */
-  recordMatch(ruleId) {
+  recordMatch(ruleId: number | null | undefined): void {
     if (ruleId) {
       incrementRuleMatchCount(ruleId);
     }
@@ -716,12 +824,12 @@ export class MatchingEngine {
 // Singleton Instance
 // =============================================================================
 
-let engineInstance = null;
+let engineInstance: MatchingEngine | null = null;
 
 /**
  * Gets the singleton matching engine instance.
  */
-export function getMatchingEngine() {
+export function getMatchingEngine(): MatchingEngine {
   if (!engineInstance) {
     engineInstance = new MatchingEngine();
   }
@@ -735,7 +843,11 @@ export function getMatchingEngine() {
 /**
  * Creates a simple extension rule.
  */
-export function createExtensionRule(extension, targetFolderNumber, name = null) {
+export function createExtensionRule(
+  extension: string,
+  targetFolderNumber: string,
+  name: string | null = null
+): number {
   const engine = getMatchingEngine();
   const ext = extension.replace(/^\./, '').toLowerCase();
 
@@ -753,11 +865,11 @@ export function createExtensionRule(extension, targetFolderNumber, name = null) 
  * Creates a keyword rule.
  */
 export function createKeywordRule(
-  keywords,
-  targetFolderNumber,
-  name = null,
-  excludePattern = null
-) {
+  keywords: string | string[],
+  targetFolderNumber: string,
+  name: string | null = null,
+  excludePattern: string | null = null
+): number {
   const engine = getMatchingEngine();
   const keywordList = Array.isArray(keywords) ? keywords.join(',') : keywords;
 
@@ -774,20 +886,14 @@ export function createKeywordRule(
 
 /**
  * Creates a compound rule (extension + keyword).
- *
- * @param {string} extension - File extension (e.g., 'pdf')
- * @param {string|string[]} keywords - Keywords to match
- * @param {string} targetFolderNumber - Target JD folder number
- * @param {string} name - Rule name (optional)
- * @param {string} excludePattern - Pattern to exclude (optional)
  */
 export function createCompoundRule(
-  extension,
-  keywords,
-  targetFolderNumber,
-  name = null,
-  excludePattern = null
-) {
+  extension: string,
+  keywords: string | string[],
+  targetFolderNumber: string,
+  name: string | null = null,
+  excludePattern: string | null = null
+): number {
   const engine = getMatchingEngine();
   const ext = extension.replace(/^\./, '').toLowerCase();
   const keywordList = Array.isArray(keywords) ? keywords : [keywords];
@@ -808,20 +914,17 @@ export function createCompoundRule(
 
 /**
  * Creates a date-based rule.
- *
- * @param {Object} dateMatch - Date matching criteria
- * @param {string} dateMatch.year - Match year (e.g., '2024')
- * @param {string} dateMatch.month - Match month (e.g., '01')
- * @param {string} dateMatch.quarter - Match quarter (e.g., 'Q1')
- * @param {string} targetFolderNumber - Target JD folder number
- * @param {string} name - Rule name (optional)
- * @param {string} excludePattern - Pattern to exclude (optional)
  */
-export function createDateRule(dateMatch, targetFolderNumber, name = null, excludePattern = null) {
+export function createDateRule(
+  dateMatch: DateMatchCriteria,
+  targetFolderNumber: string,
+  name: string | null = null,
+  excludePattern: string | null = null
+): number {
   const engine = getMatchingEngine();
 
   // Build date pattern
-  const patternParts = [];
+  const patternParts: string[] = [];
   if (dateMatch.year) patternParts.push(`year:${dateMatch.year}`);
   if (dateMatch.month) patternParts.push(`month:${dateMatch.month.padStart(2, '0')}`);
   if (dateMatch.quarter) patternParts.push(`quarter:${dateMatch.quarter.toUpperCase()}`);
@@ -843,11 +946,11 @@ export function createDateRule(dateMatch, targetFolderNumber, name = null, exclu
 /**
  * Suggests rules based on a folder's content.
  */
-export function suggestRulesForFolder(folder, files) {
-  const suggestions = [];
+export function suggestRulesForFolder(_folder: Folder, files: FileInfo[]): RuleSuggestion[] {
+  const suggestions: RuleSuggestion[] = [];
 
   // Count extensions
-  const extCounts = {};
+  const extCounts: Record<string, number> = {};
   for (const file of files) {
     const ext = file.file_extension?.toLowerCase();
     if (ext) {
@@ -868,7 +971,7 @@ export function suggestRulesForFolder(folder, files) {
   }
 
   // Extract common keywords from filenames
-  const keywordCounts = {};
+  const keywordCounts: Record<string, number> = {};
   for (const file of files) {
     const keywords = extractKeywords(file.filename);
     for (const kw of keywords) {
@@ -889,7 +992,7 @@ export function suggestRulesForFolder(folder, files) {
   }
 
   return suggestions.sort((a, b) => {
-    const confOrder = { high: 3, medium: 2, low: 1 };
+    const confOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
     return confOrder[b.confidence] - confOrder[a.confidence];
   });
 }

@@ -590,7 +590,7 @@ describe('cloudDriveService', () => {
         id: 'dropbox',
         name: 'Dropbox',
         base_path: '/Users/testuser/Dropbox',
-        jd_root_path: null,
+        jd_root_path: undefined,
         drive_type: 'dropbox',
         is_default: false,
       });
@@ -673,7 +673,7 @@ describe('cloudDriveService', () => {
         id: 'custom',
         name: 'Custom Drive',
         base_path: '/Users/testuser/CustomCloud',
-        jd_root_path: null,
+        jd_root_path: undefined,
         drive_type: 'generic',
         is_default: false,
       });

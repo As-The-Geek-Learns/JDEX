@@ -11,17 +11,96 @@
 import { getDB } from '../db.js';
 import { format, differenceInDays } from 'date-fns';
 
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
+
+/**
+ * sql.js Database interface (minimal subset for this service).
+ */
+interface Database {
+  exec(sql: string): QueryExecResult[];
+}
+
+/**
+ * Result from sql.js exec() method.
+ */
+interface QueryExecResult {
+  columns: string[];
+  values: unknown[][];
+}
+
+/**
+ * Daily file count entry.
+ */
+export interface DailyCount {
+  date: string;
+  count: number;
+}
+
+/**
+ * File type count entry.
+ */
+export interface FileTypeCount {
+  type: string;
+  count: number;
+}
+
+/**
+ * Top rule statistics entry.
+ */
+export interface TopRule {
+  name: string;
+  type: string;
+  matchCount: number;
+}
+
+/**
+ * Watch activity summary.
+ */
+export interface WatchActivitySummary {
+  total: number;
+  today: number;
+  folders: number;
+}
+
+/**
+ * Date range for filtering.
+ */
+export interface DateRange {
+  start: Date | null;
+  end: Date | null;
+}
+
+/**
+ * Complete dashboard statistics.
+ */
+export interface DashboardStats {
+  totalOrganized: number;
+  thisMonth: number;
+  activeRules: number;
+  topCategory: string;
+  activityByDay: DailyCount[];
+  filesByType: FileTypeCount[];
+  topRules: TopRule[];
+  watchActivity: WatchActivitySummary;
+  dateRange: DateRange;
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
 /**
  * Validate and sanitize a numeric parameter for SQL queries.
  * Prevents SQL injection by ensuring the value is a positive integer.
- *
- * @param {unknown} value - The value to validate
- * @param {number} defaultValue - Default if invalid
- * @param {number} maxValue - Maximum allowed value
- * @returns {number} Safe integer value
  */
-function validateNumericParam(value, defaultValue, maxValue = 1000) {
-  const num = parseInt(value, 10);
+function validateNumericParam(
+  value: unknown,
+  defaultValue: number,
+  maxValue: number = 1000
+): number {
+  const num = parseInt(String(value), 10);
   if (isNaN(num) || num < 1) {
     return defaultValue;
   }
@@ -30,10 +109,8 @@ function validateNumericParam(value, defaultValue, maxValue = 1000) {
 
 /**
  * Format a date for SQL queries (YYYY-MM-DD format).
- * @param {Date|null} date - Date to format
- * @returns {string|null} Formatted date string or null
  */
-function formatDateForSQL(date) {
+function formatDateForSQL(date: Date | null | undefined): string | null {
   if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
     return null;
   }
@@ -42,12 +119,12 @@ function formatDateForSQL(date) {
 
 /**
  * Build a WHERE clause fragment for date range filtering.
- * @param {Date|null} startDate - Start of range
- * @param {Date|null} endDate - End of range
- * @param {string} dateColumn - Column name to filter on
- * @returns {string} WHERE clause fragment (may be empty)
  */
-function buildDateRangeClause(startDate, endDate, dateColumn = 'organized_at') {
+function buildDateRangeClause(
+  startDate: Date | null | undefined,
+  endDate: Date | null | undefined,
+  dateColumn: string = 'organized_at'
+): string {
   const start = formatDateForSQL(startDate);
   const end = formatDateForSQL(endDate);
 
@@ -61,13 +138,38 @@ function buildDateRangeClause(startDate, endDate, dateColumn = 'organized_at') {
 }
 
 /**
- * Get total count of organized files
- * @param {Date|null} startDate - Start of date range (optional)
- * @param {Date|null} endDate - End of date range (optional)
- * @returns {number} Total files with status 'moved'
+ * Fill in missing days with 0 counts.
  */
-export function getTotalOrganizedFiles(startDate = null, endDate = null) {
-  const db = getDB();
+function fillMissingDays(data: DailyCount[], startDate: Date, endDate: Date): DailyCount[] {
+  const filledData: DailyCount[] = [];
+  const days = differenceInDays(endDate, startDate) + 1;
+
+  for (let i = 0; i < days; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const dateStr = format(d, 'yyyy-MM-dd');
+    const existing = data.find((item) => item.date === dateStr);
+    filledData.push({
+      date: dateStr,
+      count: existing ? existing.count : 0,
+    });
+  }
+
+  return filledData;
+}
+
+// ============================================
+// STATISTICS FUNCTIONS
+// ============================================
+
+/**
+ * Get total count of organized files.
+ */
+export function getTotalOrganizedFiles(
+  startDate: Date | null = null,
+  endDate: Date | null = null
+): number {
+  const db = getDB() as Database | null;
   if (!db) return 0;
 
   try {
@@ -78,7 +180,7 @@ export function getTotalOrganizedFiles(startDate = null, endDate = null) {
       WHERE status = 'moved'
       ${dateClause}
     `);
-    return result[0]?.values[0]?.[0] || 0;
+    return (result[0]?.values[0]?.[0] as number) || 0;
   } catch (error) {
     console.error('[StatisticsService] Error getting total organized files:', error);
     return 0;
@@ -86,21 +188,20 @@ export function getTotalOrganizedFiles(startDate = null, endDate = null) {
 }
 
 /**
- * Get count of files organized this month
- * @returns {number} Files organized in current month
+ * Get count of files organized this month.
  */
-export function getFilesOrganizedThisMonth() {
-  const db = getDB();
+export function getFilesOrganizedThisMonth(): number {
+  const db = getDB() as Database | null;
   if (!db) return 0;
 
   try {
     const result = db.exec(`
-      SELECT COUNT(*) as count 
-      FROM organized_files 
-      WHERE status = 'moved' 
+      SELECT COUNT(*) as count
+      FROM organized_files
+      WHERE status = 'moved'
       AND organized_at >= date('now', 'start of month')
     `);
-    return result[0]?.values[0]?.[0] || 0;
+    return (result[0]?.values[0]?.[0] as number) || 0;
   } catch (error) {
     console.error('[StatisticsService] Error getting files this month:', error);
     return 0;
@@ -108,20 +209,19 @@ export function getFilesOrganizedThisMonth() {
 }
 
 /**
- * Get count of active organization rules
- * @returns {number} Active rules count
+ * Get count of active organization rules.
  */
-export function getActiveRulesCount() {
-  const db = getDB();
+export function getActiveRulesCount(): number {
+  const db = getDB() as Database | null;
   if (!db) return 0;
 
   try {
     const result = db.exec(`
-      SELECT COUNT(*) as count 
-      FROM organization_rules 
+      SELECT COUNT(*) as count
+      FROM organization_rules
       WHERE is_active = 1
     `);
-    return result[0]?.values[0]?.[0] || 0;
+    return (result[0]?.values[0]?.[0] as number) || 0;
   } catch (error) {
     console.error('[StatisticsService] Error getting active rules count:', error);
     return 0;
@@ -129,13 +229,13 @@ export function getActiveRulesCount() {
 }
 
 /**
- * Get files organized by day for a date range
- * @param {Date|null} startDate - Start of date range
- * @param {Date|null} endDate - End of date range
- * @returns {Array<{date: string, count: number}>} Daily counts
+ * Get files organized by day for a date range.
  */
-export function getFilesOrganizedByDay(startDate = null, endDate = null) {
-  const db = getDB();
+export function getFilesOrganizedByDay(
+  startDate: Date | null = null,
+  endDate: Date | null = null
+): DailyCount[] {
+  const db = getDB() as Database | null;
   if (!db) return [];
 
   // Default to last 30 days if no range specified
@@ -159,9 +259,9 @@ export function getFilesOrganizedByDay(startDate = null, endDate = null) {
     }
 
     // Convert to array of objects
-    const data = result[0].values.map((row) => ({
-      date: row[0],
-      count: row[1],
+    const data: DailyCount[] = result[0].values.map((row) => ({
+      date: row[0] as string,
+      count: row[1] as number,
     }));
 
     // Fill in missing days with 0
@@ -173,39 +273,14 @@ export function getFilesOrganizedByDay(startDate = null, endDate = null) {
 }
 
 /**
- * Fill in missing days with 0 counts
- * @param {Array<{date: string, count: number}>} data - Existing data
- * @param {Date} startDate - Start date
- * @param {Date} endDate - End date
- * @returns {Array<{date: string, count: number}>} Filled data
+ * Get files organized grouped by file type.
  */
-function fillMissingDays(data, startDate, endDate) {
-  const filledData = [];
-  const days = differenceInDays(endDate, startDate) + 1;
-
-  for (let i = 0; i < days; i++) {
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + i);
-    const dateStr = format(d, 'yyyy-MM-dd');
-    const existing = data.find((item) => item.date === dateStr);
-    filledData.push({
-      date: dateStr,
-      count: existing ? existing.count : 0,
-    });
-  }
-
-  return filledData;
-}
-
-/**
- * Get files organized grouped by file type
- * @param {number} limit - Maximum number of types to return (default 8)
- * @param {Date|null} startDate - Start of date range (optional)
- * @param {Date|null} endDate - End of date range (optional)
- * @returns {Array<{type: string, count: number}>} File type counts
- */
-export function getFilesByType(limit = 8, startDate = null, endDate = null) {
-  const db = getDB();
+export function getFilesByType(
+  limit: number = 8,
+  startDate: Date | null = null,
+  endDate: Date | null = null
+): FileTypeCount[] {
+  const db = getDB() as Database | null;
   if (!db) return [];
 
   // Security: Validate numeric parameter to prevent SQL injection
@@ -228,8 +303,8 @@ export function getFilesByType(limit = 8, startDate = null, endDate = null) {
     if (!result[0]) return [];
 
     return result[0].values.map((row) => ({
-      type: row[0] || 'Unknown',
-      count: row[1],
+      type: (row[0] as string) || 'Unknown',
+      count: row[1] as number,
     }));
   } catch (error) {
     console.error('[StatisticsService] Error getting files by type:', error);
@@ -238,12 +313,10 @@ export function getFilesByType(limit = 8, startDate = null, endDate = null) {
 }
 
 /**
- * Get top organization rules by match count
- * @param {number} limit - Maximum number of rules to return (default 5)
- * @returns {Array<{name: string, type: string, matchCount: number}>} Top rules
+ * Get top organization rules by match count.
  */
-export function getTopRules(limit = 5) {
-  const db = getDB();
+export function getTopRules(limit: number = 5): TopRule[] {
+  const db = getDB() as Database | null;
   if (!db) return [];
 
   // Security: Validate numeric parameter to prevent SQL injection
@@ -251,8 +324,8 @@ export function getTopRules(limit = 5) {
 
   try {
     const result = db.exec(`
-      SELECT name, rule_type, match_count 
-      FROM organization_rules 
+      SELECT name, rule_type, match_count
+      FROM organization_rules
       WHERE is_active = 1 AND match_count > 0
       ORDER BY match_count DESC
       LIMIT ${safeLimit}
@@ -261,9 +334,9 @@ export function getTopRules(limit = 5) {
     if (!result[0]) return [];
 
     return result[0].values.map((row) => ({
-      name: row[0],
-      type: row[1],
-      matchCount: row[2],
+      name: row[0] as string,
+      type: row[1] as string,
+      matchCount: row[2] as number,
     }));
   } catch (error) {
     console.error('[StatisticsService] Error getting top rules:', error);
@@ -272,11 +345,10 @@ export function getTopRules(limit = 5) {
 }
 
 /**
- * Get watch folder activity summary
- * @returns {Object} Watch activity stats
+ * Get watch folder activity summary.
  */
-export function getWatchActivitySummary() {
-  const db = getDB();
+export function getWatchActivitySummary(): WatchActivitySummary {
+  const db = getDB() as Database | null;
   if (!db) return { total: 0, today: 0, folders: 0 };
 
   try {
@@ -284,20 +356,20 @@ export function getWatchActivitySummary() {
     const totalResult = db.exec(`
       SELECT COUNT(*) FROM watch_activity
     `);
-    const total = totalResult[0]?.values[0]?.[0] || 0;
+    const total = (totalResult[0]?.values[0]?.[0] as number) || 0;
 
     // Today's activity
     const todayResult = db.exec(`
-      SELECT COUNT(*) FROM watch_activity 
+      SELECT COUNT(*) FROM watch_activity
       WHERE DATE(created_at) = DATE('now')
     `);
-    const today = todayResult[0]?.values[0]?.[0] || 0;
+    const today = (todayResult[0]?.values[0]?.[0] as number) || 0;
 
     // Active watch folders
     const foldersResult = db.exec(`
       SELECT COUNT(*) FROM watched_folders WHERE is_active = 1
     `);
-    const folders = foldersResult[0]?.values[0]?.[0] || 0;
+    const folders = (foldersResult[0]?.values[0]?.[0] as number) || 0;
 
     return { total, today, folders };
   } catch (error) {
@@ -307,13 +379,13 @@ export function getWatchActivitySummary() {
 }
 
 /**
- * Get the most common file category (based on JD folder destinations)
- * @param {Date|null} startDate - Start of date range (optional)
- * @param {Date|null} endDate - End of date range (optional)
- * @returns {string} Most common category name or "None"
+ * Get the most common file category (based on JD folder destinations).
  */
-export function getMostCommonCategory(startDate = null, endDate = null) {
-  const db = getDB();
+export function getMostCommonCategory(
+  startDate: Date | null = null,
+  endDate: Date | null = null
+): string {
+  const db = getDB() as Database | null;
   if (!db) return 'None';
 
   try {
@@ -342,7 +414,7 @@ export function getMostCommonCategory(startDate = null, endDate = null) {
       SELECT name FROM categories WHERE number = ${safeCategoryNum}
     `);
 
-    return catResult[0]?.values[0]?.[0] || `Category ${safeCategoryNum}`;
+    return (catResult[0]?.values[0]?.[0] as string) || `Category ${safeCategoryNum}`;
   } catch (error) {
     console.error('[StatisticsService] Error getting most common category:', error);
     return 'None';
@@ -350,12 +422,12 @@ export function getMostCommonCategory(startDate = null, endDate = null) {
 }
 
 /**
- * Get all dashboard statistics in a single call
- * @param {Date|null} startDate - Start of date range (optional)
- * @param {Date|null} endDate - End of date range (optional)
- * @returns {Object} Complete dashboard statistics
+ * Get all dashboard statistics in a single call.
  */
-export function getDashboardStats(startDate = null, endDate = null) {
+export function getDashboardStats(
+  startDate: Date | null = null,
+  endDate: Date | null = null
+): DashboardStats {
   return {
     totalOrganized: getTotalOrganizedFiles(startDate, endDate),
     thisMonth: getFilesOrganizedThisMonth(),
@@ -370,10 +442,9 @@ export function getDashboardStats(startDate = null, endDate = null) {
 }
 
 /**
- * Check if there's any statistics data to display
- * @returns {boolean} True if there's data
+ * Check if there's any statistics data to display.
  */
-export function hasStatisticsData() {
+export function hasStatisticsData(): boolean {
   const total = getTotalOrganizedFiles();
   const rules = getActiveRulesCount();
   return total > 0 || rules > 0;

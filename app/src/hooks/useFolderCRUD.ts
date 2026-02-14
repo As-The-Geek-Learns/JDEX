@@ -1,6 +1,79 @@
 import { useState, useCallback } from 'react';
 import { createFolder, updateFolder, deleteFolder, getFolder } from '../db.js';
 import { useUndo, ACTION_TYPES, ENTITY_TYPES } from '../context/UndoContext.jsx';
+import type { Folder, Category } from '../types/index.js';
+import type { ViewType } from './useNavigation.js';
+
+// Type for undo actions (UndoContext.jsx is not typed)
+interface UndoAction {
+  type: string;
+  entityType: string;
+  entityId: number;
+  entityData?: Record<string, unknown>;
+  previousState?: Folder | null;
+  newState?: Record<string, unknown>;
+  deletedEntity?: Folder | null;
+  description: string;
+}
+
+interface UseUndoReturn {
+  pushAction: (action: UndoAction) => void;
+}
+
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
+
+/**
+ * Folder data for creating a new folder.
+ */
+export interface CreateFolderData {
+  folder_number: string;
+  name: string;
+  category_id: number;
+  sequence: number;
+  description?: string;
+  sensitivity?: string;
+  location?: string;
+  storage_path?: string;
+  keywords?: string;
+  notes?: string;
+}
+
+/**
+ * Folder data for updating an existing folder.
+ */
+export interface UpdateFolderData extends Partial<CreateFolderData> {
+  id: number;
+}
+
+/**
+ * Options for the useFolderCRUD hook.
+ */
+export interface UseFolderCRUDOptions {
+  triggerRefresh: () => void;
+  selectedFolder: Folder | null;
+  selectedCategory: Category | null;
+  navigateTo: (type: ViewType, data?: Category | null) => void;
+}
+
+/**
+ * Return type for the useFolderCRUD hook.
+ */
+export interface UseFolderCRUDReturn {
+  // State
+  editingFolder: Folder | null;
+  setEditingFolder: (folder: Folder | null) => void;
+
+  // Actions
+  handleCreateFolder: (folderData: CreateFolderData) => void;
+  handleUpdateFolder: (folderData: UpdateFolderData) => void;
+  handleDeleteFolder: (folder: Folder) => void;
+}
+
+// ============================================
+// HOOK IMPLEMENTATION
+// ============================================
 
 /**
  * useFolderCRUD - Manages folder CRUD operations and editing state
@@ -10,28 +83,25 @@ import { useUndo, ACTION_TYPES, ENTITY_TYPES } from '../context/UndoContext.jsx'
  *
  * WHY: Extracted from App.jsx to separate folder mutation concerns.
  *      Handlers are memoized with useCallback for performance.
- *
- * @param {Object} options - Configuration options
- * @param {Function} options.triggerRefresh - Function to refresh app data after mutations
- * @param {Object|null} options.selectedFolder - Currently selected folder
- * @param {Object|null} options.selectedCategory - Currently selected category
- * @param {Function} options.navigateTo - Navigation function for post-delete redirect
- * @returns {Object} Folder CRUD handlers and editing state
  */
-export function useFolderCRUD({ triggerRefresh, selectedFolder, selectedCategory, navigateTo }) {
+export function useFolderCRUD({
+  triggerRefresh,
+  selectedFolder,
+  selectedCategory,
+  navigateTo,
+}: UseFolderCRUDOptions): UseFolderCRUDReturn {
   // Editing state
-  const [editingFolder, setEditingFolder] = useState(null);
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
 
-  // Undo context
-  const { pushAction } = useUndo();
+  // Undo context (cast since UndoContext.jsx is not typed)
+  const { pushAction } = useUndo() as UseUndoReturn;
 
   /**
    * Create a new folder
-   * @param {Object} folderData - Folder data to create
    */
   const handleCreateFolder = useCallback(
-    (folderData) => {
-      const newId = createFolder(folderData);
+    (folderData: CreateFolderData) => {
+      const newId = createFolder(folderData) as number;
 
       // Push to undo stack
       pushAction({
@@ -49,12 +119,11 @@ export function useFolderCRUD({ triggerRefresh, selectedFolder, selectedCategory
 
   /**
    * Update an existing folder
-   * @param {Object} folderData - Folder data with id
    */
   const handleUpdateFolder = useCallback(
-    (folderData) => {
+    (folderData: UpdateFolderData) => {
       // Capture before state for undo
-      const beforeState = getFolder(folderData.id);
+      const beforeState = getFolder(folderData.id) as Folder | null;
 
       updateFolder(folderData.id, folderData);
 
@@ -76,14 +145,13 @@ export function useFolderCRUD({ triggerRefresh, selectedFolder, selectedCategory
   /**
    * Delete a folder with confirmation
    * If the deleted folder is currently selected, navigates back to category view
-   * @param {Object} folder - Folder to delete
    */
   const handleDeleteFolder = useCallback(
-    (folder) => {
+    (folder: Folder) => {
       if (confirm(`Delete folder "${folder.folder_number} ${folder.name}"?`)) {
         try {
           // Capture full state before delete for undo
-          const fullFolder = getFolder(folder.id);
+          const fullFolder = getFolder(folder.id) as Folder | null;
 
           deleteFolder(folder.id);
 
@@ -101,7 +169,7 @@ export function useFolderCRUD({ triggerRefresh, selectedFolder, selectedCategory
             navigateTo('category', selectedCategory);
           }
         } catch (e) {
-          alert(e.message);
+          alert((e as Error).message);
         }
       }
     },

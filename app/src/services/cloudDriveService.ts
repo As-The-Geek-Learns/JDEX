@@ -21,6 +21,81 @@ import {
   getDefaultCloudDrive,
   setDefaultCloudDrive,
 } from '../db.js';
+import type { CloudDrive, DriveType } from '../types/index.js';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/**
+ * Operating system platform.
+ */
+export type Platform = 'macos' | 'windows' | 'linux' | 'unknown';
+
+/**
+ * Known platform keys (excludes 'unknown').
+ */
+export type KnownPlatform = Exclude<Platform, 'unknown'>;
+
+/**
+ * Platform-specific paths.
+ */
+export interface PlatformPaths {
+  macos?: string;
+  windows?: string;
+  linux?: string;
+}
+
+/**
+ * Configuration for a known cloud drive.
+ */
+export interface KnownDriveConfig {
+  id: string;
+  name: string;
+  drive_type: DriveType | 'google';
+  paths: PlatformPaths;
+  alternatePaths?: PlatformPaths;
+  description: string;
+  supportsEncryption: boolean;
+  isWildcard?: boolean;
+}
+
+/**
+ * Detected drive with resolved path.
+ */
+export interface DetectedDrive extends KnownDriveConfig {
+  detectedPath: string;
+  allMatches?: string[];
+}
+
+/**
+ * Results from drive detection and comparison.
+ */
+export interface DriveDetectionResults {
+  detected: DetectedDrive[];
+  configured: (DetectedDrive | CloudDrive)[];
+  missing: CloudDrive[];
+  available: (DetectedDrive | CloudDrive)[];
+}
+
+/**
+ * Options for configuring a detected drive.
+ */
+export interface ConfigureDriveOptions {
+  jdRootPath?: string;
+  isDefault?: boolean;
+}
+
+/**
+ * Custom drive configuration.
+ */
+export interface CustomDriveConfig {
+  id: string;
+  name: string;
+  path: string;
+  jdRootPath?: string;
+  isDefault?: boolean;
+}
 
 // =============================================================================
 // Platform Detection
@@ -28,9 +103,8 @@ import {
 
 /**
  * Detect the current operating system.
- * @returns {'macos'|'windows'|'linux'|'unknown'}
  */
-export function getPlatform() {
+export function getPlatform(): Platform {
   // In Electron renderer, we can use navigator.platform
   // In Node.js context, use process.platform
   if (typeof process !== 'undefined' && process.platform) {
@@ -59,9 +133,8 @@ export function getPlatform() {
 
 /**
  * Get the user's home directory path.
- * @returns {string}
  */
-export function getHomeDirectory() {
+export function getHomeDirectory(): string {
   // In Electron/Node.js
   if (typeof process !== 'undefined') {
     return process.env.HOME || process.env.USERPROFILE || '';
@@ -71,15 +144,16 @@ export function getHomeDirectory() {
 
 /**
  * Expand path variables like ~ and %USERPROFILE%.
- * @param {string} path - Path with potential variables
- * @returns {string} Expanded path
+ *
+ * @param path - Path with potential variables
+ * @returns Expanded path
  */
-export function expandPath(path) {
+export function expandPath(path: string): string {
   if (!path) return '';
 
   const home = getHomeDirectory();
 
-  let expanded = path
+  const expanded = path
     // Unix home shortcut
     .replace(/^~/, home)
     // Windows environment variables
@@ -97,7 +171,7 @@ export function expandPath(path) {
  * Known cloud drive paths by platform.
  * These are the default installation locations for each cloud service.
  */
-export const KNOWN_DRIVES = {
+export const KNOWN_DRIVES: Record<string, KnownDriveConfig> = {
   icloud: {
     id: 'icloud',
     name: 'iCloud Drive',
@@ -193,17 +267,50 @@ export const KNOWN_DRIVES = {
 // File System Helpers (Electron/Node.js)
 // =============================================================================
 
+// Type definitions for Node.js modules used via window.require
+interface NodeStats {
+  isDirectory(): boolean;
+}
+
+interface NodeDirent {
+  name: string;
+  isDirectory(): boolean;
+}
+
+interface NodeFsPromises {
+  stat(path: string): Promise<NodeStats>;
+  readdir(path: string, options: { withFileTypes: true }): Promise<NodeDirent[]>;
+}
+
+interface NodePath {
+  dirname(path: string): string;
+  basename(path: string): string;
+  join(...paths: string[]): string;
+}
+
+interface NodeError extends Error {
+  code?: string;
+}
+
+// Extend Window for Electron's require
+declare global {
+  interface Window {
+    require?: (module: string) => unknown;
+  }
+}
+
 /**
  * Check if a directory exists.
  * Uses Electron's Node.js integration.
  *
- * @param {string} dirPath - Path to check
- * @returns {Promise<boolean>} True if directory exists
+ * @param dirPath - Path to check
+ * @returns True if directory exists
  */
-export async function directoryExists(dirPath) {
+export async function directoryExists(dirPath: string): Promise<boolean> {
   try {
     // In Electron, we have access to Node.js fs module
-    const fs = window.require ? window.require('fs').promises : null;
+    const fsModule = window.require ? window.require('fs') : null;
+    const fs = fsModule ? (fsModule as { promises: NodeFsPromises }).promises : null;
 
     if (!fs) {
       console.warn('[CloudDrive] fs module not available - running in browser mode');
@@ -214,12 +321,13 @@ export async function directoryExists(dirPath) {
     const stats = await fs.stat(expanded);
     return stats.isDirectory();
   } catch (error) {
+    const nodeError = error as NodeError;
     // ENOENT = doesn't exist, which is fine
-    if (error.code === 'ENOENT') {
+    if (nodeError.code === 'ENOENT') {
       return false;
     }
     // Other errors (permission, etc.) - log but return false
-    console.warn(`[CloudDrive] Error checking ${dirPath}:`, error.message);
+    console.warn(`[CloudDrive] Error checking ${dirPath}:`, nodeError.message);
     return false;
   }
 }
@@ -227,13 +335,16 @@ export async function directoryExists(dirPath) {
 /**
  * List directories matching a pattern (for wildcard paths).
  *
- * @param {string} pattern - Path pattern with * wildcard
- * @returns {Promise<string[]>} Array of matching directory paths
+ * @param pattern - Path pattern with * wildcard
+ * @returns Array of matching directory paths
  */
-export async function findMatchingDirectories(pattern) {
+export async function findMatchingDirectories(pattern: string): Promise<string[]> {
   try {
-    const fs = window.require ? window.require('fs').promises : null;
-    const path = window.require ? window.require('path') : null;
+    const fsModule = window.require ? window.require('fs') : null;
+    const pathModule = window.require ? window.require('path') : null;
+
+    const fs = fsModule ? (fsModule as { promises: NodeFsPromises }).promises : null;
+    const path = pathModule as NodePath | null;
 
     if (!fs || !path) {
       return [];
@@ -253,7 +364,8 @@ export async function findMatchingDirectories(pattern) {
 
     return matches;
   } catch (error) {
-    console.warn(`[CloudDrive] Error finding matches for ${pattern}:`, error.message);
+    const nodeError = error as NodeError;
+    console.warn(`[CloudDrive] Error finding matches for ${pattern}:`, nodeError.message);
     return [];
   }
 }
@@ -265,16 +377,22 @@ export async function findMatchingDirectories(pattern) {
 /**
  * Detect a single known cloud drive.
  *
- * @param {string} driveKey - Key from KNOWN_DRIVES (e.g., 'icloud', 'dropbox')
- * @returns {Promise<Object|null>} Detected drive info or null
+ * @param driveKey - Key from KNOWN_DRIVES (e.g., 'icloud', 'dropbox')
+ * @returns Detected drive info or null
  */
-export async function detectDrive(driveKey) {
+export async function detectDrive(driveKey: string): Promise<DetectedDrive | null> {
   const driveConfig = KNOWN_DRIVES[driveKey];
   if (!driveConfig) {
     return null;
   }
 
   const platform = getPlatform();
+
+  // Handle unknown platform - can't detect drives
+  if (platform === 'unknown') {
+    return null;
+  }
+
   const primaryPath = driveConfig.paths[platform];
   const alternatePath = driveConfig.alternatePaths?.[platform];
 
@@ -328,10 +446,10 @@ export async function detectDrive(driveKey) {
 /**
  * Detect all installed cloud drives on the system.
  *
- * @returns {Promise<Array>} Array of detected drive objects
+ * @returns Array of detected drive objects
  */
-export async function detectAllDrives() {
-  const detected = [];
+export async function detectAllDrives(): Promise<DetectedDrive[]> {
+  const detected: DetectedDrive[] = [];
 
   for (const driveKey of Object.keys(KNOWN_DRIVES)) {
     try {
@@ -340,7 +458,8 @@ export async function detectAllDrives() {
         detected.push(drive);
       }
     } catch (error) {
-      console.warn(`[CloudDrive] Error detecting ${driveKey}:`, error.message);
+      const err = error as Error;
+      console.warn(`[CloudDrive] Error detecting ${driveKey}:`, err.message);
     }
   }
 
@@ -351,13 +470,13 @@ export async function detectAllDrives() {
  * Detect drives and compare with configured drives.
  * Returns status of each drive (detected, configured, missing, etc.)
  *
- * @returns {Promise<Object>} Detection results with status
+ * @returns Detection results with status
  */
-export async function detectAndCompare() {
+export async function detectAndCompare(): Promise<DriveDetectionResults> {
   const detected = await detectAllDrives();
-  const configured = getCloudDrives();
+  const configured = getCloudDrives() as CloudDrive[];
 
-  const results = {
+  const results: DriveDetectionResults = {
     detected: [], // Drives found on system but not configured
     configured: [], // Drives configured and present
     missing: [], // Drives configured but not found
@@ -402,21 +521,22 @@ export async function detectAndCompare() {
 /**
  * Add a detected drive to the configuration.
  *
- * @param {Object} detectedDrive - Drive from detectDrive()
- * @param {Object} options - Additional options
- * @param {string} [options.jdRootPath] - Path to JD folder within drive
- * @param {boolean} [options.isDefault] - Set as default drive
- * @returns {string} The created drive ID
+ * @param detectedDrive - Drive from detectDrive()
+ * @param options - Additional options
+ * @returns The created drive ID
  */
-export function configureDetectedDrive(detectedDrive, options = {}) {
+export function configureDetectedDrive(
+  detectedDrive: DetectedDrive,
+  options: ConfigureDriveOptions = {}
+): string {
   const { jdRootPath, isDefault = false } = options;
 
   return createCloudDrive({
     id: detectedDrive.id,
     name: detectedDrive.name,
     base_path: detectedDrive.detectedPath,
-    jd_root_path: jdRootPath || null,
-    drive_type: detectedDrive.drive_type,
+    jd_root_path: jdRootPath,
+    drive_type: detectedDrive.drive_type as DriveType,
     is_default: isDefault,
   });
 }
@@ -424,15 +544,10 @@ export function configureDetectedDrive(detectedDrive, options = {}) {
 /**
  * Add a custom cloud drive location.
  *
- * @param {Object} drive - Drive configuration
- * @param {string} drive.id - Unique ID for the drive
- * @param {string} drive.name - Display name
- * @param {string} drive.path - Path to the drive
- * @param {string} [drive.jdRootPath] - Path to JD folder
- * @param {boolean} [drive.isDefault] - Set as default
- * @returns {string} The created drive ID
+ * @param drive - Drive configuration
+ * @returns The created drive ID
  */
-export async function addCustomDrive(drive) {
+export async function addCustomDrive(drive: CustomDriveConfig): Promise<string> {
   // Validate the path exists
   const exists = await directoryExists(drive.path);
   if (!exists) {
@@ -444,10 +559,10 @@ export async function addCustomDrive(drive) {
   const expandedBasePath = expandPath(drive.path);
 
   // Security: Validate jdRootPath if provided
-  let validatedJdRootPath = null;
+  let validatedJdRootPath: string | undefined;
   if (drive.jdRootPath) {
     // Sanitize and validate the jdRootPath
-    validateFilePath(drive.jdRootPath, { allowHome: true, allowRelative: true });
+    validateFilePath(drive.jdRootPath, { allowHome: true });
 
     // Build full path and ensure it's within the base path
     const fullJdPath = drive.jdRootPath.startsWith('/')
@@ -477,17 +592,17 @@ export async function addCustomDrive(drive) {
 /**
  * Update a drive's JD root path.
  *
- * @param {string} driveId - The drive ID
- * @param {string} jdRootPath - New JD root path
+ * @param driveId - The drive ID
+ * @param jdRootPath - New JD root path
  */
-export async function setDriveJDRoot(driveId, jdRootPath) {
-  const drive = getCloudDrive(driveId);
+export async function setDriveJDRoot(driveId: string, jdRootPath: string): Promise<void> {
+  const drive = getCloudDrive(driveId) as CloudDrive | null;
   if (!drive) {
     throw new CloudDriveError(`Drive not found: ${driveId}`, driveId, 'connect');
   }
 
   // Security: Validate jdRootPath before use
-  validateFilePath(jdRootPath, { allowHome: true, allowRelative: true });
+  validateFilePath(jdRootPath, { allowHome: true });
 
   // Build full path and verify it exists
   const fullPath = jdRootPath.startsWith('/') ? jdRootPath : `${drive.base_path}/${jdRootPath}`;
@@ -512,12 +627,12 @@ export async function setDriveJDRoot(driveId, jdRootPath) {
 /**
  * Get the full path to a JD folder on a drive.
  *
- * @param {string} driveId - The drive ID
- * @param {string} [folderPath] - Optional subfolder path
- * @returns {string|null} Full path or null if drive not found
+ * @param driveId - The drive ID
+ * @param folderPath - Optional subfolder path
+ * @returns Full path or null if drive not found
  */
-export function getDrivePath(driveId, folderPath = '') {
-  const drive = getCloudDrive(driveId);
+export function getDrivePath(driveId: string, folderPath: string = ''): string | null {
+  const drive = getCloudDrive(driveId) as CloudDrive | null;
   if (!drive) return null;
 
   const basePath = drive.jd_root_path

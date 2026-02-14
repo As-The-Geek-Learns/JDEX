@@ -8,14 +8,53 @@
  */
 
 import { format } from 'date-fns';
+import type {
+  DailyCount,
+  FileTypeCount,
+  TopRule,
+  WatchActivitySummary,
+} from './statisticsService.js';
+
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
+
+/**
+ * Header mapping for CSV columns.
+ */
+type HeaderMapping = Record<string, string>;
+
+/**
+ * Date range for report filtering.
+ */
+export interface ReportDateRange {
+  start?: Date | null;
+  end?: Date | null;
+}
+
+/**
+ * Dashboard statistics for export.
+ */
+export interface ExportableStats {
+  totalOrganized?: number;
+  thisMonth?: number;
+  activeRules?: number;
+  topCategory?: string;
+  activityByDay?: DailyCount[];
+  filesByType?: FileTypeCount[];
+  topRules?: TopRule[];
+  watchActivity?: WatchActivitySummary;
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
 
 /**
  * Escape a value for CSV format.
  * Handles commas, quotes, and newlines.
- * @param {string|number|null} value - Value to escape
- * @returns {string} CSV-safe string
  */
-function escapeCSV(value) {
+function escapeCSV(value: string | number | null | undefined): string {
   if (value === null || value === undefined) {
     return '';
   }
@@ -32,12 +71,12 @@ function escapeCSV(value) {
 
 /**
  * Convert an array of objects to CSV string.
- * @param {Array<Object>} data - Array of objects to convert
- * @param {Array<string>} columns - Column names (keys from objects)
- * @param {Object<string, string>} headers - Optional column name to header label mapping
- * @returns {string} CSV string
  */
-function arrayToCSV(data, columns, headers = {}) {
+function arrayToCSV<T>(
+  data: T[],
+  columns: (keyof T & string)[],
+  headers: HeaderMapping = {}
+): string {
   if (!data || data.length === 0) {
     return '';
   }
@@ -46,17 +85,21 @@ function arrayToCSV(data, columns, headers = {}) {
   const headerRow = columns.map((col) => escapeCSV(headers[col] || col)).join(',');
 
   // Data rows
-  const dataRows = data.map((row) => columns.map((col) => escapeCSV(row[col])).join(','));
+  const dataRows = data.map((row) =>
+    columns.map((col) => escapeCSV(row[col] as unknown as string | number | null)).join(',')
+  );
 
   return [headerRow, ...dataRows].join('\n');
 }
 
+// ============================================
+// EXPORT FUNCTIONS
+// ============================================
+
 /**
  * Generate CSV for daily activity data.
- * @param {Array<{date: string, count: number}>} activityByDay - Daily activity data
- * @returns {string} CSV string
  */
-export function exportActivityByDay(activityByDay) {
+export function exportActivityByDay(activityByDay: DailyCount[] | undefined): string {
   if (!activityByDay || activityByDay.length === 0) {
     return 'Date,Files Organized\n';
   }
@@ -69,10 +112,8 @@ export function exportActivityByDay(activityByDay) {
 
 /**
  * Generate CSV for file type distribution.
- * @param {Array<{type: string, count: number}>} filesByType - File type data
- * @returns {string} CSV string
  */
-export function exportFilesByType(filesByType) {
+export function exportFilesByType(filesByType: FileTypeCount[] | undefined): string {
   if (!filesByType || filesByType.length === 0) {
     return 'File Type,Count\n';
   }
@@ -85,10 +126,8 @@ export function exportFilesByType(filesByType) {
 
 /**
  * Generate CSV for top rules data.
- * @param {Array<{name: string, type: string, matchCount: number}>} topRules - Top rules data
- * @returns {string} CSV string
  */
-export function exportTopRules(topRules) {
+export function exportTopRules(topRules: TopRule[] | undefined): string {
   if (!topRules || topRules.length === 0) {
     return 'Rule Name,Rule Type,Match Count\n';
   }
@@ -103,13 +142,12 @@ export function exportTopRules(topRules) {
 /**
  * Generate a complete statistics report as CSV.
  * Combines all statistics sections into a single exportable document.
- *
- * @param {Object} stats - Dashboard statistics object
- * @param {Object} dateRange - Selected date range
- * @returns {string} Complete CSV report
  */
-export function exportFullStatisticsReport(stats, dateRange = {}) {
-  const sections = [];
+export function exportFullStatisticsReport(
+  stats: ExportableStats,
+  dateRange: ReportDateRange = {}
+): string {
+  const sections: string[] = [];
   const timestamp = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
 
   // Report header
@@ -160,10 +198,8 @@ export function exportFullStatisticsReport(stats, dateRange = {}) {
 
 /**
  * Trigger a CSV file download in the browser.
- * @param {string} csvContent - CSV content to download
- * @param {string} filename - Filename for download
  */
-export function downloadCSV(csvContent, filename = 'jdex-statistics.csv') {
+export function downloadCSV(csvContent: string, filename: string = 'jdex-statistics.csv'): void {
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
 
@@ -183,11 +219,11 @@ export function downloadCSV(csvContent, filename = 'jdex-statistics.csv') {
 /**
  * Export and download the full statistics report.
  * Convenience function that combines export and download.
- *
- * @param {Object} stats - Dashboard statistics object
- * @param {Object} dateRange - Selected date range
  */
-export function downloadStatisticsReport(stats, dateRange = {}) {
+export function downloadStatisticsReport(
+  stats: ExportableStats,
+  dateRange: ReportDateRange = {}
+): void {
   const csvContent = exportFullStatisticsReport(stats, dateRange);
   const timestamp = format(new Date(), 'yyyy-MM-dd');
   const filename = `jdex-statistics-${timestamp}.csv`;

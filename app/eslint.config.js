@@ -47,6 +47,9 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.node,
+        // Node.js TypeScript types used in Electron context
+        NodeRequire: 'readonly',
+        NodeJS: 'readonly',
       },
       parser: tsParser,
       parserOptions: {

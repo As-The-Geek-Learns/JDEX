@@ -27,6 +27,211 @@ import {
   getDefaultCloudDrive,
   getCloudDrive,
 } from '../db.js';
+import type { CloudDrive, Folder, OrganizedFile } from '../types/index.js';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/**
+ * Conflict resolution strategy.
+ */
+export type ConflictStrategy = 'rename' | 'skip' | 'overwrite';
+
+/**
+ * Operation status code.
+ */
+export type OperationStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'success'
+  | 'failed'
+  | 'skipped'
+  | 'rolled_back';
+
+/**
+ * Node.js fs module type (simplified).
+ */
+interface NodeFs {
+  existsSync(path: string): boolean;
+  statSync(path: string): { isDirectory(): boolean; size: number };
+  mkdirSync(path: string, options?: { recursive?: boolean }): void;
+  renameSync(oldPath: string, newPath: string): void;
+  copyFileSync(src: string, dest: string): void;
+  unlinkSync(path: string): void;
+  realpathSync(path: string): string;
+}
+
+/**
+ * Node.js path module type (simplified).
+ */
+interface NodePath {
+  basename(path: string, ext?: string): string;
+  extname(path: string): string;
+  dirname(path: string): string;
+  join(...paths: string[]): string;
+  resolve(...paths: string[]): string;
+}
+
+/**
+ * Node.js modules container.
+ */
+interface NodeModules {
+  fs: NodeFs;
+  path: NodePath;
+}
+
+/**
+ * Node.js error with code.
+ */
+interface NodeError extends Error {
+  code?: string;
+}
+
+/**
+ * Extended folder info from database.
+ */
+interface FolderWithInfo extends Folder {
+  area_name?: string;
+  category_name?: string;
+}
+
+/**
+ * Destination path info.
+ */
+export interface DestinationPath {
+  basePath: string;
+  folderPath: string;
+  fullPath: string;
+  folder: FolderWithInfo;
+}
+
+/**
+ * Build destination options.
+ */
+export interface BuildDestinationOptions {
+  cloudDriveId?: string | null;
+}
+
+/**
+ * Move file parameters.
+ */
+export interface MoveFileParams {
+  sourcePath: string;
+  folderNumber: string;
+  conflictStrategy?: ConflictStrategy;
+  cloudDriveId?: string | null;
+}
+
+/**
+ * Successful move result.
+ */
+export interface MoveSuccessResult {
+  status: OperationStatus;
+  sourcePath: string;
+  destinationPath: string;
+  filename?: string;
+  folderNumber?: string;
+  recordId?: number;
+  reason?: string;
+}
+
+/**
+ * Rollback success result.
+ */
+export interface RollbackSuccessResult {
+  status: OperationStatus;
+  originalPath: string;
+  fromPath: string;
+}
+
+/**
+ * Batch operation input.
+ */
+export interface BatchOperation {
+  sourcePath: string;
+  folderNumber: string;
+  conflictStrategy?: ConflictStrategy;
+  cloudDriveId?: string | null;
+}
+
+/**
+ * Progress callback info.
+ */
+export interface ProgressInfo {
+  current: number;
+  total: number;
+  percent: number;
+  currentFile?: string;
+}
+
+/**
+ * Batch operation options.
+ */
+export interface BatchMoveOptions {
+  onProgress?: (info: ProgressInfo) => void;
+  onFileComplete?: (result: BatchOperationResult) => void;
+  conflictStrategy?: ConflictStrategy;
+  stopOnError?: boolean;
+}
+
+/**
+ * Single batch operation result.
+ */
+export interface BatchOperationResult extends BatchOperation {
+  success: boolean;
+  result: MoveSuccessResult | null;
+  error: Error | null;
+}
+
+/**
+ * Batch move results summary.
+ */
+export interface BatchMoveResults {
+  total: number;
+  success: number;
+  failed: number;
+  skipped: number;
+  operations: BatchOperationResult[];
+}
+
+/**
+ * Batch rollback result item.
+ */
+export interface BatchRollbackItem {
+  recordId: number;
+  success: boolean;
+  result: RollbackSuccessResult | null;
+  error: Error | null;
+}
+
+/**
+ * Batch rollback results summary.
+ */
+export interface BatchRollbackResults {
+  total: number;
+  success: number;
+  failed: number;
+  operations: BatchRollbackItem[];
+}
+
+/**
+ * Preview operation result.
+ */
+export interface PreviewResult extends BatchOperation {
+  sourceExists: boolean;
+  destinationPath: string | null;
+  wouldConflict: boolean;
+  folder: FolderWithInfo | null;
+  error: string | null;
+}
+
+// Extend Window for Electron's require
+declare global {
+  interface Window {
+    require?: (module: string) => unknown;
+  }
+}
 
 // =============================================================================
 // Constants
@@ -36,22 +241,22 @@ import {
  * Conflict resolution strategies.
  */
 export const CONFLICT_STRATEGY = {
-  RENAME: 'rename', // Add suffix to new file (e.g., file_1.pdf)
-  SKIP: 'skip', // Don't move, leave original in place
-  OVERWRITE: 'overwrite', // Replace existing file (dangerous)
-};
+  RENAME: 'rename' as ConflictStrategy,
+  SKIP: 'skip' as ConflictStrategy,
+  OVERWRITE: 'overwrite' as ConflictStrategy,
+} as const;
 
 /**
  * Operation status codes.
  */
 export const OP_STATUS = {
-  PENDING: 'pending',
-  IN_PROGRESS: 'in_progress',
-  SUCCESS: 'success',
-  FAILED: 'failed',
-  SKIPPED: 'skipped',
-  ROLLED_BACK: 'rolled_back',
-};
+  PENDING: 'pending' as OperationStatus,
+  IN_PROGRESS: 'in_progress' as OperationStatus,
+  SUCCESS: 'success' as OperationStatus,
+  FAILED: 'failed' as OperationStatus,
+  SKIPPED: 'skipped' as OperationStatus,
+  ROLLED_BACK: 'rolled_back' as OperationStatus,
+} as const;
 
 // =============================================================================
 // File System Helpers
@@ -60,11 +265,11 @@ export const OP_STATUS = {
 /**
  * Gets Node.js fs and path modules in Electron environment.
  */
-function getNodeModules() {
+function getNodeModules(): NodeModules | null {
   if (typeof window !== 'undefined' && window.require) {
     try {
-      const fs = window.require('fs');
-      const path = window.require('path');
+      const fs = window.require('fs') as NodeFs;
+      const path = window.require('path') as NodePath;
       return { fs, path };
     } catch {
       return null;
@@ -76,14 +281,14 @@ function getNodeModules() {
 /**
  * Checks if file system access is available.
  */
-export function hasFileSystemAccess() {
+export function hasFileSystemAccess(): boolean {
   return getNodeModules() !== null;
 }
 
 /**
  * Checks if a file exists.
  */
-export function fileExists(filePath) {
+export function fileExists(filePath: string): boolean {
   const modules = getNodeModules();
   if (!modules) return false;
 
@@ -97,7 +302,7 @@ export function fileExists(filePath) {
 /**
  * Checks if a directory exists.
  */
-export function directoryExists(dirPath) {
+export function directoryExists(dirPath: string): boolean {
   const modules = getNodeModules();
   if (!modules) return false;
 
@@ -112,7 +317,7 @@ export function directoryExists(dirPath) {
 /**
  * Creates a directory recursively if it doesn't exist.
  */
-export function ensureDirectory(dirPath) {
+export function ensureDirectory(dirPath: string): boolean {
   const modules = getNodeModules();
   if (!modules) {
     throw new FileSystemError('File system not available', 'mkdir', dirPath);
@@ -124,11 +329,12 @@ export function ensureDirectory(dirPath) {
     }
     return true;
   } catch (error) {
+    const nodeError = error as NodeError;
     throw new FileSystemError(
-      `Failed to create directory: ${error.message}`,
+      `Failed to create directory: ${nodeError.message}`,
       'mkdir',
       dirPath,
-      error
+      nodeError
     );
   }
 }
@@ -137,7 +343,7 @@ export function ensureDirectory(dirPath) {
  * Generates a unique filename by adding a numeric suffix.
  * Sanitizes the filename to remove invalid characters.
  */
-export function generateUniqueFilename(dirPath, filename) {
+export function generateUniqueFilename(dirPath: string, filename: string): string {
   const modules = getNodeModules();
   if (!modules) return filename;
 
@@ -172,37 +378,41 @@ export function generateUniqueFilename(dirPath, filename) {
 /**
  * Builds the full destination path for a file based on JD folder.
  *
- * @param {string} folderNumber - JD folder number (e.g., "11.01")
- * @param {string} filename - Original filename
- * @param {Object} options - Optional configuration
- * @returns {Object} { basePath, folderPath, fullPath }
+ * @param folderNumber - JD folder number (e.g., "11.01")
+ * @param filename - Original filename
+ * @param options - Optional configuration
+ * @returns Destination path info
  */
-export function buildDestinationPath(folderNumber, filename, options = {}) {
+export function buildDestinationPath(
+  folderNumber: string,
+  filename: string,
+  options: BuildDestinationOptions = {}
+): DestinationPath {
   const modules = getNodeModules();
   if (!modules) {
     throw new FileSystemError('File system not available', 'buildPath');
   }
 
-  const { path } = modules;
+  const { path, fs } = modules;
 
   // Get folder info from database
-  const folder = getFolderByNumber(folderNumber);
+  const folder = getFolderByNumber(folderNumber) as FolderWithInfo | null;
   if (!folder) {
     throw new FileSystemError(`Folder ${folderNumber} not found`, 'buildPath');
   }
 
   // Determine base path (cloud drive or custom)
-  let basePath;
+  let basePath: string | undefined;
 
   if (options.cloudDriveId) {
-    const drive = getCloudDrive(options.cloudDriveId);
+    const drive = getCloudDrive(options.cloudDriveId) as CloudDrive | null;
     if (drive) {
       basePath = drive.jd_root_path || drive.base_path;
     }
   }
 
   if (!basePath) {
-    const defaultDrive = getDefaultCloudDrive();
+    const defaultDrive = getDefaultCloudDrive() as CloudDrive | null;
     if (defaultDrive) {
       basePath = defaultDrive.jd_root_path || defaultDrive.base_path;
     }
@@ -210,7 +420,7 @@ export function buildDestinationPath(folderNumber, filename, options = {}) {
 
   if (!basePath) {
     // Fallback to user's home directory
-    basePath = process.env.HOME || process.env.USERPROFILE;
+    basePath = process.env.HOME || process.env.USERPROFILE || '';
     basePath = path.join(basePath, 'JohnnyDecimal');
   }
 
@@ -222,7 +432,7 @@ export function buildDestinationPath(folderNumber, filename, options = {}) {
 
   // Security: Sanitize folder names to prevent path traversal
   // Remove any path separators or traversal sequences from names
-  const sanitizeFolderName = (name) => {
+  const sanitizeFolderName = (name: string | undefined): string => {
     if (!name) return '';
     return name
       .replace(/[/\\]/g, '_') // Replace path separators with underscore
@@ -248,11 +458,11 @@ export function buildDestinationPath(folderNumber, filename, options = {}) {
     validateFilePath(folderPath, { allowHome: true });
     validateFilePath(fullPath, { allowHome: true });
   } catch (error) {
-    throw new FileSystemError(`Invalid destination path: ${error.message}`, 'buildPath', fullPath);
+    const err = error as Error;
+    throw new FileSystemError(`Invalid destination path: ${err.message}`, 'buildPath', fullPath);
   }
 
   // Security: Resolve the base path to its real path (handles symlinks)
-  const { fs } = modules;
   let realBasePath = basePath;
   try {
     if (fs.existsSync(basePath)) {
@@ -283,14 +493,12 @@ export function buildDestinationPath(folderNumber, filename, options = {}) {
 /**
  * Moves a single file to its destination.
  *
- * @param {Object} params - Operation parameters
- * @param {string} params.sourcePath - Original file path
- * @param {string} params.folderNumber - Target JD folder number
- * @param {string} params.conflictStrategy - How to handle conflicts
- * @param {string} params.cloudDriveId - Optional specific cloud drive
- * @returns {Result} Operation result
+ * @param params - Operation parameters
+ * @returns Operation result
  */
-export function moveFile(params) {
+export function moveFile(
+  params: MoveFileParams
+): ReturnType<typeof Result.ok<MoveSuccessResult>> | ReturnType<typeof Result.error> {
   const {
     sourcePath,
     folderNumber,
@@ -306,19 +514,18 @@ export function moveFile(params) {
   const { fs, path } = modules;
 
   // Validate source path
-  let validatedSource;
+  let validatedSource: string;
   try {
     validatedSource = validateFilePath(sourcePath, {
       allowHome: true,
-      allowSystemPaths: false,
     });
   } catch (error) {
-    return Result.error(error);
+    return Result.error(error as Error);
   }
 
   // Check source exists
   if (!fs.existsSync(validatedSource)) {
-    const notFoundError = new Error('Source file not found');
+    const notFoundError = new Error('Source file not found') as NodeError;
     notFoundError.code = 'ENOENT';
     return Result.error(
       new FileSystemError('Source file not found', 'move', sourcePath, notFoundError)
@@ -327,19 +534,19 @@ export function moveFile(params) {
 
   // Build destination path
   const filename = path.basename(validatedSource);
-  let destination;
+  let destination: DestinationPath;
 
   try {
     destination = buildDestinationPath(folderNumber, filename, { cloudDriveId });
   } catch (error) {
-    return Result.error(error);
+    return Result.error(error as Error);
   }
 
   // Ensure destination directory exists
   try {
     ensureDirectory(destination.folderPath);
   } catch (error) {
-    return Result.error(error);
+    return Result.error(error as Error);
   }
 
   // Handle conflicts
@@ -349,7 +556,7 @@ export function moveFile(params) {
   if (fs.existsSync(finalPath)) {
     switch (conflictStrategy) {
       case CONFLICT_STRATEGY.SKIP:
-        return Result.ok({
+        return Result.ok<MoveSuccessResult>({
           status: OP_STATUS.SKIPPED,
           reason: 'File already exists at destination',
           sourcePath: validatedSource,
@@ -376,18 +583,20 @@ export function moveFile(params) {
     try {
       fs.renameSync(validatedSource, finalPath);
     } catch (renameError) {
+      const nodeError = renameError as NodeError;
       // Cross-filesystem move - copy then delete
-      if (renameError.code === 'EXDEV') {
+      if (nodeError.code === 'EXDEV') {
         try {
           fs.copyFileSync(validatedSource, finalPath);
           fs.unlinkSync(validatedSource);
         } catch (copyError) {
+          const copyNodeError = copyError as NodeError;
           // Classify copy/delete errors
           const fsError = new FileSystemError(
-            `Failed to copy file: ${copyError.message}`,
+            `Failed to copy file: ${copyNodeError.message}`,
             'move',
             sourcePath,
-            copyError
+            copyNodeError
           );
           return Result.error(fsError);
         }
@@ -397,7 +606,8 @@ export function moveFile(params) {
     }
 
     // Record in database
-    const record = recordOrganizedFile({
+    const defaultDrive = getDefaultCloudDrive() as CloudDrive | null;
+    const recordId = recordOrganizedFile({
       filename: finalFilename,
       original_path: validatedSource,
       current_path: finalPath,
@@ -405,25 +615,26 @@ export function moveFile(params) {
       file_extension: path.extname(filename).slice(1).toLowerCase(),
       file_type: 'document', // Could be enhanced with file type detection
       file_size: fs.statSync(finalPath).size,
-      cloud_drive_id: cloudDriveId || getDefaultCloudDrive()?.id,
+      cloud_drive_id: cloudDriveId || defaultDrive?.id,
       status: 'moved',
-    });
+    }) as number | undefined;
 
-    return Result.ok({
+    return Result.ok<MoveSuccessResult>({
       status: OP_STATUS.SUCCESS,
       sourcePath: validatedSource,
       destinationPath: finalPath,
       filename: finalFilename,
       folderNumber,
-      recordId: record?.id,
+      recordId,
     });
   } catch (error) {
+    const nodeError = error as NodeError;
     // Create FileSystemError with proper classification
     const fsError = new FileSystemError(
-      `Failed to move file: ${error.message}`,
+      `Failed to move file: ${nodeError.message}`,
       'move',
       sourcePath,
-      error
+      nodeError
     );
     return Result.error(fsError);
   }
@@ -432,10 +643,12 @@ export function moveFile(params) {
 /**
  * Rolls back a file move operation.
  *
- * @param {number} recordId - ID of the organized_files record
- * @returns {Result} Rollback result
+ * @param recordId - ID of the organized_files record
+ * @returns Rollback result
  */
-export function rollbackMove(recordId) {
+export function rollbackMove(
+  recordId: number
+): ReturnType<typeof Result.ok<RollbackSuccessResult>> | ReturnType<typeof Result.error> {
   const modules = getNodeModules();
   if (!modules) {
     return Result.error(new FileSystemError('File system not available', 'rollback'));
@@ -444,7 +657,7 @@ export function rollbackMove(recordId) {
   const { fs, path } = modules;
 
   // Get the record
-  const record = getOrganizedFile(recordId);
+  const record = getOrganizedFile(recordId) as OrganizedFile | null;
   if (!record) {
     return Result.error(new FileSystemError(`Record ${recordId} not found`, 'rollback'));
   }
@@ -457,7 +670,7 @@ export function rollbackMove(recordId) {
 
   // Check current file exists
   if (!fs.existsSync(record.current_path)) {
-    const notFoundError = new Error('File no longer exists at destination');
+    const notFoundError = new Error('File no longer exists at destination') as NodeError;
     notFoundError.code = 'ENOENT';
     return Result.error(
       new FileSystemError(
@@ -481,7 +694,7 @@ export function rollbackMove(recordId) {
   try {
     ensureDirectory(originalDir);
   } catch (error) {
-    return Result.error(error);
+    return Result.error(error as Error);
   }
 
   // Move file back
@@ -489,7 +702,8 @@ export function rollbackMove(recordId) {
     try {
       fs.renameSync(record.current_path, record.original_path);
     } catch (renameError) {
-      if (renameError.code === 'EXDEV') {
+      const nodeError = renameError as NodeError;
+      if (nodeError.code === 'EXDEV') {
         fs.copyFileSync(record.current_path, record.original_path);
         fs.unlinkSync(record.current_path);
       } else {
@@ -500,18 +714,19 @@ export function rollbackMove(recordId) {
     // Update database record
     updateOrganizedFile(recordId, { status: 'undone' });
 
-    return Result.ok({
+    return Result.ok<RollbackSuccessResult>({
       status: OP_STATUS.ROLLED_BACK,
       originalPath: record.original_path,
       fromPath: record.current_path,
     });
   } catch (error) {
+    const nodeError = error as NodeError;
     return Result.error(
       new FileSystemError(
-        `Failed to rollback: ${error.message}`,
+        `Failed to rollback: ${nodeError.message}`,
         'rollback',
         record.current_path,
-        error
+        nodeError
       )
     );
   }
@@ -524,15 +739,14 @@ export function rollbackMove(recordId) {
 /**
  * Batch move operation with progress tracking.
  *
- * @param {Array} operations - Array of { sourcePath, folderNumber } objects
- * @param {Object} options - Batch options
- * @param {Function} options.onProgress - Progress callback
- * @param {Function} options.onFileComplete - Per-file callback
- * @param {string} options.conflictStrategy - Default conflict strategy
- * @param {boolean} options.stopOnError - Stop batch on first error
- * @returns {Object} Batch result summary
+ * @param operations - Array of operation objects
+ * @param options - Batch options
+ * @returns Batch result summary
  */
-export async function batchMove(operations, options = {}) {
+export async function batchMove(
+  operations: BatchOperation[],
+  options: BatchMoveOptions = {}
+): Promise<BatchMoveResults> {
   const {
     onProgress = () => {},
     onFileComplete = () => {},
@@ -540,7 +754,7 @@ export async function batchMove(operations, options = {}) {
     stopOnError = false,
   } = options;
 
-  const results = {
+  const results: BatchMoveResults = {
     total: operations.length,
     success: 0,
     failed: 0,
@@ -568,17 +782,18 @@ export async function batchMove(operations, options = {}) {
     });
 
     // Track result
-    const opResult = {
+    const opResult: BatchOperationResult = {
       ...op,
       success: result.success,
-      result: result.success ? result.data : null,
-      error: result.success ? null : result.error,
+      result: result.success ? (result.data as MoveSuccessResult) : null,
+      error: result.success ? null : (result.error as Error),
     };
 
     results.operations.push(opResult);
 
     if (result.success) {
-      if (result.data.status === OP_STATUS.SKIPPED) {
+      const data = result.data as MoveSuccessResult;
+      if (data.status === OP_STATUS.SKIPPED) {
         results.skipped++;
       } else {
         results.success++;
@@ -603,12 +818,15 @@ export async function batchMove(operations, options = {}) {
 /**
  * Batch rollback operation.
  *
- * @param {Array} recordIds - Array of organized_files record IDs
- * @param {Function} onProgress - Progress callback
- * @returns {Object} Batch rollback result
+ * @param recordIds - Array of organized_files record IDs
+ * @param onProgress - Progress callback
+ * @returns Batch rollback result
  */
-export async function batchRollback(recordIds, onProgress = () => {}) {
-  const results = {
+export async function batchRollback(
+  recordIds: number[],
+  onProgress: (info: ProgressInfo) => void = () => {}
+): Promise<BatchRollbackResults> {
+  const results: BatchRollbackResults = {
     total: recordIds.length,
     success: 0,
     failed: 0,
@@ -629,8 +847,8 @@ export async function batchRollback(recordIds, onProgress = () => {}) {
     results.operations.push({
       recordId,
       success: result.success,
-      result: result.success ? result.data : null,
-      error: result.success ? null : result.error,
+      result: result.success ? (result.data as RollbackSuccessResult) : null,
+      error: result.success ? null : (result.error as Error),
     });
 
     if (result.success) {
@@ -653,17 +871,26 @@ export async function batchRollback(recordIds, onProgress = () => {}) {
  * Previews what would happen if files were organized.
  * Does not actually move any files.
  *
- * @param {Array} operations - Array of { sourcePath, folderNumber } objects
- * @returns {Array} Preview of operations
+ * @param operations - Array of operation objects
+ * @returns Preview of operations
  */
-export function previewOperations(operations) {
+export function previewOperations(operations: BatchOperation[]): PreviewResult[] {
   const modules = getNodeModules();
-  if (!modules) return operations.map((op) => ({ ...op, error: 'File system not available' }));
+  if (!modules) {
+    return operations.map((op) => ({
+      ...op,
+      sourceExists: false,
+      destinationPath: null,
+      wouldConflict: false,
+      folder: null,
+      error: 'File system not available',
+    }));
+  }
 
   const { fs, path } = modules;
 
   return operations.map((op) => {
-    const preview = {
+    const preview: PreviewResult = {
       ...op,
       sourceExists: false,
       destinationPath: null,
@@ -688,7 +915,8 @@ export function previewOperations(operations) {
       preview.folder = dest.folder;
       preview.wouldConflict = fs.existsSync(dest.fullPath);
     } catch (error) {
-      preview.error = error.message;
+      const err = error as Error;
+      preview.error = err.message;
     }
 
     return preview;

@@ -1,5 +1,55 @@
 import { useState, useCallback } from 'react';
 
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
+
+/**
+ * Modal names supported by the hook.
+ */
+export type ModalName =
+  | 'newFolder'
+  | 'newItem'
+  | 'settings'
+  | 'fileOrganizer'
+  | 'statsDashboard'
+  | 'batchRename';
+
+/**
+ * Return type for the useModalState hook.
+ */
+export interface UseModalStateReturn {
+  // Modal states
+  showNewFolderModal: boolean;
+  showNewItemModal: boolean;
+  showSettings: boolean;
+  showFileOrganizer: boolean;
+  showStatsDashboard: boolean;
+  showBatchRename: boolean;
+
+  // Modal setters (for direct control)
+  setShowNewFolderModal: (show: boolean) => void;
+  setShowNewItemModal: (show: boolean) => void;
+  setShowSettings: (show: boolean) => void;
+  setShowFileOrganizer: (show: boolean) => void;
+  setShowStatsDashboard: (show: boolean) => void;
+  setShowBatchRename: (show: boolean) => void;
+
+  // Sidebar state
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  toggleSidebar: () => void;
+
+  // Helper functions
+  openModal: (modalName: ModalName) => void;
+  closeModal: (modalName: ModalName) => void;
+  closeAllModals: () => void;
+}
+
+// ============================================
+// HOOK IMPLEMENTATION
+// ============================================
+
 /**
  * useModalState - Manages modal visibility states
  *
@@ -8,10 +58,8 @@ import { useState, useCallback } from 'react';
  *
  * WHY: Extracted from App.jsx to reduce state clutter and provide
  *      consistent modal management patterns.
- *
- * @returns {Object} Modal states and control functions
  */
-export function useModalState() {
+export function useModalState(): UseModalStateReturn {
   // Modal visibility states
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [showNewItemModal, setShowNewItemModal] = useState(false);
@@ -25,9 +73,8 @@ export function useModalState() {
 
   /**
    * Open a specific modal by name
-   * @param {string} modalName - Name of the modal to open
    */
-  const openModal = useCallback((modalName) => {
+  const openModal = useCallback((modalName: ModalName) => {
     switch (modalName) {
       case 'newFolder':
         setShowNewFolderModal(true);
@@ -52,9 +99,8 @@ export function useModalState() {
 
   /**
    * Close a specific modal by name
-   * @param {string} modalName - Name of the modal to close
    */
-  const closeModal = useCallback((modalName) => {
+  const closeModal = useCallback((modalName: ModalName) => {
     switch (modalName) {
       case 'newFolder':
         setShowNewFolderModal(false);

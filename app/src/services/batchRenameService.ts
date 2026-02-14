@@ -7,16 +7,195 @@
 
 import { validateFilePath, sanitizeText } from '../utils/validation.js';
 
-// =============================================================================
-// Constants
-// =============================================================================
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
 
-// Characters not allowed in filenames
+/**
+ * Node.js fs module interface for Electron.
+ */
+interface FsModule {
+  existsSync(path: string): boolean;
+  renameSync(oldPath: string, newPath: string): void;
+  readdirSync(
+    path: string,
+    options: { withFileTypes: true }
+  ): Array<{ name: string; isFile(): boolean }>;
+  statSync(path: string): { size: number };
+}
+
+/**
+ * Node.js path module interface for Electron.
+ */
+interface PathModule {
+  join(...paths: string[]): string;
+  dirname(path: string): string;
+}
+
+/**
+ * Case transformation types.
+ */
+export type CaseType = 'lowercase' | 'uppercase' | 'titlecase' | 'sentencecase';
+
+/**
+ * Number position in filename.
+ */
+export type NumberPosition = 'prefix' | 'suffix';
+
+/**
+ * Rename operation options.
+ */
+export interface RenameOptions {
+  // Find & Replace
+  findReplace?: boolean;
+  find?: string;
+  replace?: string;
+  replaceAll?: boolean;
+
+  // Case change
+  changeCase?: boolean;
+  caseType?: CaseType;
+
+  // Prefix/Suffix
+  addPrefix?: boolean;
+  prefix?: string;
+  addSuffix?: boolean;
+  suffix?: string;
+
+  // Sequential numbering
+  addNumber?: boolean;
+  startNumber?: number | string;
+  digits?: number | string;
+  numberPosition?: NumberPosition;
+}
+
+/**
+ * File info for batch operations.
+ */
+export interface FileInfo {
+  name: string;
+  path: string;
+}
+
+/**
+ * Directory file entry.
+ */
+export interface DirectoryFileEntry {
+  name: string;
+  path: string;
+  size: number;
+  isDirectory: boolean;
+}
+
+/**
+ * Conflict type.
+ */
+export type ConflictType = 'duplicate' | 'exists' | null;
+
+/**
+ * Preview item for rename operation.
+ */
+export interface PreviewItem {
+  original: string;
+  originalPath: string;
+  newName: string;
+  newPath: string;
+  conflict: ConflictType;
+  willChange: boolean;
+}
+
+/**
+ * Undo log entry.
+ */
+export interface UndoLogEntry {
+  original: string;
+  renamed: string;
+  originalName: string;
+  newName: string;
+}
+
+/**
+ * Error entry from batch operation.
+ */
+export interface BatchError {
+  file: string;
+  error: string;
+}
+
+/**
+ * Result of batch rename execution.
+ */
+export interface BatchRenameResult {
+  success: boolean;
+  count?: number;
+  total?: number;
+  errors?: BatchError[];
+  undoId?: string | null;
+  error?: string;
+}
+
+/**
+ * Result of undo operation.
+ */
+export interface UndoResult {
+  success: boolean;
+  count?: number;
+  total?: number;
+  errors?: BatchError[];
+  error?: string;
+}
+
+/**
+ * Stored undo log with metadata.
+ */
+interface StoredUndoLog {
+  timestamp: number;
+  log: UndoLogEntry[];
+}
+
+/**
+ * Undo logs storage structure.
+ */
+interface UndoLogsStorage {
+  [undoId: string]: StoredUndoLog;
+}
+
+/**
+ * Recent undo log info.
+ */
+export interface RecentUndoLog {
+  id: string;
+  timestamp: number;
+  log: UndoLogEntry[];
+}
+
+/**
+ * Batch limit check result.
+ */
+export interface BatchLimitResult {
+  allowed: boolean;
+  limit: number;
+}
+
+/**
+ * Progress callback function.
+ */
+export type ProgressCallback = (current: number, total: number) => void;
+
+// ============================================
+// CONSTANTS
+// ============================================
+
+/**
+ * Characters not allowed in filenames.
+ */
 // eslint-disable-next-line no-control-regex
 const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\x00-\x1f]/g;
 
-// Windows reserved names
-const RESERVED_NAMES = [
+/**
+ * Windows reserved names.
+ */
+const RESERVED_NAMES: readonly string[] = [
   'CON',
   'PRN',
   'AUX',
@@ -41,35 +220,72 @@ const RESERVED_NAMES = [
   'LPT9',
 ];
 
-// Undo log key in localStorage
+/**
+ * Undo log key in localStorage.
+ */
 const UNDO_LOG_KEY = 'jdex_batch_rename_undo';
 
-// =============================================================================
-// Filename Utilities
-// =============================================================================
+/**
+ * Free tier batch file limit.
+ */
+const FREE_TIER_BATCH_LIMIT = 5;
 
 /**
- * Get base name without extension
+ * Maximum undo logs to keep.
  */
-export function getBaseName(filename) {
+const MAX_UNDO_LOGS = 10;
+
+/**
+ * Maximum filename length.
+ */
+const MAX_FILENAME_LENGTH = 250;
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Get the fs module from Electron's window.require.
+ */
+function getFs(): FsModule | null {
+  const windowWithRequire = window as Window & { require?: NodeRequire };
+  return windowWithRequire.require ? (windowWithRequire.require('fs') as FsModule) : null;
+}
+
+/**
+ * Get the path module from Electron's window.require.
+ */
+function getPath(): PathModule | null {
+  const windowWithRequire = window as Window & { require?: NodeRequire };
+  return windowWithRequire.require ? (windowWithRequire.require('path') as PathModule) : null;
+}
+
+// ============================================
+// FILENAME UTILITIES
+// ============================================
+
+/**
+ * Get base name without extension.
+ */
+export function getBaseName(filename: string): string {
   const lastDot = filename.lastIndexOf('.');
   if (lastDot <= 0) return filename;
   return filename.substring(0, lastDot);
 }
 
 /**
- * Get file extension (without dot)
+ * Get file extension (without dot).
  */
-export function getExtension(filename) {
+export function getExtension(filename: string): string {
   const lastDot = filename.lastIndexOf('.');
   if (lastDot <= 0) return '';
   return filename.substring(lastDot + 1);
 }
 
 /**
- * Sanitize a filename to remove invalid characters
+ * Sanitize a filename to remove invalid characters.
  */
-export function sanitizeFilename(filename) {
+export function sanitizeFilename(filename: string | null | undefined): string {
   if (!filename) return 'unnamed';
 
   // Remove invalid characters
@@ -90,7 +306,7 @@ export function sanitizeFilename(filename) {
   }
 
   // Limit length (most filesystems have 255 char limit)
-  if (sanitized.length > 250) {
+  if (sanitized.length > MAX_FILENAME_LENGTH) {
     const ext = getExtension(sanitized);
     const base = getBaseName(sanitized);
     sanitized = base.substring(0, 245 - ext.length) + '.' + ext;
@@ -100,9 +316,9 @@ export function sanitizeFilename(filename) {
 }
 
 /**
- * Transform case of a string
+ * Transform case of a string.
  */
-export function transformCase(str, caseType) {
+export function transformCase(str: string, caseType: CaseType): string {
   switch (caseType) {
     case 'lowercase':
       return str.toLowerCase();
@@ -117,19 +333,18 @@ export function transformCase(str, caseType) {
   }
 }
 
-// =============================================================================
-// Name Generation
-// =============================================================================
+// ============================================
+// NAME GENERATION
+// ============================================
 
 /**
- * Generate new filename based on rename options
- *
- * @param {string} originalName - Original filename
- * @param {Object} options - Rename options
- * @param {number} index - File index in batch (for numbering)
- * @returns {string} New filename
+ * Generate new filename based on rename options.
  */
-export function generateNewName(originalName, options, index = 0) {
+export function generateNewName(
+  originalName: string,
+  options: RenameOptions,
+  index: number = 0
+): string {
   let name = getBaseName(originalName);
   const ext = getExtension(originalName);
 
@@ -164,8 +379,8 @@ export function generateNewName(originalName, options, index = 0) {
 
   // 5. Add sequential number
   if (options.addNumber) {
-    const startNum = parseInt(options.startNumber) || 1;
-    const digits = parseInt(options.digits) || 3;
+    const startNum = parseInt(String(options.startNumber)) || 1;
+    const digits = parseInt(String(options.digits)) || 3;
     const num = (startNum + index).toString().padStart(digits, '0');
 
     if (options.numberPosition === 'prefix') {
@@ -192,25 +407,21 @@ export function generateNewName(originalName, options, index = 0) {
 }
 
 /**
- * Generate preview of all renames
- *
- * @param {Array} files - Array of { name, path } objects
- * @param {Object} options - Rename options
- * @returns {Array} Array of { original, newName, path, newPath, conflict }
+ * Generate preview of all renames.
  */
-export function generatePreview(files, options) {
-  const fs = window.require ? window.require('fs') : null;
-  const pathModule = window.require ? window.require('path') : null;
+export function generatePreview(files: FileInfo[], options: RenameOptions): PreviewItem[] {
+  const fs = getFs();
+  const pathModule = getPath();
 
-  const newNames = new Set();
-  const preview = [];
+  const newNames = new Set<string>();
+  const preview: PreviewItem[] = [];
 
   files.forEach((file, index) => {
     const newName = generateNewName(file.name, options, index);
     const newPath = pathModule ? pathModule.join(pathModule.dirname(file.path), newName) : '';
 
     // Check for conflicts
-    let conflict = null;
+    let conflict: ConflictType = null;
 
     // Conflict with another file in this batch
     if (newNames.has(newName.toLowerCase())) {
@@ -236,27 +447,26 @@ export function generatePreview(files, options) {
   return preview;
 }
 
-// =============================================================================
-// Rename Execution
-// =============================================================================
+// ============================================
+// RENAME EXECUTION
+// ============================================
 
 /**
- * Execute batch rename operation
- *
- * @param {Array} preview - Preview array from generatePreview
- * @param {Object} options - Additional options
- * @param {Function} onProgress - Progress callback (current, total)
- * @returns {Object} { success, count, errors, undoId }
+ * Execute batch rename operation.
  */
-export async function executeBatchRename(preview, _options = {}, onProgress = () => {}) {
-  const fs = window.require ? window.require('fs') : null;
+export async function executeBatchRename(
+  preview: PreviewItem[],
+  _options: Record<string, unknown> = {},
+  onProgress: ProgressCallback = () => {}
+): Promise<BatchRenameResult> {
+  const fs = getFs();
 
   if (!fs) {
     return { success: false, error: 'File system not available' };
   }
 
-  const undoLog = [];
-  const errors = [];
+  const undoLog: UndoLogEntry[] = [];
+  const errors: BatchError[] = [];
   let successCount = 0;
 
   // Filter to only files that will change
@@ -291,7 +501,7 @@ export async function executeBatchRename(preview, _options = {}, onProgress = ()
     } catch (error) {
       errors.push({
         file: item.original,
-        error: error.message || 'Failed to rename',
+        error: (error as Error).message || 'Failed to rename',
       });
     }
 
@@ -314,25 +524,25 @@ export async function executeBatchRename(preview, _options = {}, onProgress = ()
   };
 }
 
-// =============================================================================
-// Undo Support
-// =============================================================================
+// ============================================
+// UNDO SUPPORT
+// ============================================
 
 /**
- * Save undo log to localStorage
+ * Save undo log to localStorage.
  */
-function saveUndoLog(undoId, log) {
+function saveUndoLog(undoId: string, log: UndoLogEntry[]): void {
   try {
-    const existing = JSON.parse(localStorage.getItem(UNDO_LOG_KEY) || '{}');
+    const existing = JSON.parse(localStorage.getItem(UNDO_LOG_KEY) || '{}') as UndoLogsStorage;
     existing[undoId] = {
       timestamp: Date.now(),
       log,
     };
 
-    // Keep only last 10 undo logs
+    // Keep only last N undo logs
     const keys = Object.keys(existing).sort().reverse();
-    if (keys.length > 10) {
-      keys.slice(10).forEach((k) => delete existing[k]);
+    if (keys.length > MAX_UNDO_LOGS) {
+      keys.slice(MAX_UNDO_LOGS).forEach((k) => delete existing[k]);
     }
 
     localStorage.setItem(UNDO_LOG_KEY, JSON.stringify(existing));
@@ -342,11 +552,11 @@ function saveUndoLog(undoId, log) {
 }
 
 /**
- * Get undo log by ID
+ * Get undo log by ID.
  */
-export function getUndoLog(undoId) {
+export function getUndoLog(undoId: string): UndoLogEntry[] | null {
   try {
-    const existing = JSON.parse(localStorage.getItem(UNDO_LOG_KEY) || '{}');
+    const existing = JSON.parse(localStorage.getItem(UNDO_LOG_KEY) || '{}') as UndoLogsStorage;
     return existing[undoId]?.log || null;
   } catch {
     return null;
@@ -354,11 +564,11 @@ export function getUndoLog(undoId) {
 }
 
 /**
- * Get most recent undo log
+ * Get most recent undo log.
  */
-export function getMostRecentUndoLog() {
+export function getMostRecentUndoLog(): RecentUndoLog | null {
   try {
-    const existing = JSON.parse(localStorage.getItem(UNDO_LOG_KEY) || '{}');
+    const existing = JSON.parse(localStorage.getItem(UNDO_LOG_KEY) || '{}') as UndoLogsStorage;
     const keys = Object.keys(existing).sort().reverse();
     if (keys.length === 0) return null;
 
@@ -372,14 +582,13 @@ export function getMostRecentUndoLog() {
 }
 
 /**
- * Execute undo operation
- *
- * @param {string} undoId - Undo log ID
- * @param {Function} onProgress - Progress callback
- * @returns {Object} { success, count, errors }
+ * Execute undo operation.
  */
-export async function undoBatchRename(undoId, onProgress = () => {}) {
-  const fs = window.require ? window.require('fs') : null;
+export async function undoBatchRename(
+  undoId: string,
+  onProgress: ProgressCallback = () => {}
+): Promise<UndoResult> {
+  const fs = getFs();
 
   if (!fs) {
     return { success: false, error: 'File system not available' };
@@ -390,7 +599,7 @@ export async function undoBatchRename(undoId, onProgress = () => {}) {
     return { success: false, error: 'Undo log not found' };
   }
 
-  const errors = [];
+  const errors: BatchError[] = [];
   let successCount = 0;
 
   // Reverse the renames
@@ -418,7 +627,7 @@ export async function undoBatchRename(undoId, onProgress = () => {}) {
     } catch (error) {
       errors.push({
         file: item.newName,
-        error: error.message || 'Failed to undo',
+        error: (error as Error).message || 'Failed to undo',
       });
     }
 
@@ -439,11 +648,11 @@ export async function undoBatchRename(undoId, onProgress = () => {}) {
 }
 
 /**
- * Remove an undo log
+ * Remove an undo log.
  */
-function removeUndoLog(undoId) {
+function removeUndoLog(undoId: string): void {
   try {
-    const existing = JSON.parse(localStorage.getItem(UNDO_LOG_KEY) || '{}');
+    const existing = JSON.parse(localStorage.getItem(UNDO_LOG_KEY) || '{}') as UndoLogsStorage;
     delete existing[undoId];
     localStorage.setItem(UNDO_LOG_KEY, JSON.stringify(existing));
   } catch (error) {
@@ -451,19 +660,16 @@ function removeUndoLog(undoId) {
   }
 }
 
-// =============================================================================
-// File Selection Helpers
-// =============================================================================
+// ============================================
+// FILE SELECTION HELPERS
+// ============================================
 
 /**
- * Read files from a directory
- *
- * @param {string} dirPath - Directory path
- * @returns {Array} Array of { name, path, size, isDirectory }
+ * Read files from a directory.
  */
-export function readDirectoryFiles(dirPath) {
-  const fs = window.require ? window.require('fs') : null;
-  const pathModule = window.require ? window.require('path') : null;
+export function readDirectoryFiles(dirPath: string): DirectoryFileEntry[] {
+  const fs = getFs();
+  const pathModule = getPath();
 
   if (!fs || !pathModule) {
     return [];
@@ -497,20 +703,14 @@ export function readDirectoryFiles(dirPath) {
   }
 }
 
-// =============================================================================
-// Premium Limits
-// =============================================================================
-
-const FREE_TIER_BATCH_LIMIT = 5;
+// ============================================
+// PREMIUM LIMITS
+// ============================================
 
 /**
- * Check if batch size is within limits
- *
- * @param {number} fileCount - Number of files to rename
- * @param {boolean} isPremium - User's premium status
- * @returns {{ allowed: boolean, limit: number }}
+ * Check if batch size is within limits.
  */
-export function checkBatchLimit(fileCount, isPremium) {
+export function checkBatchLimit(fileCount: number, isPremium: boolean): BatchLimitResult {
   if (isPremium) {
     return { allowed: true, limit: Infinity };
   }
@@ -521,9 +721,9 @@ export function checkBatchLimit(fileCount, isPremium) {
   };
 }
 
-// =============================================================================
-// Exports
-// =============================================================================
+// ============================================
+// DEFAULT EXPORT
+// ============================================
 
 export default {
   generateNewName,

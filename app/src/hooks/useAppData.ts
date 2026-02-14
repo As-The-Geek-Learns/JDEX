@@ -1,5 +1,48 @@
 import { useState, useEffect, useCallback } from 'react';
 import { initDatabase, getAreas, getCategories, getFolders, getStats } from '../db.js';
+import type { Area, Category, Folder } from '../types/index.js';
+
+// ============================================
+// TYPE DEFINITIONS
+// ============================================
+
+/**
+ * Database statistics shape.
+ */
+export interface DatabaseStats {
+  totalAreas?: number;
+  totalCategories?: number;
+  totalFolders?: number;
+  totalItems?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Return type for the useAppData hook.
+ */
+export interface UseAppDataReturn {
+  // State
+  isLoading: boolean;
+  areas: Area[];
+  categories: Category[];
+  folders: Folder[];
+  stats: DatabaseStats;
+  refreshKey: number;
+
+  // Setters (for direct updates when needed)
+  setAreas: (areas: Area[]) => void;
+  setCategories: (categories: Category[]) => void;
+  setFolders: (folders: Folder[]) => void;
+  setStats: (stats: DatabaseStats) => void;
+
+  // Actions
+  loadData: () => void;
+  triggerRefresh: () => void;
+}
+
+// ============================================
+// HOOK IMPLEMENTATION
+// ============================================
 
 /**
  * useAppData - Manages core application data state and refresh mechanism
@@ -9,16 +52,14 @@ import { initDatabase, getAreas, getCategories, getFolders, getStats } from '../
  *
  * WHY: Extracted from App.jsx to separate data fetching concerns from UI rendering.
  *      This enables independent testing and reduces cognitive load in the main component.
- *
- * @returns {Object} Core data state and control functions
  */
-export function useAppData() {
+export function useAppData(): UseAppDataReturn {
   // Core data state
   const [isLoading, setIsLoading] = useState(true);
-  const [areas, setAreas] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [folders, setFolders] = useState([]);
-  const [stats, setStats] = useState({});
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [stats, setStats] = useState<DatabaseStats>({});
 
   // Refresh trigger - increment to force data reload
   const [refreshKey, setRefreshKey] = useState(0);
@@ -28,10 +69,10 @@ export function useAppData() {
    * Called on init and whenever refreshKey changes
    */
   const loadData = useCallback(() => {
-    setAreas(getAreas());
-    setCategories(getCategories());
-    setFolders(getFolders());
-    setStats(getStats());
+    setAreas(getAreas() as Area[]);
+    setCategories(getCategories() as Category[]);
+    setFolders(getFolders() as Folder[]);
+    setStats(getStats() as DatabaseStats);
   }, []);
 
   /**
@@ -46,7 +87,7 @@ export function useAppData() {
   useEffect(() => {
     let isMounted = true;
 
-    async function init() {
+    async function init(): Promise<void> {
       await initDatabase();
       // Only update state if component is still mounted
       if (isMounted) {

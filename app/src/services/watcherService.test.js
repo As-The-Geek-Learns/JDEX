@@ -1264,7 +1264,14 @@ describe('watcherService', () => {
 
       // Return low confidence match
       getMatchingEngine.mockReturnValue({
-        matchFile: vi.fn(() => [{ confidence: 'low', targetFolder: '11.01', ruleId: 1 }]),
+        matchFile: vi.fn(() => [
+          {
+            confidence: 'low',
+            folder: { folder_number: '11.01', name: 'Test Folder' },
+            rule: { id: 1, name: 'Test Rule' },
+            reason: 'Test match',
+          },
+        ]),
       });
 
       await processExistingFiles(1);
@@ -1298,7 +1305,14 @@ describe('watcherService', () => {
 
       // Return high confidence match
       getMatchingEngine.mockReturnValue({
-        matchFile: vi.fn(() => [{ confidence: 'high', targetFolder: '11.01', ruleId: 1 }]),
+        matchFile: vi.fn(() => [
+          {
+            confidence: 'high',
+            folder: { folder_number: '11.01', name: 'Test Folder' },
+            rule: { id: 1, name: 'Test Rule' },
+            reason: 'Test match',
+          },
+        ]),
       });
 
       await processExistingFiles(1);
@@ -1335,7 +1349,12 @@ describe('watcherService', () => {
       // Return high confidence match
       getMatchingEngine.mockReturnValue({
         matchFile: vi.fn(() => [
-          { confidence: 'high', targetFolder: '11.01', ruleId: 1, ruleName: 'Test Rule' },
+          {
+            confidence: 'high',
+            folder: { folder_number: '11.01', name: 'Test Folder' },
+            rule: { id: 1, name: 'Test Rule' },
+            reason: 'Test match',
+          },
         ]),
       });
 
@@ -1374,10 +1393,17 @@ describe('watcherService', () => {
       });
 
       getMatchingEngine.mockReturnValue({
-        matchFile: vi.fn(() => [{ confidence: 'high', targetFolder: '11.01', ruleId: 1 }]),
+        matchFile: vi.fn(() => [
+          {
+            confidence: 'high',
+            folder: { folder_number: '11.01', name: 'Test Folder' },
+            rule: { id: 1, name: 'Test Rule' },
+            reason: 'Test match',
+          },
+        ]),
       });
 
-      moveFile.mockReturnValue({ success: false, error: 'Move failed' });
+      moveFile.mockReturnValue({ success: false, error: new Error('Move failed') });
 
       await processExistingFiles(1);
 
