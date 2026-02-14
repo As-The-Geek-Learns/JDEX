@@ -327,12 +327,13 @@ These are acknowledged issues, not bugs:
 | Issue | File | Lines | Impact |
 |-------|------|-------|--------|
 | No TypeScript | All `.jsx`/`.js` | -- | No compile-time type checking |
-| Service layer tests | `services/` | -- | Business logic not fully tested |
+| Repository layer tests | `db/repositories/` | -- | File Organizer repos ~35% coverage |
 
 ### Resolved Debt
 - ~~Monolithic root component~~ → Refactored to hooks + components (283 lines, Feb 2026)
 - ~~All DB logic in one file~~ → Refactored to modular `db/` structure (Feb 2026)
 - ~~No automated tests~~ → 1,422 tests across database layer (Feb 2026)
+- ~~Service layer tests~~ → 94.46% coverage, 98.56% function coverage (Feb 2026)
 
 ---
 
