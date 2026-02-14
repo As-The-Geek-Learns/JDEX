@@ -33,6 +33,10 @@ vi.mock('../Settings/FeedbackSettings.jsx', () => ({
   default: vi.fn(() => <div data-testid="feedback-tab">Feedback Settings</div>),
 }));
 
+vi.mock('../Settings/AppearanceSettings.jsx', () => ({
+  default: vi.fn(() => <div data-testid="appearance-tab">Appearance Settings</div>),
+}));
+
 describe('SettingsModal', () => {
   const mockOnClose = vi.fn();
   const mockOnDataChange = vi.fn();
@@ -112,6 +116,12 @@ describe('SettingsModal', () => {
   // ===========================================================================
 
   describe('tabs', () => {
+    it('should render Appearance tab', () => {
+      render(<SettingsModal {...defaultProps} />);
+
+      expect(screen.getByText('Appearance')).toBeInTheDocument();
+    });
+
     it('should render Areas tab', () => {
       render(<SettingsModal {...defaultProps} />);
 
@@ -154,10 +164,19 @@ describe('SettingsModal', () => {
   // ===========================================================================
 
   describe('tab navigation', () => {
-    it('should show Areas tab content by default', () => {
+    it('should show Appearance tab content by default', () => {
       render(<SettingsModal {...defaultProps} />);
 
+      expect(screen.getByTestId('appearance-tab')).toBeInTheDocument();
+    });
+
+    it('should switch to Areas tab when clicked', () => {
+      render(<SettingsModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Areas'));
+
       expect(screen.getByTestId('areas-tab')).toBeInTheDocument();
+      expect(screen.queryByTestId('appearance-tab')).not.toBeInTheDocument();
     });
 
     it('should switch to Categories tab when clicked', () => {
@@ -166,7 +185,7 @@ describe('SettingsModal', () => {
       fireEvent.click(screen.getByText('Categories'));
 
       expect(screen.getByTestId('categories-tab')).toBeInTheDocument();
-      expect(screen.queryByTestId('areas-tab')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('appearance-tab')).not.toBeInTheDocument();
     });
 
     it('should switch to Cloud Storage tab when clicked', () => {
@@ -204,8 +223,8 @@ describe('SettingsModal', () => {
     it('should highlight active tab', () => {
       render(<SettingsModal {...defaultProps} />);
 
-      const areasTab = screen.getByText('Areas').closest('button');
-      expect(areasTab).toHaveClass('text-teal-400');
+      const appearanceTab = screen.getByText('Appearance').closest('button');
+      expect(appearanceTab).toHaveClass('text-teal-400');
     });
   });
 

@@ -8,6 +8,7 @@ import {
   Layers,
   MessageSquare,
   Settings,
+  Palette,
 } from 'lucide-react';
 import AreasTab from '../Settings/AreasTab.jsx';
 import CategoriesTab from '../Settings/CategoriesTab.jsx';
@@ -15,9 +16,10 @@ import DatabaseTab from '../Settings/DatabaseTab.jsx';
 import CloudDriveSettings from '../Settings/CloudDriveSettings.jsx';
 import LicenseSettings from '../Settings/LicenseSettings.jsx';
 import FeedbackSettings from '../Settings/FeedbackSettings.jsx';
+import AppearanceSettings from '../Settings/AppearanceSettings.jsx';
 
 function SettingsModal({ isOpen, onClose, areas, categories, onDataChange }) {
-  const [activeTab, setActiveTab] = useState('areas');
+  const [activeTab, setActiveTab] = useState('appearance');
 
   if (!isOpen) return null;
 
@@ -34,45 +36,52 @@ function SettingsModal({ isOpen, onClose, areas, categories, onDataChange }) {
           </button>
         </div>
 
-        <div className="flex border-b border-slate-700">
+        <div className="flex border-b border-slate-700 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('appearance')}
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${activeTab === 'appearance' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
+          >
+            <Palette size={16} className="inline mr-2" />
+            Appearance
+          </button>
           <button
             onClick={() => setActiveTab('areas')}
-            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'areas' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${activeTab === 'areas' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
           >
             <Layers size={16} className="inline mr-2" />
             Areas
           </button>
           <button
             onClick={() => setActiveTab('categories')}
-            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'categories' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${activeTab === 'categories' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
           >
             <FolderTree size={16} className="inline mr-2" />
             Categories
           </button>
           <button
             onClick={() => setActiveTab('cloud')}
-            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'cloud' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${activeTab === 'cloud' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
           >
             <Cloud size={16} className="inline mr-2" />
             Cloud Storage
           </button>
           <button
             onClick={() => setActiveTab('license')}
-            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'license' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${activeTab === 'license' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
           >
             <Shield size={16} className="inline mr-2" />
             License
           </button>
           <button
             onClick={() => setActiveTab('database')}
-            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'database' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${activeTab === 'database' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
           >
             <Database size={16} className="inline mr-2" />
             Database
           </button>
           <button
             onClick={() => setActiveTab('feedback')}
-            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'feedback' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${activeTab === 'feedback' ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-400 hover:text-white'}`}
           >
             <MessageSquare size={16} className="inline mr-2" />
             Feedback
@@ -80,6 +89,8 @@ function SettingsModal({ isOpen, onClose, areas, categories, onDataChange }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
+          {activeTab === 'appearance' && <AppearanceSettings />}
+
           {activeTab === 'areas' && <AreasTab areas={areas} onDataChange={onDataChange} />}
 
           {activeTab === 'categories' && (

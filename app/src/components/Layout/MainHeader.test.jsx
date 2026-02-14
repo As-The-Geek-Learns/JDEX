@@ -8,6 +8,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import MainHeader from './MainHeader.jsx';
 
+// Helper to get the search input (placeholder now includes keyboard shortcut)
+const getSearchInput = () => screen.getByPlaceholderText(/Search folders and items/i);
+
 describe('MainHeader', () => {
   const mockOnSearchChange = vi.fn();
   const mockOnToggleSidebar = vi.fn();
@@ -32,7 +35,7 @@ describe('MainHeader', () => {
     it('should render search input', () => {
       render(<MainHeader {...defaultProps} />);
 
-      expect(screen.getByPlaceholderText('Search folders and items...')).toBeInTheDocument();
+      expect(getSearchInput()).toBeInTheDocument();
     });
 
     it('should render menu toggle button', () => {
@@ -75,15 +78,13 @@ describe('MainHeader', () => {
     it('should display current search query', () => {
       render(<MainHeader {...defaultProps} searchQuery="invoices" />);
 
-      const input = screen.getByPlaceholderText('Search folders and items...');
-      expect(input).toHaveValue('invoices');
+      expect(getSearchInput()).toHaveValue('invoices');
     });
 
     it('should call onSearchChange when typing', () => {
       render(<MainHeader {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Search folders and items...');
-      fireEvent.change(input, { target: { value: 'test search' } });
+      fireEvent.change(getSearchInput(), { target: { value: 'test search' } });
 
       expect(mockOnSearchChange).toHaveBeenCalledWith('test search');
     });
@@ -91,8 +92,7 @@ describe('MainHeader', () => {
     it('should handle empty search query', () => {
       render(<MainHeader {...defaultProps} searchQuery="" />);
 
-      const input = screen.getByPlaceholderText('Search folders and items...');
-      expect(input).toHaveValue('');
+      expect(getSearchInput()).toHaveValue('');
     });
 
     it('should render search icon', () => {
@@ -101,6 +101,14 @@ describe('MainHeader', () => {
       // Lucide Search icon renders as SVG
       const svg = container.querySelector('svg.lucide-search');
       expect(svg).toBeInTheDocument();
+    });
+
+    it('should show keyboard shortcut in placeholder', () => {
+      render(<MainHeader {...defaultProps} />);
+
+      const input = getSearchInput();
+      // Placeholder should include keyboard shortcut (Cmd+K or Ctrl+K)
+      expect(input.placeholder).toMatch(/\((Cmd|Ctrl)\+K\)/);
     });
   });
 
@@ -163,7 +171,7 @@ describe('MainHeader', () => {
     it('should have search input styling', () => {
       render(<MainHeader {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Search folders and items...');
+      const input = getSearchInput();
       expect(input).toHaveClass('bg-slate-800');
       expect(input).toHaveClass('rounded-lg');
     });

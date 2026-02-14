@@ -11,6 +11,19 @@ import {
   Upload,
 } from 'lucide-react';
 import { CategoryTree } from '../Navigation/index.js';
+import { getShortcutForAction } from '../../hooks/useKeyboardShortcuts.js';
+
+// Keyboard shortcut badge component
+function ShortcutBadge({ action }) {
+  const shortcut = getShortcutForAction(action);
+  if (!shortcut) return null;
+
+  return (
+    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-black/20 text-white/60 font-mono">
+      {shortcut}
+    </span>
+  );
+}
 
 function Sidebar({
   isOpen,
@@ -62,7 +75,7 @@ function Sidebar({
         <div className="p-4 border-b border-slate-700/50 space-y-2">
           <button
             onClick={onNewFolder}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl
               bg-gradient-to-r from-amber-600 to-amber-500 text-white font-medium
               shadow-[0_2px_10px_rgba(245,158,11,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
               hover:from-amber-500 hover:to-amber-400 hover:shadow-[0_4px_20px_rgba(245,158,11,0.4)]
@@ -70,10 +83,11 @@ function Sidebar({
           >
             <FolderOpen size={18} />
             New Folder (XX.XX)
+            <ShortcutBadge action="newFolder" />
           </button>
           <button
             onClick={onNewItem}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl
               bg-gradient-to-r from-teal-600 to-teal-500 text-white font-medium
               shadow-[0_2px_10px_rgba(20,184,166,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
               hover:from-teal-500 hover:to-teal-400 hover:shadow-[0_4px_20px_rgba(20,184,166,0.4)]
@@ -81,10 +95,11 @@ function Sidebar({
           >
             <Plus size={18} />
             New Item (XX.XX.XX)
+            <ShortcutBadge action="newItem" />
           </button>
           <button
             onClick={onFileOrganizer}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl
               bg-gradient-to-r from-purple-600 to-purple-500 text-white font-medium
               shadow-[0_2px_10px_rgba(139,92,246,0.3),inset_0_1px_0_rgba(255,255,255,0.15)]
               hover:from-purple-500 hover:to-purple-400 hover:shadow-[0_4px_20px_rgba(139,92,246,0.4)]
@@ -92,10 +107,11 @@ function Sidebar({
           >
             <HardDrive size={18} />
             File Organizer
+            <ShortcutBadge action="fileOrganizer" />
           </button>
           <button
             onClick={onStatsDashboard}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl
               bg-gradient-to-r from-purple-600/90 via-fuchsia-600/90 to-teal-600/90 text-white font-medium
               shadow-[0_2px_10px_rgba(139,92,246,0.25),inset_0_1px_0_rgba(255,255,255,0.15)]
               hover:from-purple-500/90 hover:via-fuchsia-500/90 hover:to-teal-500/90
@@ -104,10 +120,11 @@ function Sidebar({
           >
             <ChartColumn size={18} />
             Statistics
+            <ShortcutBadge action="statsDashboard" />
           </button>
           <button
             onClick={onBatchRename}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl
               bg-gradient-to-r from-amber-600/90 to-orange-600/90 text-white font-medium
               shadow-[0_2px_10px_rgba(234,88,12,0.25),inset_0_1px_0_rgba(255,255,255,0.15)]
               hover:from-amber-500/90 hover:to-orange-500/90 hover:shadow-[0_4px_20px_rgba(234,88,12,0.35)]
@@ -115,16 +132,18 @@ function Sidebar({
           >
             <FileEdit size={18} />
             Batch Rename
+            <ShortcutBadge action="batchRename" />
           </button>
           <button
             onClick={onSettings}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl
               bg-slate-800/50 border border-slate-600/50 text-slate-300 font-medium
               hover:bg-slate-700/50 hover:border-slate-500/50 hover:text-white
               transition-all duration-200"
           >
             <Settings size={18} />
             Settings
+            <ShortcutBadge action="settings" />
           </button>
         </div>
 
