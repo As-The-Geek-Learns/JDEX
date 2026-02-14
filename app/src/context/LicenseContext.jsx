@@ -143,6 +143,7 @@ export function LicenseProvider({ children }) {
 // Hook
 // =============================================================================
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useLicense() {
   const context = useContext(LicenseContext);
   if (!context) {
@@ -155,6 +156,7 @@ export function useLicense() {
 // HOC for feature gating
 // =============================================================================
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function withPremiumFeature(WrappedComponent, featureId) {
   return function PremiumGatedComponent(props) {
     const { hasFeature, isPremium: _isPremium } = useLicense();

@@ -679,7 +679,7 @@ describe('addScannedFilesBatch', () => {
     // First file succeeds, second might fail validation
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const result = addScannedFilesBatch(files);
+    const _result = addScannedFilesBatch(files);
 
     // At least some files should be processed
     expect(saveDatabase).toHaveBeenCalled();

@@ -24,7 +24,7 @@ import FileTypeChart from './FileTypeChart.jsx';
 import TopRulesCard from './TopRulesCard.jsx';
 import DateRangePicker from './DateRangePicker.jsx';
 import ComparisonView from './ComparisonView.jsx';
-import { getPreviousPeriodRange } from './ComparisonCard.jsx';
+import { getPreviousPeriodRange } from '../../utils/dateUtils.js';
 
 /**
  * StatsDashboard - Premium feature showing organization statistics

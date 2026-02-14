@@ -128,19 +128,3 @@ export default function ComparisonCard({
     </div>
   );
 }
-
-/**
- * Utility function to get a previous period date range based on current range.
- * @param {Date} start - Current period start
- * @param {Date} end - Current period end
- * @returns {{ start: Date, end: Date }} Previous period range
- */
-export function getPreviousPeriodRange(start, end) {
-  if (!start || !end) return { start: null, end: null };
-
-  const duration = end.getTime() - start.getTime();
-  const previousEnd = new Date(start.getTime() - 1); // Day before current start
-  const previousStart = new Date(previousEnd.getTime() - duration);
-
-  return { start: previousStart, end: previousEnd };
-}

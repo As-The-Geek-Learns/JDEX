@@ -89,6 +89,7 @@ export function DragDropProvider({ children }) {
   return <DragDropContext.Provider value={value}>{children}</DragDropContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDragDrop() {
   const context = useContext(DragDropContext);
   if (!context) {

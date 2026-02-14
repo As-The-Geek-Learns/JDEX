@@ -7,7 +7,8 @@
 
 import { FolderOpen, Calendar, Zap, TrendingUp, ArrowLeftRight } from 'lucide-react';
 import { format } from 'date-fns';
-import ComparisonCard, { getPreviousPeriodRange } from './ComparisonCard.jsx';
+import ComparisonCard from './ComparisonCard.jsx';
+import { getPreviousPeriodRange } from '../../utils/dateUtils.js';
 
 export default function ComparisonView({ currentStats, previousStats, dateRange, onClose }) {
   if (!currentStats || !previousStats) {

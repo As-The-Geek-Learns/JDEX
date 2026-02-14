@@ -159,7 +159,7 @@ const mockDeleteCategory = vi.fn((id) => {
   mockDbState.categories.splice(index, 1);
   return true;
 });
-const mockGetCategoryCount = vi.fn(() => mockDbState.categories.length);
+const _mockGetCategoryCount = vi.fn(() => mockDbState.categories.length);
 const mockIsCategoryNumberAvailable = vi.fn((number, excludeId = null) => {
   return !mockDbState.categories.some((c) => c.id !== excludeId && c.number === number);
 });
