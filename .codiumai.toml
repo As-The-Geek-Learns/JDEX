@@ -1,0 +1,29 @@
+# .codiumai.toml — Qodo Gen test generation config
+# WHAT: Configures how Qodo generates tests for this project
+# WHY: Ensures generated tests match our style and framework
+
+[tests]
+framework = "Jest"
+
+# Start without mocks — learn real behavior first.
+# Flip to true when testing code with external dependencies.
+use_mocks = false
+
+# 4 tests gives good variety (happy path, edge cases, errors)
+num_desired_tests = 4
+
+# Reference test — Qodo uses this as a template for generated tests.
+reference_test = """
+describe('functionName', () => {
+  it('should return expected value when given valid input', () => {
+    // GIVEN: Set up test conditions
+    const input = { key: 'value' };
+
+    // WHEN: Execute the function under test
+    const result = functionName(input);
+
+    // THEN: Verify the result
+    expect(result).toEqual(expectedValue);
+  });
+});
+"""

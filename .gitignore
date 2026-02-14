@@ -54,3 +54,9 @@ rules/
 .husky/_
 # Editor-specific files
 .cursor/
+
+# Claude Code local settings (personal hooks, not team-shared)
+.claude/settings.local.json
+
+# Qodo Gen local overrides (personal preferences, not team-shared)
+.codiumai.local.toml

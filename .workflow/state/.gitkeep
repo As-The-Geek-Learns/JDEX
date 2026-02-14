@@ -1,0 +1,2 @@
+# This directory stores verification state files
+# verify-state.json will be generated here by scripts/verify.js
