@@ -318,7 +318,11 @@ export function moveFile(params) {
 
   // Check source exists
   if (!fs.existsSync(validatedSource)) {
-    return Result.error(new FileSystemError('Source file not found', 'move', sourcePath));
+    const notFoundError = new Error('Source file not found');
+    notFoundError.code = 'ENOENT';
+    return Result.error(
+      new FileSystemError('Source file not found', 'move', sourcePath, notFoundError)
+    );
   }
 
   // Build destination path
@@ -374,8 +378,19 @@ export function moveFile(params) {
     } catch (renameError) {
       // Cross-filesystem move - copy then delete
       if (renameError.code === 'EXDEV') {
-        fs.copyFileSync(validatedSource, finalPath);
-        fs.unlinkSync(validatedSource);
+        try {
+          fs.copyFileSync(validatedSource, finalPath);
+          fs.unlinkSync(validatedSource);
+        } catch (copyError) {
+          // Classify copy/delete errors
+          const fsError = new FileSystemError(
+            `Failed to copy file: ${copyError.message}`,
+            'move',
+            sourcePath,
+            copyError
+          );
+          return Result.error(fsError);
+        }
       } else {
         throw renameError;
       }
@@ -403,9 +418,14 @@ export function moveFile(params) {
       recordId: record?.id,
     });
   } catch (error) {
-    return Result.error(
-      new FileSystemError(`Failed to move file: ${error.message}`, 'move', sourcePath, error)
+    // Create FileSystemError with proper classification
+    const fsError = new FileSystemError(
+      `Failed to move file: ${error.message}`,
+      'move',
+      sourcePath,
+      error
     );
+    return Result.error(fsError);
   }
 }
 
@@ -437,12 +457,23 @@ export function rollbackMove(recordId) {
 
   // Check current file exists
   if (!fs.existsSync(record.current_path)) {
-    return Result.error(new FileSystemError('File no longer exists at destination', 'rollback'));
+    const notFoundError = new Error('File no longer exists at destination');
+    notFoundError.code = 'ENOENT';
+    return Result.error(
+      new FileSystemError(
+        'File no longer exists at destination',
+        'rollback',
+        record.current_path,
+        notFoundError
+      )
+    );
   }
 
   // Check original location is available
   if (fs.existsSync(record.original_path)) {
-    return Result.error(new FileSystemError('Original location already has a file', 'rollback'));
+    return Result.error(
+      new FileSystemError('Original location already has a file', 'rollback', record.original_path)
+    );
   }
 
   // Ensure original directory exists

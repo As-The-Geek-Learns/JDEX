@@ -8,6 +8,11 @@
  * 2. Keyword rules - Match by filename keywords (e.g., "invoice" → 12.03)
  * 3. Path rules - Match by path patterns (e.g., /Work/ → 30-39 area)
  * 4. Regex rules - Match by regular expression
+ * 5. Compound rules - Match by extension AND keyword together (e.g., .pdf + "invoice" → 11.01)
+ * 6. Date rules - Match by date patterns in filename (e.g., 2024-01 → 11.01)
+ *
+ * Features:
+ * - Exclude patterns - Skip files matching an exclude pattern
  *
  * Security:
  * - All inputs are validated
@@ -103,6 +108,58 @@ const _KEYWORD_INDICATORS = {
   guide: ['reference', 'guide', 'howto'],
   tutorial: ['reference', 'learning', 'tutorial'],
 };
+
+// =============================================================================
+// Date Pattern Recognition
+// =============================================================================
+
+/**
+ * Common date patterns in filenames.
+ * Used for automatic date-based organization.
+ */
+const DATE_PATTERNS = [
+  // ISO format: 2024-01-15, 2024-01-15T10:30
+  { regex: /(\d{4})-(\d{2})-(\d{2})/, format: 'YYYY-MM-DD', confidence: 'high' },
+  // US format: 01-15-2024, 01/15/2024
+  { regex: /(\d{2})[-/](\d{2})[-/](\d{4})/, format: 'MM-DD-YYYY', confidence: 'medium' },
+  // Compact: 20240115
+  { regex: /\b(20\d{2})(\d{2})(\d{2})\b/, format: 'YYYYMMDD', confidence: 'medium' },
+  // Year-month: 2024-01, 2024_01
+  { regex: /(20\d{2})[-_](\d{2})/, format: 'YYYY-MM', confidence: 'medium' },
+  // Month-year: Jan2024, January-2024
+  {
+    regex:
+      /(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[_\-\s]?(20\d{2})/i,
+    format: 'Month-YYYY',
+    confidence: 'medium',
+  },
+  // Quarter: Q1-2024, 2024-Q2
+  {
+    regex: /(20\d{2})[-_]?Q([1-4])|Q([1-4])[-_]?(20\d{2})/i,
+    format: 'Quarter',
+    confidence: 'medium',
+  },
+];
+
+/**
+ * Extracts date information from a filename.
+ * @param {string} filename - The filename to analyze
+ * @returns {Object|null} Date info or null if no date found
+ */
+export function extractDateFromFilename(filename) {
+  for (const pattern of DATE_PATTERNS) {
+    const match = filename.match(pattern.regex);
+    if (match) {
+      return {
+        match: match[0],
+        format: pattern.format,
+        confidence: pattern.confidence,
+        groups: match.slice(1),
+      };
+    }
+  }
+  return null;
+}
 
 // =============================================================================
 // Helper Functions
@@ -275,9 +332,51 @@ export class MatchingEngine {
   }
 
   /**
+   * Checks if a file should be excluded based on rule's exclude pattern.
+   * @param {Object} rule - The rule with optional exclude_pattern
+   * @param {Object} file - The file to check
+   * @returns {boolean} True if file should be excluded
+   */
+  shouldExclude(rule, file) {
+    if (!rule.exclude_pattern) return false;
+
+    const patterns = rule.exclude_pattern
+      .toLowerCase()
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    const filename = file.filename.toLowerCase();
+    const path = (file.path || '').toLowerCase();
+    const testString = `${filename} ${path}`;
+
+    for (const pattern of patterns) {
+      // Check if pattern is a regex (starts with /)
+      if (pattern.startsWith('/') && pattern.endsWith('/')) {
+        const regexPattern = pattern.slice(1, -1);
+        if (safeRegexTest(regexPattern, testString)) {
+          return true;
+        }
+      } else {
+        // Plain text pattern
+        if (testString.includes(pattern)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Matches a single rule against a file.
    */
   matchRule(rule, file) {
+    // Check exclusions first
+    if (this.shouldExclude(rule, file)) {
+      return null;
+    }
+
     switch (rule.rule_type) {
       case 'extension':
         return this.matchExtensionRule(rule, file);
@@ -287,6 +386,10 @@ export class MatchingEngine {
         return this.matchPathRule(rule, file);
       case 'regex':
         return this.matchRegexRule(rule, file);
+      case 'compound':
+        return this.matchCompoundRule(rule, file);
+      case 'date':
+        return this.matchDateRule(rule, file);
       default:
         return null;
     }
@@ -364,6 +467,99 @@ export class MatchingEngine {
         reason: `Regex pattern matched`,
       };
     }
+    return null;
+  }
+
+  /**
+   * Matches compound rule (extension + keyword together).
+   * Pattern format: "ext:pdf,keyword:invoice" or "ext:xlsx,keyword:budget,report"
+   */
+  matchCompoundRule(rule, file) {
+    const conditions = rule.pattern.split(',').map((c) => c.trim());
+    let extensionMatch = false;
+    let keywordMatch = false;
+    let matchedExt = '';
+    let matchedKeyword = '';
+
+    const ext = (file.file_extension || '').toLowerCase();
+    const filename = file.filename.toLowerCase();
+    const path = (file.path || '').toLowerCase();
+
+    for (const condition of conditions) {
+      if (condition.startsWith('ext:')) {
+        const targetExt = condition.slice(4).toLowerCase().replace(/^\./, '');
+        if (ext === targetExt) {
+          extensionMatch = true;
+          matchedExt = targetExt;
+        }
+      } else if (condition.startsWith('keyword:')) {
+        const keyword = condition.slice(8).toLowerCase();
+        if (filename.includes(keyword) || path.includes(keyword)) {
+          keywordMatch = true;
+          matchedKeyword = keyword;
+        }
+      }
+    }
+
+    // Compound rule requires ALL conditions to match
+    if (extensionMatch && keywordMatch) {
+      return {
+        confidence: CONFIDENCE.HIGH,
+        reason: `Compound match: .${matchedExt} + "${matchedKeyword}"`,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Matches date-based rule.
+   * Pattern format: "year:2024" or "month:01" or "quarter:Q1" or "range:2024-01,2024-03"
+   */
+  matchDateRule(rule, file) {
+    const dateInfo = extractDateFromFilename(file.filename);
+    if (!dateInfo) return null;
+
+    const conditions = rule.pattern.split(',').map((c) => c.trim());
+
+    for (const condition of conditions) {
+      if (condition.startsWith('year:')) {
+        const targetYear = condition.slice(5);
+        // Check if the date groups contain this year
+        if (dateInfo.groups.some((g) => g === targetYear)) {
+          return {
+            confidence: dateInfo.confidence === 'high' ? CONFIDENCE.HIGH : CONFIDENCE.MEDIUM,
+            reason: `Date matches year: ${targetYear}`,
+          };
+        }
+      } else if (condition.startsWith('month:')) {
+        const targetMonth = condition.slice(6).padStart(2, '0');
+        if (dateInfo.groups.some((g) => g === targetMonth)) {
+          return {
+            confidence: CONFIDENCE.MEDIUM,
+            reason: `Date matches month: ${targetMonth}`,
+          };
+        }
+      } else if (condition.startsWith('quarter:')) {
+        const targetQuarter = condition.slice(8).toUpperCase().replace('Q', '');
+        if (dateInfo.format === 'Quarter' && dateInfo.groups.some((g) => g === targetQuarter)) {
+          return {
+            confidence: CONFIDENCE.MEDIUM,
+            reason: `Date matches quarter: Q${targetQuarter}`,
+          };
+        }
+      } else if (condition.startsWith('pattern:')) {
+        // Match any date pattern
+        const targetPattern = condition.slice(8);
+        if (!targetPattern || targetPattern === '*') {
+          return {
+            confidence: CONFIDENCE.LOW,
+            reason: `Contains date: ${dateInfo.match}`,
+          };
+        }
+      }
+    }
+
     return null;
   }
 
@@ -556,7 +752,12 @@ export function createExtensionRule(extension, targetFolderNumber, name = null) 
 /**
  * Creates a keyword rule.
  */
-export function createKeywordRule(keywords, targetFolderNumber, name = null) {
+export function createKeywordRule(
+  keywords,
+  targetFolderNumber,
+  name = null,
+  excludePattern = null
+) {
   const engine = getMatchingEngine();
   const keywordList = Array.isArray(keywords) ? keywords.join(',') : keywords;
 
@@ -567,6 +768,75 @@ export function createKeywordRule(keywords, targetFolderNumber, name = null) {
     target_type: 'folder',
     target_id: targetFolderNumber,
     priority: 60, // Keywords are often more specific
+    exclude_pattern: excludePattern,
+  });
+}
+
+/**
+ * Creates a compound rule (extension + keyword).
+ *
+ * @param {string} extension - File extension (e.g., 'pdf')
+ * @param {string|string[]} keywords - Keywords to match
+ * @param {string} targetFolderNumber - Target JD folder number
+ * @param {string} name - Rule name (optional)
+ * @param {string} excludePattern - Pattern to exclude (optional)
+ */
+export function createCompoundRule(
+  extension,
+  keywords,
+  targetFolderNumber,
+  name = null,
+  excludePattern = null
+) {
+  const engine = getMatchingEngine();
+  const ext = extension.replace(/^\./, '').toLowerCase();
+  const keywordList = Array.isArray(keywords) ? keywords : [keywords];
+
+  // Build compound pattern: ext:pdf,keyword:invoice,keyword:receipt
+  const pattern = [`ext:${ext}`, ...keywordList.map((k) => `keyword:${k.toLowerCase()}`)].join(',');
+
+  return engine.createRule({
+    name: name || `Auto-organize .${ext} files with: ${keywordList.join(', ')}`,
+    rule_type: 'compound',
+    pattern,
+    target_type: 'folder',
+    target_id: targetFolderNumber,
+    priority: 70, // Compound rules are most specific
+    exclude_pattern: excludePattern,
+  });
+}
+
+/**
+ * Creates a date-based rule.
+ *
+ * @param {Object} dateMatch - Date matching criteria
+ * @param {string} dateMatch.year - Match year (e.g., '2024')
+ * @param {string} dateMatch.month - Match month (e.g., '01')
+ * @param {string} dateMatch.quarter - Match quarter (e.g., 'Q1')
+ * @param {string} targetFolderNumber - Target JD folder number
+ * @param {string} name - Rule name (optional)
+ * @param {string} excludePattern - Pattern to exclude (optional)
+ */
+export function createDateRule(dateMatch, targetFolderNumber, name = null, excludePattern = null) {
+  const engine = getMatchingEngine();
+
+  // Build date pattern
+  const patternParts = [];
+  if (dateMatch.year) patternParts.push(`year:${dateMatch.year}`);
+  if (dateMatch.month) patternParts.push(`month:${dateMatch.month.padStart(2, '0')}`);
+  if (dateMatch.quarter) patternParts.push(`quarter:${dateMatch.quarter.toUpperCase()}`);
+  if (dateMatch.any) patternParts.push('pattern:*');
+
+  const pattern = patternParts.join(',') || 'pattern:*';
+
+  return engine.createRule({
+    name: name || `Auto-organize files by date: ${pattern}`,
+    rule_type: 'date',
+    pattern,
+    target_type: 'folder',
+    target_id: targetFolderNumber,
+    priority: 55, // Date rules are moderately specific
+    exclude_pattern: excludePattern,
   });
 }
 
@@ -633,6 +903,9 @@ export default {
   getMatchingEngine,
   createExtensionRule,
   createKeywordRule,
+  createCompoundRule,
+  createDateRule,
+  extractDateFromFilename,
   suggestRulesForFolder,
   CONFIDENCE,
 };

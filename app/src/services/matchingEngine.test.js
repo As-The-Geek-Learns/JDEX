@@ -18,6 +18,9 @@ import {
   getMatchingEngine,
   createExtensionRule,
   createKeywordRule,
+  createCompoundRule,
+  createDateRule,
+  extractDateFromFilename,
   suggestRulesForFolder,
 } from './matchingEngine.js';
 
@@ -1030,5 +1033,450 @@ describe('Edge cases', () => {
 
     // Should not throw
     expect(() => engine.matchFile(file)).not.toThrow();
+  });
+});
+
+// =============================================================================
+// Date Pattern Recognition Tests
+// =============================================================================
+
+describe('extractDateFromFilename', () => {
+  it('should extract ISO date format (YYYY-MM-DD)', () => {
+    const result = extractDateFromFilename('report-2024-01-15.pdf');
+
+    expect(result).not.toBeNull();
+    expect(result.format).toBe('YYYY-MM-DD');
+    expect(result.match).toBe('2024-01-15');
+    expect(result.confidence).toBe('high');
+  });
+
+  it('should extract compact date format (YYYYMMDD)', () => {
+    // Word boundaries required - use space or filename start/end
+    const result = extractDateFromFilename('backup 20240115 data.zip');
+
+    expect(result).not.toBeNull();
+    expect(result.format).toBe('YYYYMMDD');
+    expect(result.confidence).toBe('medium');
+  });
+
+  it('should extract year-month format (YYYY-MM)', () => {
+    const result = extractDateFromFilename('invoice_2024-01_final.pdf');
+
+    expect(result).not.toBeNull();
+    expect(result.format).toBe('YYYY-MM');
+  });
+
+  it('should extract US date format (MM-DD-YYYY)', () => {
+    const result = extractDateFromFilename('document_01-15-2024.doc');
+
+    expect(result).not.toBeNull();
+    expect(result.format).toBe('MM-DD-YYYY');
+  });
+
+  it('should extract month-year format', () => {
+    const result = extractDateFromFilename('January-2024-report.pdf');
+
+    expect(result).not.toBeNull();
+    expect(result.format).toBe('Month-YYYY');
+  });
+
+  it('should extract quarter format', () => {
+    const result = extractDateFromFilename('financials-Q1-2024.xlsx');
+
+    expect(result).not.toBeNull();
+    expect(result.format).toBe('Quarter');
+  });
+
+  it('should return null for filename without date', () => {
+    const result = extractDateFromFilename('random-file-name.txt');
+
+    expect(result).toBeNull();
+  });
+});
+
+// =============================================================================
+// Compound Rule Tests
+// =============================================================================
+
+describe('MatchingEngine compound rules', () => {
+  let engine;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    engine = new MatchingEngine();
+    getOrganizationRules.mockReturnValue([...mockRules]);
+    getFolders.mockReturnValue([...mockFolders]);
+    getCategories.mockReturnValue([...mockCategories]);
+    getAreas.mockReturnValue([...mockAreas]);
+  });
+
+  describe('matchCompoundRule', () => {
+    it('should match when both extension and keyword match', () => {
+      const rule = { pattern: 'ext:pdf,keyword:invoice' };
+      const file = {
+        filename: 'my-invoice-2024.pdf',
+        file_extension: 'pdf',
+        path: '/documents/',
+      };
+
+      const result = engine.matchCompoundRule(rule, file);
+
+      expect(result).not.toBeNull();
+      expect(result.confidence).toBe(CONFIDENCE.HIGH);
+      expect(result.reason).toContain('.pdf');
+      expect(result.reason).toContain('invoice');
+    });
+
+    it('should not match when only extension matches', () => {
+      const rule = { pattern: 'ext:pdf,keyword:invoice' };
+      const file = {
+        filename: 'report.pdf',
+        file_extension: 'pdf',
+        path: '/documents/',
+      };
+
+      const result = engine.matchCompoundRule(rule, file);
+
+      expect(result).toBeNull();
+    });
+
+    it('should not match when only keyword matches', () => {
+      const rule = { pattern: 'ext:pdf,keyword:invoice' };
+      const file = {
+        filename: 'invoice.docx',
+        file_extension: 'docx',
+        path: '/documents/',
+      };
+
+      const result = engine.matchCompoundRule(rule, file);
+
+      expect(result).toBeNull();
+    });
+
+    it('should match keyword in path', () => {
+      const rule = { pattern: 'ext:pdf,keyword:work' };
+      const file = {
+        filename: 'report.pdf',
+        file_extension: 'pdf',
+        path: '/work/projects/',
+      };
+
+      const result = engine.matchCompoundRule(rule, file);
+
+      expect(result).not.toBeNull();
+    });
+
+    it('should support multiple keywords (OR logic)', () => {
+      const rule = { pattern: 'ext:pdf,keyword:invoice,keyword:bill' };
+      const file = {
+        filename: 'my-bill.pdf',
+        file_extension: 'pdf',
+        path: '/documents/',
+      };
+
+      const result = engine.matchCompoundRule(rule, file);
+
+      expect(result).not.toBeNull();
+    });
+  });
+});
+
+// =============================================================================
+// Date Rule Tests
+// =============================================================================
+
+describe('MatchingEngine date rules', () => {
+  let engine;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    engine = new MatchingEngine();
+    getOrganizationRules.mockReturnValue([...mockRules]);
+    getFolders.mockReturnValue([...mockFolders]);
+    getCategories.mockReturnValue([...mockCategories]);
+    getAreas.mockReturnValue([...mockAreas]);
+  });
+
+  describe('matchDateRule', () => {
+    it('should match by year', () => {
+      const rule = { pattern: 'year:2024' };
+      const file = { filename: 'report-2024-01-15.pdf' };
+
+      const result = engine.matchDateRule(rule, file);
+
+      expect(result).not.toBeNull();
+      expect(result.reason).toContain('2024');
+    });
+
+    it('should match by month', () => {
+      const rule = { pattern: 'month:01' };
+      const file = { filename: 'report-2024-01-15.pdf' };
+
+      const result = engine.matchDateRule(rule, file);
+
+      expect(result).not.toBeNull();
+      expect(result.reason).toContain('01');
+    });
+
+    it('should match by quarter', () => {
+      const rule = { pattern: 'quarter:Q1' };
+      const file = { filename: 'financials-Q1-2024.xlsx' };
+
+      const result = engine.matchDateRule(rule, file);
+
+      expect(result).not.toBeNull();
+      expect(result.reason).toContain('Q1');
+    });
+
+    it('should match any date pattern', () => {
+      const rule = { pattern: 'pattern:*' };
+      const file = { filename: 'backup 20240115.zip' };
+
+      const result = engine.matchDateRule(rule, file);
+
+      expect(result).not.toBeNull();
+      expect(result.confidence).toBe(CONFIDENCE.LOW);
+    });
+
+    it('should return null for file without date', () => {
+      const rule = { pattern: 'year:2024' };
+      const file = { filename: 'random-file.txt' };
+
+      const result = engine.matchDateRule(rule, file);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when year does not match', () => {
+      const rule = { pattern: 'year:2025' };
+      const file = { filename: 'report-2024-01-15.pdf' };
+
+      const result = engine.matchDateRule(rule, file);
+
+      expect(result).toBeNull();
+    });
+  });
+});
+
+// =============================================================================
+// Exclude Pattern Tests
+// =============================================================================
+
+describe('MatchingEngine exclude patterns', () => {
+  let engine;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    engine = new MatchingEngine();
+    getOrganizationRules.mockReturnValue([...mockRules]);
+    getFolders.mockReturnValue([...mockFolders]);
+    getCategories.mockReturnValue([...mockCategories]);
+    getAreas.mockReturnValue([...mockAreas]);
+  });
+
+  describe('shouldExclude', () => {
+    it('should return false when no exclude pattern', () => {
+      const rule = { pattern: 'pdf' };
+      const file = { filename: 'test.pdf', path: '' };
+
+      const result = engine.shouldExclude(rule, file);
+
+      expect(result).toBe(false);
+    });
+
+    it('should exclude file matching text pattern in filename', () => {
+      const rule = { exclude_pattern: 'draft,temp' };
+      const file = { filename: 'draft-report.pdf', path: '' };
+
+      const result = engine.shouldExclude(rule, file);
+
+      expect(result).toBe(true);
+    });
+
+    it('should exclude file matching text pattern in path', () => {
+      const rule = { exclude_pattern: 'temp,trash' };
+      const file = { filename: 'report.pdf', path: '/trash/old/' };
+
+      const result = engine.shouldExclude(rule, file);
+
+      expect(result).toBe(true);
+    });
+
+    it('should exclude file matching regex pattern', () => {
+      const rule = { exclude_pattern: '/\\d{4}-temp/' };
+      const file = { filename: '2024-temp-file.pdf', path: '' };
+
+      const result = engine.shouldExclude(rule, file);
+
+      expect(result).toBe(true);
+    });
+
+    it('should not exclude file that does not match', () => {
+      const rule = { exclude_pattern: 'draft,temp' };
+      const file = { filename: 'final-report.pdf', path: '/documents/' };
+
+      const result = engine.shouldExclude(rule, file);
+
+      expect(result).toBe(false);
+    });
+
+    it('should handle empty exclude pattern', () => {
+      const rule = { exclude_pattern: '' };
+      const file = { filename: 'test.pdf', path: '' };
+
+      const result = engine.shouldExclude(rule, file);
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('matchRule with exclusions', () => {
+    it('should return null for excluded files', () => {
+      const rule = {
+        rule_type: 'extension',
+        pattern: 'pdf',
+        exclude_pattern: 'draft',
+      };
+      const file = { filename: 'draft-report.pdf', file_extension: 'pdf' };
+
+      const result = engine.matchRule(rule, file);
+
+      expect(result).toBeNull();
+    });
+
+    it('should match non-excluded files', () => {
+      const rule = {
+        rule_type: 'extension',
+        pattern: 'pdf',
+        exclude_pattern: 'draft',
+      };
+      const file = { filename: 'final-report.pdf', file_extension: 'pdf' };
+
+      const result = engine.matchRule(rule, file);
+
+      expect(result).not.toBeNull();
+    });
+  });
+});
+
+// =============================================================================
+// Compound and Date Rule Helper Tests
+// =============================================================================
+
+describe('createCompoundRule', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getMatchingEngine().invalidateCache();
+    getOrganizationRules.mockReturnValue([]);
+    getFolders.mockReturnValue([]);
+    getCategories.mockReturnValue([]);
+    getAreas.mockReturnValue([]);
+  });
+
+  it('should create a compound rule with extension and keyword', () => {
+    createCompoundRule('pdf', 'invoice', '11.01');
+
+    expect(createOrganizationRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rule_type: 'compound',
+        pattern: 'ext:pdf,keyword:invoice',
+        target_type: 'folder',
+        target_id: '11.01',
+        priority: 70,
+      })
+    );
+  });
+
+  it('should handle multiple keywords', () => {
+    createCompoundRule('pdf', ['invoice', 'bill', 'receipt'], '11.01');
+
+    expect(createOrganizationRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pattern: 'ext:pdf,keyword:invoice,keyword:bill,keyword:receipt',
+      })
+    );
+  });
+
+  it('should strip leading dot from extension', () => {
+    createCompoundRule('.pdf', 'invoice', '11.01');
+
+    expect(createOrganizationRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pattern: 'ext:pdf,keyword:invoice',
+      })
+    );
+  });
+
+  it('should include exclude pattern when provided', () => {
+    createCompoundRule('pdf', 'invoice', '11.01', 'My Rule', 'draft,temp');
+
+    expect(createOrganizationRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exclude_pattern: 'draft,temp',
+      })
+    );
+  });
+});
+
+describe('createDateRule', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getMatchingEngine().invalidateCache();
+    getOrganizationRules.mockReturnValue([]);
+    getFolders.mockReturnValue([]);
+    getCategories.mockReturnValue([]);
+    getAreas.mockReturnValue([]);
+  });
+
+  it('should create a date rule matching year', () => {
+    createDateRule({ year: '2024' }, '11.01');
+
+    expect(createOrganizationRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rule_type: 'date',
+        pattern: 'year:2024',
+        priority: 55,
+      })
+    );
+  });
+
+  it('should create a date rule matching month', () => {
+    createDateRule({ month: '1' }, '11.01');
+
+    expect(createOrganizationRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pattern: 'month:01',
+      })
+    );
+  });
+
+  it('should create a date rule matching quarter', () => {
+    createDateRule({ quarter: 'q1' }, '11.01');
+
+    expect(createOrganizationRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pattern: 'quarter:Q1',
+      })
+    );
+  });
+
+  it('should create a rule matching any date', () => {
+    createDateRule({ any: true }, '11.01');
+
+    expect(createOrganizationRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pattern: 'pattern:*',
+      })
+    );
+  });
+
+  it('should include exclude pattern when provided', () => {
+    createDateRule({ year: '2024' }, '11.01', 'Year 2024 Rule', 'archived');
+
+    expect(createOrganizationRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exclude_pattern: 'archived',
+      })
+    );
   });
 });

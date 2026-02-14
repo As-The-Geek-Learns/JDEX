@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   ChartColumn,
   TrendingUp,
@@ -10,47 +10,92 @@ import {
   Crown,
   Lock,
   Sparkles,
-  ChevronDown,
   RefreshCw,
+  Download,
+  ArrowLeftRight,
 } from 'lucide-react';
+import { subDays, startOfDay, endOfDay } from 'date-fns';
 import { useLicense } from '../../context/LicenseContext.jsx';
 import { getDashboardStats } from '../../services/statisticsService.js';
+import { downloadStatisticsReport } from '../../services/csvExportService.js';
 import StatCard from './StatCard.jsx';
 import ActivityChart from './ActivityChart.jsx';
 import FileTypeChart from './FileTypeChart.jsx';
 import TopRulesCard from './TopRulesCard.jsx';
+import DateRangePicker from './DateRangePicker.jsx';
+import ComparisonView from './ComparisonView.jsx';
+import { getPreviousPeriodRange } from './ComparisonCard.jsx';
 
 /**
  * StatsDashboard - Premium feature showing organization statistics
  * Modern design with animations and rich visual feedback
  */
+// Default date range: last 30 days
+const getDefaultDateRange = () => ({
+  start: startOfDay(subDays(new Date(), 29)),
+  end: endOfDay(new Date()),
+});
+
 export default function StatsDashboard({ onClose }) {
   const { isPremium, showUpgradePrompt } = useLicense();
   const [stats, setStats] = useState(null);
+  const [previousStats, setPreviousStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedPeriod, setSelectedPeriod] = useState('30days');
+  const [dateRange, setDateRange] = useState(getDefaultDateRange);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+
+  const loadStats = useCallback(
+    async (range = dateRange) => {
+      setIsLoading(true);
+      try {
+        // Pass date range to stats service
+        const data = getDashboardStats(range.start, range.end);
+        setStats(data);
+      } catch (error) {
+        console.error('[StatsDashboard] Error loading stats:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [dateRange]
+  );
 
   useEffect(() => {
     loadStats();
-  }, []);
+  }, [loadStats]);
 
-  const loadStats = async () => {
-    setIsLoading(true);
-    try {
-      const data = getDashboardStats();
-      setStats(data);
-    } catch (error) {
-      console.error('[StatsDashboard] Error loading stats:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleDateRangeChange = (newRange) => {
+    setDateRange(newRange);
+    loadStats(newRange);
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await loadStats();
     setTimeout(() => setIsRefreshing(false), 500);
+  };
+
+  const handleExportCSV = () => {
+    if (stats) {
+      downloadStatisticsReport(stats, dateRange);
+    }
+  };
+
+  const handleToggleComparison = async () => {
+    if (!showComparison && dateRange.start && dateRange.end) {
+      // Load previous period stats
+      const prevRange = getPreviousPeriodRange(dateRange.start, dateRange.end);
+      if (prevRange.start && prevRange.end) {
+        try {
+          const prevData = getDashboardStats(prevRange.start, prevRange.end);
+          setPreviousStats(prevData);
+        } catch (error) {
+          console.error('[StatsDashboard] Error loading previous stats:', error);
+        }
+      }
+    }
+    setShowComparison(!showComparison);
   };
 
   // Premium gate - show upgrade prompt for free users
@@ -201,25 +246,39 @@ export default function StatsDashboard({ onClose }) {
           </div>
 
           <div className="relative flex items-center gap-3">
-            {/* Period selector */}
-            <div className="relative">
-              <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="appearance-none bg-slate-800/50 border border-slate-600/50 rounded-xl 
-                  px-4 py-2 pr-10 text-sm text-white cursor-pointer
-                  hover:border-slate-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50
-                  transition-all"
-              >
-                <option value="7days">Last 7 days</option>
-                <option value="30days">Last 30 days</option>
-                <option value="90days">Last 90 days</option>
-              </select>
-              <ChevronDown
-                size={16}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            {/* Date range picker */}
+            <DateRangePicker value={dateRange} onChange={handleDateRangeChange} />
+
+            {/* Comparison toggle button */}
+            <button
+              onClick={handleToggleComparison}
+              disabled={!stats || isLoading || !dateRange.start || !dateRange.end}
+              className={`p-2.5 rounded-xl transition-all group
+                disabled:opacity-50 disabled:cursor-not-allowed
+                ${showComparison ? 'bg-purple-600/20 text-purple-400' : 'hover:bg-slate-700/50'}`}
+              title="Compare with previous period"
+            >
+              <ArrowLeftRight
+                size={18}
+                className={`transition-colors ${
+                  showComparison ? 'text-purple-400' : 'text-slate-400 group-hover:text-white'
+                }`}
               />
-            </div>
+            </button>
+
+            {/* Export button */}
+            <button
+              onClick={handleExportCSV}
+              disabled={!stats || isLoading}
+              className="p-2.5 hover:bg-slate-700/50 rounded-xl transition-all group
+                disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Export statistics to CSV"
+            >
+              <Download
+                size={18}
+                className="text-slate-400 group-hover:text-white transition-colors"
+              />
+            </button>
 
             {/* Refresh button */}
             <button
@@ -282,6 +341,13 @@ export default function StatsDashboard({ onClose }) {
                 </button>
               </div>
             </div>
+          ) : showComparison ? (
+            <ComparisonView
+              currentStats={stats}
+              previousStats={previousStats}
+              dateRange={dateRange}
+              onClose={() => setShowComparison(false)}
+            />
           ) : (
             <div className="space-y-6 animate-stagger">
               {/* Top Stats Row */}

@@ -29,6 +29,7 @@ import {
 import { sanitizeErrorForUser } from '../../utils/errors.js';
 import { useLicense, UpgradePrompt } from '../../context/LicenseContext.jsx';
 import { LICENSE_TIERS } from '../../services/licenseService.js';
+import FolderStatus, { StatusSummaryBar } from './StatusIndicator.jsx';
 
 // =============================================================================
 // Constants
@@ -66,6 +67,7 @@ export default function WatchFolders() {
   const [watcherAvailable, setWatcherAvailable] = useState(false);
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(null);
+  const [toggling, setToggling] = useState(null); // Track which folder is toggling state
 
   // Calculate remaining slots
   const remainingSlots = MAX_WATCH_FOLDERS - watchedFolders.length;
@@ -159,6 +161,67 @@ export default function WatchFolders() {
     [loadData, watcherAvailable]
   );
 
+  const handleToggleActive = useCallback(
+    async (id, newActive, isRunning = false) => {
+      // Confirm when pausing an actively running watcher
+      if (!newActive && isRunning) {
+        const confirmed = confirm(
+          'This folder is actively watching for files. Are you sure you want to pause it?'
+        );
+        if (!confirmed) return;
+      }
+
+      setToggling(id);
+      try {
+        updateWatchedFolder(id, { is_active: newActive });
+
+        if (watcherAvailable) {
+          if (newActive) {
+            startWatcher(id);
+          } else {
+            stopWatcher(id);
+          }
+        }
+
+        loadData();
+      } catch (e) {
+        setError(sanitizeErrorForUser(e));
+      } finally {
+        // Brief delay for visual feedback
+        setTimeout(() => setToggling(null), 300);
+      }
+    },
+    [loadData, watcherAvailable]
+  );
+
+  // Bulk operations
+  const handlePauseAll = useCallback(() => {
+    const activeFolders = watchedFolders.filter((f) => f.is_active);
+    if (activeFolders.length === 0) return;
+
+    const confirmed = confirm(
+      `Pause all ${activeFolders.length} active folder${activeFolders.length > 1 ? 's' : ''}?`
+    );
+    if (!confirmed) return;
+
+    activeFolders.forEach((folder) => {
+      updateWatchedFolder(folder.id, { is_active: false });
+      if (watcherAvailable) stopWatcher(folder.id);
+    });
+    loadData();
+  }, [watchedFolders, loadData, watcherAvailable]);
+
+  const handleResumeAll = useCallback(() => {
+    const pausedFolders = watchedFolders.filter((f) => !f.is_active);
+    if (pausedFolders.length === 0) return;
+
+    pausedFolders.forEach((folder) => {
+      updateWatchedFolder(folder.id, { is_active: true });
+      if (watcherAvailable) startWatcher(folder.id);
+    });
+    loadData();
+  }, [watchedFolders, loadData, watcherAvailable]);
+
   const handleDeleteFolder = useCallback(
     async (id) => {
       if (!confirm('Are you sure you want to remove this watched folder?')) return;
@@ -226,21 +289,48 @@ export default function WatchFolders() {
             )}
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          disabled={!canAddMore}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-            canAddMore
-              ? 'bg-teal-600 hover:bg-teal-700 text-white'
-              : 'bg-slate-700 text-gray-500 cursor-not-allowed'
-          }`}
-          title={
-            canAddMore ? 'Add a new watch folder' : `Maximum ${MAX_WATCH_FOLDERS} folders reached`
-          }
-        >
-          <span>➕</span>
-          {canAddMore ? 'Add Watch Folder' : 'Limit Reached'}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Bulk controls */}
+          {watchedFolders.length > 1 && (
+            <div className="flex items-center gap-1 mr-2">
+              <button
+                onClick={handlePauseAll}
+                disabled={!watchedFolders.some((f) => f.is_active)}
+                className="px-3 py-1.5 text-xs rounded-md transition-colors
+                  bg-slate-700 hover:bg-slate-600 text-gray-300
+                  disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Pause all active folders"
+              >
+                ⏸️ Pause All
+              </button>
+              <button
+                onClick={handleResumeAll}
+                disabled={!watchedFolders.some((f) => !f.is_active)}
+                className="px-3 py-1.5 text-xs rounded-md transition-colors
+                  bg-slate-700 hover:bg-slate-600 text-gray-300
+                  disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Resume all paused folders"
+              >
+                ▶️ Resume All
+              </button>
+            </div>
+          )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            disabled={!canAddMore}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              canAddMore
+                ? 'bg-teal-600 hover:bg-teal-700 text-white'
+                : 'bg-slate-700 text-gray-500 cursor-not-allowed'
+            }`}
+            title={
+              canAddMore ? 'Add a new watch folder' : `Maximum ${MAX_WATCH_FOLDERS} folders reached`
+            }
+          >
+            <span>➕</span>
+            {canAddMore ? 'Add Watch Folder' : 'Limit Reached'}
+          </button>
+        </div>
       </div>
 
       {/* Status Banner */}
@@ -269,6 +359,26 @@ export default function WatchFolders() {
         </div>
       )}
 
+      {/* Summary Status Bar */}
+      {watchedFolders.length > 0 && (
+        <StatusSummaryBar
+          totalFolders={watchedFolders.length}
+          activeFolders={watchedFolders.filter((f) => f.is_active).length}
+          filesProcessedToday={
+            activity.filter((a) => {
+              const today = new Date();
+              const activityDate = new Date(a.created_at);
+              return (
+                activityDate.getDate() === today.getDate() &&
+                activityDate.getMonth() === today.getMonth() &&
+                activityDate.getFullYear() === today.getFullYear()
+              );
+            }).length
+          }
+          isWatcherAvailable={watcherAvailable}
+        />
+      )}
+
       {/* Watched Folders List */}
       <div className="space-y-4">
         {watchedFolders.length === 0 ? (
@@ -279,11 +389,12 @@ export default function WatchFolders() {
               key={folder.id}
               folder={folder}
               queuedCount={queuedCounts.find((q) => q.id === folder.id)?.queued_count || 0}
-              onToggleActive={(active) => handleUpdateFolder(folder.id, { is_active: active })}
+              onToggleActive={(active) => handleToggleActive(folder.id, active, folder.is_running)}
               onEdit={() => setEditingFolder(folder)}
               onDelete={() => handleDeleteFolder(folder.id)}
               onProcessExisting={() => handleProcessExisting(folder.id)}
               processing={processing === folder.id}
+              toggling={toggling === folder.id}
               watcherAvailable={watcherAvailable}
             />
           ))
@@ -346,11 +457,9 @@ function WatchedFolderCard({
   onDelete,
   onProcessExisting,
   processing,
+  toggling,
   watcherAvailable,
 }) {
-  const isRunning = folder.is_running;
-  const canRun = folder.can_run;
-
   return (
     <div
       className={`bg-slate-800 rounded-lg border p-4 transition-colors ${
@@ -359,68 +468,21 @@ function WatchedFolderCard({
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mb-2">
             <h3 className="font-medium text-white">{folder.name}</h3>
-
-            {/* Status badges */}
-            <div className="flex items-center gap-2">
-              {isRunning && (
-                <span
-                  className="px-2 py-0.5 bg-green-900/50 text-green-400 text-xs rounded-full 
-                  flex items-center gap-1"
-                >
-                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
-                  Watching
-                </span>
-              )}
-              {folder.is_active && !isRunning && watcherAvailable && (
-                <span className="px-2 py-0.5 bg-yellow-900/50 text-yellow-400 text-xs rounded-full">
-                  {canRun ? 'Ready' : 'Path Not Found'}
-                </span>
-              )}
-              {!folder.is_active && (
-                <span className="px-2 py-0.5 bg-slate-700 text-gray-400 text-xs rounded-full">
-                  Paused
-                </span>
-              )}
-              {folder.auto_organize ? (
-                <span className="px-2 py-0.5 bg-teal-900/50 text-teal-400 text-xs rounded-full">
-                  Auto-Organize
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 bg-blue-900/50 text-blue-400 text-xs rounded-full">
-                  Queue Only
-                </span>
-              )}
-            </div>
           </div>
 
-          <p className="text-sm text-gray-400 mt-1 font-mono truncate" title={folder.path}>
+          <p className="text-sm text-gray-400 font-mono truncate mb-3" title={folder.path}>
             {folder.path}
           </p>
 
-          {/* Stats */}
-          <div className="flex items-center gap-6 mt-3 text-sm">
-            <div className="text-gray-400">
-              <span className="text-gray-500">Processed:</span>{' '}
-              <span className="text-white">{folder.files_processed || 0}</span>
-            </div>
-            <div className="text-gray-400">
-              <span className="text-gray-500">Organized:</span>{' '}
-              <span className="text-teal-400">{folder.files_organized || 0}</span>
-            </div>
-            {queuedCount > 0 && (
-              <div className="text-amber-400">
-                <span className="text-amber-500">Queued:</span>{' '}
-                <span className="font-medium">{queuedCount}</span>
-              </div>
-            )}
-            {folder.last_checked_at && (
-              <div className="text-gray-500 text-xs">
-                Last: {new Date(folder.last_checked_at).toLocaleString()}
-              </div>
-            )}
-          </div>
+          {/* Enhanced Status Indicator */}
+          <FolderStatus
+            folder={folder}
+            queuedCount={queuedCount}
+            isProcessing={processing}
+            watcherAvailable={watcherAvailable}
+          />
         </div>
 
         {/* Actions */}
@@ -428,7 +490,7 @@ function WatchedFolderCard({
           {watcherAvailable && (
             <button
               onClick={onProcessExisting}
-              disabled={processing || !canRun}
+              disabled={processing || !folder.can_run}
               className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-gray-300 
                 text-sm rounded-md transition-colors disabled:opacity-50"
               title="Process existing files in folder"
@@ -439,13 +501,32 @@ function WatchedFolderCard({
 
           <button
             onClick={() => onToggleActive(!folder.is_active)}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-              folder.is_active
-                ? 'bg-yellow-900/50 hover:bg-yellow-900/70 text-yellow-400'
-                : 'bg-green-900/50 hover:bg-green-900/70 text-green-400'
+            disabled={toggling}
+            className={`px-3 py-1.5 text-sm rounded-md transition-all duration-200 min-w-[90px] ${
+              toggling
+                ? 'bg-slate-600 text-slate-300 cursor-wait'
+                : folder.is_active
+                  ? 'bg-yellow-900/50 hover:bg-yellow-900/70 text-yellow-400 hover:scale-105'
+                  : 'bg-green-900/50 hover:bg-green-900/70 text-green-400 hover:scale-105'
             }`}
+            title={
+              toggling
+                ? 'Please wait...'
+                : folder.is_active
+                  ? 'Pause monitoring this folder'
+                  : 'Start monitoring this folder'
+            }
           >
-            {folder.is_active ? '⏸️ Pause' : '▶️ Start'}
+            {toggling ? (
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                {folder.is_active ? 'Pausing...' : 'Starting...'}
+              </span>
+            ) : folder.is_active ? (
+              '⏸️ Pause'
+            ) : (
+              '▶️ Start'
+            )}
           </button>
 
           <button
@@ -469,63 +550,168 @@ function WatchedFolderCard({
   );
 }
 
+// Activity action type config
+const ACTION_TYPES = {
+  detected: { icon: '👀', label: 'Detected', color: 'text-gray-400', bgColor: 'bg-gray-500/20' },
+  queued: { icon: '📥', label: 'Queued', color: 'text-amber-400', bgColor: 'bg-amber-500/20' },
+  auto_organized: {
+    icon: '✅',
+    label: 'Organized',
+    color: 'text-green-400',
+    bgColor: 'bg-green-500/20',
+  },
+  skipped: { icon: '⏭️', label: 'Skipped', color: 'text-gray-500', bgColor: 'bg-gray-500/20' },
+  error: { icon: '❌', label: 'Error', color: 'text-red-400', bgColor: 'bg-red-500/20' },
+};
+
 function ActivityLog({ activity }) {
-  const getActionIcon = (action) => {
-    switch (action) {
-      case 'detected':
-        return '👀';
-      case 'queued':
-        return '📥';
-      case 'auto_organized':
-        return '✅';
-      case 'skipped':
-        return '⏭️';
-      case 'error':
-        return '❌';
-      default:
-        return '•';
-    }
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilters, setActiveFilters] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter activity based on search and action filters
+  const filteredActivity = activity.filter((item) => {
+    // Search filter
+    const matchesSearch =
+      !searchQuery ||
+      item.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.target_folder?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.rule_name?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // Action type filter
+    const matchesFilter = activeFilters.length === 0 || activeFilters.includes(item.action);
+
+    return matchesSearch && matchesFilter;
+  });
+
+  const toggleFilter = (action) => {
+    setActiveFilters((prev) =>
+      prev.includes(action) ? prev.filter((a) => a !== action) : [...prev, action]
+    );
   };
 
-  const getActionColor = (action) => {
-    switch (action) {
-      case 'detected':
-        return 'text-gray-400';
-      case 'queued':
-        return 'text-amber-400';
-      case 'auto_organized':
-        return 'text-green-400';
-      case 'skipped':
-        return 'text-gray-500';
-      case 'error':
-        return 'text-red-400';
-      default:
-        return 'text-gray-400';
-    }
+  const clearFilters = () => {
+    setSearchQuery('');
+    setActiveFilters([]);
   };
+
+  const hasActiveFilters = searchQuery || activeFilters.length > 0;
 
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden">
-      <div className="max-h-64 overflow-y-auto">
-        {activity.map((item, index) => (
-          <div
-            key={item.id || index}
-            className="flex items-center gap-3 px-4 py-2 border-b border-slate-700/50 
-              last:border-b-0 hover:bg-slate-700/30"
-          >
-            <span className={getActionColor(item.action)}>{getActionIcon(item.action)}</span>
-            <span className="flex-1 text-sm text-gray-300 truncate" title={item.filename}>
-              {item.filename}
-            </span>
-            {item.target_folder && (
-              <span className="text-xs text-teal-400">→ {item.target_folder}</span>
-            )}
-            {item.rule_name && <span className="text-xs text-gray-500">({item.rule_name})</span>}
-            <span className="text-xs text-gray-500">
-              {new Date(item.created_at).toLocaleTimeString()}
-            </span>
+      {/* Filter Controls */}
+      <div className="px-4 py-3 border-b border-slate-700 space-y-3">
+        <div className="flex items-center gap-2">
+          {/* Search input */}
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search files, folders, rules..."
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-900 border border-slate-600 rounded-md
+                text-sm text-white placeholder-gray-500 focus:border-teal-500 focus:ring-1
+                focus:ring-teal-500"
+            />
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500">🔍</span>
           </div>
-        ))}
+
+          {/* Filter toggle button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1.5 ${
+              showFilters || activeFilters.length > 0
+                ? 'bg-teal-900/50 text-teal-400'
+                : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+            }`}
+          >
+            <span>⚙️</span>
+            Filter
+            {activeFilters.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 bg-teal-500/30 rounded-full text-xs">
+                {activeFilters.length}
+              </span>
+            )}
+          </button>
+
+          {/* Clear filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="px-2 py-1.5 text-xs text-gray-400 hover:text-white
+                hover:bg-slate-700 rounded transition-colors"
+              title="Clear all filters"
+            >
+              ✕ Clear
+            </button>
+          )}
+        </div>
+
+        {/* Action type filter chips */}
+        {showFilters && (
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(ACTION_TYPES).map(([action, config]) => (
+              <button
+                key={action}
+                onClick={() => toggleFilter(action)}
+                className={`px-2.5 py-1 text-xs rounded-full transition-colors flex items-center gap-1.5 ${
+                  activeFilters.includes(action)
+                    ? `${config.bgColor} ${config.color} ring-1 ring-current`
+                    : 'bg-slate-700 text-gray-400 hover:text-white'
+                }`}
+              >
+                <span>{config.icon}</span>
+                {config.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Results count */}
+        {hasActiveFilters && (
+          <div className="text-xs text-slate-500">
+            Showing {filteredActivity.length} of {activity.length} events
+          </div>
+        )}
+      </div>
+
+      {/* Activity List */}
+      <div className="max-h-64 overflow-y-auto">
+        {filteredActivity.length === 0 ? (
+          <div className="px-4 py-8 text-center text-gray-500 text-sm">
+            {hasActiveFilters
+              ? 'No matching activity found. Try adjusting your filters.'
+              : 'No activity recorded yet.'}
+          </div>
+        ) : (
+          filteredActivity.map((item, index) => {
+            const actionConfig = ACTION_TYPES[item.action] || {
+              icon: '•',
+              color: 'text-gray-400',
+            };
+            return (
+              <div
+                key={item.id || index}
+                className="flex items-center gap-3 px-4 py-2 border-b border-slate-700/50
+                  last:border-b-0 hover:bg-slate-700/30"
+              >
+                <span className={actionConfig.color}>{actionConfig.icon}</span>
+                <span className="flex-1 text-sm text-gray-300 truncate" title={item.filename}>
+                  {item.filename}
+                </span>
+                {item.target_folder && (
+                  <span className="text-xs text-teal-400">→ {item.target_folder}</span>
+                )}
+                {item.rule_name && (
+                  <span className="text-xs text-gray-500">({item.rule_name})</span>
+                )}
+                <span className="text-xs text-gray-500">
+                  {new Date(item.created_at).toLocaleTimeString()}
+                </span>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

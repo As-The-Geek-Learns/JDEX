@@ -158,26 +158,25 @@ describe('StatsDashboard', () => {
       });
     });
 
-    it('should render period selector', async () => {
+    it('should render date range picker', async () => {
       render(<StatsDashboard onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        // DateRangePicker shows "Last 30 days" as default
+        expect(screen.getByText('Last 30 days')).toBeInTheDocument();
       });
     });
 
-    it('should have period options', async () => {
-      render(<StatsDashboard onClose={mockOnClose} />);
+    it('should render date range picker button with calendar icon', async () => {
+      const { container } = render(<StatsDashboard onClose={mockOnClose} />);
 
       await waitFor(() => {
-        const select = screen.getByRole('combobox');
-        expect(select).toBeInTheDocument();
+        expect(screen.getByText('Last 30 days')).toBeInTheDocument();
       });
 
-      // Check options exist
-      expect(screen.getByText('Last 7 days')).toBeInTheDocument();
-      expect(screen.getByText('Last 30 days')).toBeInTheDocument();
-      expect(screen.getByText('Last 90 days')).toBeInTheDocument();
+      // DateRangePicker has a calendar icon
+      const calendarIcon = container.querySelector('.lucide-calendar');
+      expect(calendarIcon).toBeInTheDocument();
     });
 
     it('should render stat cards', async () => {

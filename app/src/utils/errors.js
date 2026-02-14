@@ -40,32 +40,186 @@ export class AppError extends Error {
 }
 
 /**
+ * File system error types for classification.
+ */
+export const FILE_ERROR_TYPE = {
+  PERMISSION_DENIED: 'permission_denied',
+  FILE_NOT_FOUND: 'file_not_found',
+  FILE_IN_USE: 'file_in_use',
+  DISK_FULL: 'disk_full',
+  PATH_TOO_LONG: 'path_too_long',
+  INVALID_PATH: 'invalid_path',
+  CROSS_DEVICE: 'cross_device',
+  DIRECTORY_NOT_EMPTY: 'directory_not_empty',
+  NETWORK_ERROR: 'network_error',
+  UNKNOWN: 'unknown',
+};
+
+/**
+ * Classify a system error code into a user-friendly error type.
+ * @param {Error} error - The original system error
+ * @returns {string} One of FILE_ERROR_TYPE values
+ */
+export function classifyFileError(error) {
+  if (!error) return FILE_ERROR_TYPE.UNKNOWN;
+
+  const code = error.code || '';
+  const message = (error.message || '').toLowerCase();
+
+  // Permission errors
+  if (code === 'EACCES' || code === 'EPERM' || message.includes('permission denied')) {
+    return FILE_ERROR_TYPE.PERMISSION_DENIED;
+  }
+
+  // File not found
+  if (code === 'ENOENT' || message.includes('no such file')) {
+    return FILE_ERROR_TYPE.FILE_NOT_FOUND;
+  }
+
+  // File in use / locked
+  if (code === 'EBUSY' || code === 'ENOTEMPTY' || message.includes('resource busy')) {
+    return FILE_ERROR_TYPE.FILE_IN_USE;
+  }
+
+  // Disk full
+  if (code === 'ENOSPC' || message.includes('no space left')) {
+    return FILE_ERROR_TYPE.DISK_FULL;
+  }
+
+  // Path too long
+  if (code === 'ENAMETOOLONG' || message.includes('name too long')) {
+    return FILE_ERROR_TYPE.PATH_TOO_LONG;
+  }
+
+  // Invalid path
+  if (code === 'EINVAL' || message.includes('invalid argument')) {
+    return FILE_ERROR_TYPE.INVALID_PATH;
+  }
+
+  // Cross-device move (requires copy+delete)
+  if (code === 'EXDEV') {
+    return FILE_ERROR_TYPE.CROSS_DEVICE;
+  }
+
+  // Directory not empty
+  if (code === 'ENOTEMPTY') {
+    return FILE_ERROR_TYPE.DIRECTORY_NOT_EMPTY;
+  }
+
+  // Network errors
+  if (
+    code === 'ENETUNREACH' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ETIMEDOUT' ||
+    message.includes('network')
+  ) {
+    return FILE_ERROR_TYPE.NETWORK_ERROR;
+  }
+
+  return FILE_ERROR_TYPE.UNKNOWN;
+}
+
+/**
  * Error for file system operations.
  * Use when file read/write/move operations fail.
  */
 export class FileSystemError extends AppError {
-  constructor(message, operation = 'unknown', path = null) {
+  constructor(message, operation = 'unknown', path = null, originalError = null) {
     super(message, 'FILE_SYSTEM_ERROR');
     this.name = 'FileSystemError';
     this.operation = operation; // 'read', 'write', 'move', 'delete', 'scan'
     // Don't store the actual path - it might be sensitive
     this.hasPath = path !== null;
+    // Classify the error type
+    this.errorType = originalError ? classifyFileError(originalError) : FILE_ERROR_TYPE.UNKNOWN;
+    // Store system error code for debugging
+    this.systemCode = originalError?.code || null;
   }
 
   /**
-   * Get a user-friendly message based on the operation.
+   * Check if this error is likely transient and worth retrying.
+   */
+  isRetryable() {
+    return [
+      FILE_ERROR_TYPE.FILE_IN_USE,
+      FILE_ERROR_TYPE.NETWORK_ERROR,
+      FILE_ERROR_TYPE.CROSS_DEVICE,
+    ].includes(this.errorType);
+  }
+
+  /**
+   * Get a suggested action for the user based on error type.
+   */
+  getSuggestedAction() {
+    const actions = {
+      [FILE_ERROR_TYPE.PERMISSION_DENIED]:
+        'Check file permissions or try running with admin rights.',
+      [FILE_ERROR_TYPE.FILE_NOT_FOUND]: 'The file may have been moved or deleted.',
+      [FILE_ERROR_TYPE.FILE_IN_USE]: 'Close any programs using this file and try again.',
+      [FILE_ERROR_TYPE.DISK_FULL]: 'Free up disk space and try again.',
+      [FILE_ERROR_TYPE.PATH_TOO_LONG]: 'Move the file to a shorter path or rename it.',
+      [FILE_ERROR_TYPE.INVALID_PATH]: 'Check for invalid characters in the filename.',
+      [FILE_ERROR_TYPE.CROSS_DEVICE]: 'The file will be copied instead of moved.',
+      [FILE_ERROR_TYPE.NETWORK_ERROR]: 'Check your network connection and try again.',
+      [FILE_ERROR_TYPE.DIRECTORY_NOT_EMPTY]: 'The folder contains files that must be moved first.',
+      [FILE_ERROR_TYPE.UNKNOWN]: 'Try again or check the file manually.',
+    };
+    return actions[this.errorType] || actions[FILE_ERROR_TYPE.UNKNOWN];
+  }
+
+  /**
+   * Get a user-friendly message based on the error type and operation.
    */
   getUserMessage() {
-    const messages = {
+    // Type-specific messages take priority
+    const typeMessages = {
+      [FILE_ERROR_TYPE.PERMISSION_DENIED]:
+        'Permission denied. You may not have access to this file.',
+      [FILE_ERROR_TYPE.FILE_NOT_FOUND]: 'File not found. It may have been moved or deleted.',
+      [FILE_ERROR_TYPE.FILE_IN_USE]: 'File is in use. Close other programs and try again.',
+      [FILE_ERROR_TYPE.DISK_FULL]: 'Not enough disk space. Free up space and try again.',
+      [FILE_ERROR_TYPE.PATH_TOO_LONG]: 'File path is too long. Try a shorter destination.',
+      [FILE_ERROR_TYPE.NETWORK_ERROR]: 'Network error. Check your connection and try again.',
+    };
+
+    if (typeMessages[this.errorType]) {
+      return typeMessages[this.errorType];
+    }
+
+    // Fall back to operation-based messages
+    const operationMessages = {
       read: 'Unable to read the file. Please check if it exists and you have permission.',
       write: 'Unable to save the file. Please check if you have write permission.',
       move: 'Unable to move the file. The destination may not be accessible.',
       delete: 'Unable to delete the file. It may be in use or protected.',
       scan: 'Unable to scan the folder. Please check if it exists and you have permission.',
       create: 'Unable to create the file or folder. Please check permissions.',
+      mkdir: 'Unable to create the folder. Please check permissions.',
+      buildPath: 'Unable to determine destination path.',
+      rename: 'Unable to rename the file.',
+      rollback: 'Unable to undo the file operation.',
       unknown: 'A file operation failed. Please try again.',
     };
-    return messages[this.operation] || messages.unknown;
+    return operationMessages[this.operation] || operationMessages.unknown;
+  }
+
+  /**
+   * Get a short label for the error type (for badges/tags).
+   */
+  getTypeLabel() {
+    const labels = {
+      [FILE_ERROR_TYPE.PERMISSION_DENIED]: 'Permission Denied',
+      [FILE_ERROR_TYPE.FILE_NOT_FOUND]: 'Not Found',
+      [FILE_ERROR_TYPE.FILE_IN_USE]: 'File In Use',
+      [FILE_ERROR_TYPE.DISK_FULL]: 'Disk Full',
+      [FILE_ERROR_TYPE.PATH_TOO_LONG]: 'Path Too Long',
+      [FILE_ERROR_TYPE.INVALID_PATH]: 'Invalid Path',
+      [FILE_ERROR_TYPE.CROSS_DEVICE]: 'Cross Device',
+      [FILE_ERROR_TYPE.NETWORK_ERROR]: 'Network Error',
+      [FILE_ERROR_TYPE.DIRECTORY_NOT_EMPTY]: 'Not Empty',
+      [FILE_ERROR_TYPE.UNKNOWN]: 'Error',
+    };
+    return labels[this.errorType] || 'Error';
   }
 }
 

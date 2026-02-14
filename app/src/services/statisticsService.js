@@ -5,9 +5,11 @@
  * All queries are read-only and optimized for dashboard display.
  *
  * Security: All numeric parameters are validated before use in queries.
+ * Date parameters are validated and sanitized before use.
  */
 
 import { getDB } from '../db.js';
+import { format, differenceInDays } from 'date-fns';
 
 /**
  * Validate and sanitize a numeric parameter for SQL queries.
@@ -27,18 +29,54 @@ function validateNumericParam(value, defaultValue, maxValue = 1000) {
 }
 
 /**
+ * Format a date for SQL queries (YYYY-MM-DD format).
+ * @param {Date|null} date - Date to format
+ * @returns {string|null} Formatted date string or null
+ */
+function formatDateForSQL(date) {
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+    return null;
+  }
+  return format(date, 'yyyy-MM-dd');
+}
+
+/**
+ * Build a WHERE clause fragment for date range filtering.
+ * @param {Date|null} startDate - Start of range
+ * @param {Date|null} endDate - End of range
+ * @param {string} dateColumn - Column name to filter on
+ * @returns {string} WHERE clause fragment (may be empty)
+ */
+function buildDateRangeClause(startDate, endDate, dateColumn = 'organized_at') {
+  const start = formatDateForSQL(startDate);
+  const end = formatDateForSQL(endDate);
+
+  if (!start && !end) return '';
+  if (start && end) {
+    return `AND DATE(${dateColumn}) >= '${start}' AND DATE(${dateColumn}) <= '${end}'`;
+  }
+  if (start) return `AND DATE(${dateColumn}) >= '${start}'`;
+  if (end) return `AND DATE(${dateColumn}) <= '${end}'`;
+  return '';
+}
+
+/**
  * Get total count of organized files
+ * @param {Date|null} startDate - Start of date range (optional)
+ * @param {Date|null} endDate - End of date range (optional)
  * @returns {number} Total files with status 'moved'
  */
-export function getTotalOrganizedFiles() {
+export function getTotalOrganizedFiles(startDate = null, endDate = null) {
   const db = getDB();
   if (!db) return 0;
 
   try {
+    const dateClause = buildDateRangeClause(startDate, endDate, 'organized_at');
     const result = db.exec(`
-      SELECT COUNT(*) as count 
-      FROM organized_files 
+      SELECT COUNT(*) as count
+      FROM organized_files
       WHERE status = 'moved'
+      ${dateClause}
     `);
     return result[0]?.values[0]?.[0] || 0;
   } catch (error) {
@@ -91,28 +129,34 @@ export function getActiveRulesCount() {
 }
 
 /**
- * Get files organized by day for the last N days
- * @param {number} days - Number of days to look back (default 30)
+ * Get files organized by day for a date range
+ * @param {Date|null} startDate - Start of date range
+ * @param {Date|null} endDate - End of date range
  * @returns {Array<{date: string, count: number}>} Daily counts
  */
-export function getFilesOrganizedByDay(days = 30) {
+export function getFilesOrganizedByDay(startDate = null, endDate = null) {
   const db = getDB();
   if (!db) return [];
 
-  // Security: Validate numeric parameter to prevent SQL injection
-  const safeDays = validateNumericParam(days, 30, 365);
+  // Default to last 30 days if no range specified
+  const end = endDate || new Date();
+  const start = startDate || new Date(end.getTime() - 29 * 24 * 60 * 60 * 1000);
 
   try {
+    const dateClause = buildDateRangeClause(start, end, 'organized_at');
     const result = db.exec(`
-      SELECT DATE(organized_at) as date, COUNT(*) as count 
-      FROM organized_files 
-      WHERE status = 'moved' 
-      AND organized_at >= date('now', '-${safeDays} days')
+      SELECT DATE(organized_at) as date, COUNT(*) as count
+      FROM organized_files
+      WHERE status = 'moved'
+      ${dateClause}
       GROUP BY DATE(organized_at)
       ORDER BY date ASC
     `);
 
-    if (!result[0]) return [];
+    if (!result[0]) {
+      // Return empty data for date range
+      return fillMissingDays([], start, end);
+    }
 
     // Convert to array of objects
     const data = result[0].values.map((row) => ({
@@ -121,20 +165,7 @@ export function getFilesOrganizedByDay(days = 30) {
     }));
 
     // Fill in missing days with 0
-    const filledData = [];
-    const today = new Date();
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const existing = data.find((item) => item.date === dateStr);
-      filledData.push({
-        date: dateStr,
-        count: existing ? existing.count : 0,
-      });
-    }
-
-    return filledData;
+    return fillMissingDays(data, start, end);
   } catch (error) {
     console.error('[StatisticsService] Error getting files by day:', error);
     return [];
@@ -142,11 +173,38 @@ export function getFilesOrganizedByDay(days = 30) {
 }
 
 /**
+ * Fill in missing days with 0 counts
+ * @param {Array<{date: string, count: number}>} data - Existing data
+ * @param {Date} startDate - Start date
+ * @param {Date} endDate - End date
+ * @returns {Array<{date: string, count: number}>} Filled data
+ */
+function fillMissingDays(data, startDate, endDate) {
+  const filledData = [];
+  const days = differenceInDays(endDate, startDate) + 1;
+
+  for (let i = 0; i < days; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const dateStr = format(d, 'yyyy-MM-dd');
+    const existing = data.find((item) => item.date === dateStr);
+    filledData.push({
+      date: dateStr,
+      count: existing ? existing.count : 0,
+    });
+  }
+
+  return filledData;
+}
+
+/**
  * Get files organized grouped by file type
  * @param {number} limit - Maximum number of types to return (default 8)
+ * @param {Date|null} startDate - Start of date range (optional)
+ * @param {Date|null} endDate - End of date range (optional)
  * @returns {Array<{type: string, count: number}>} File type counts
  */
-export function getFilesByType(limit = 8) {
+export function getFilesByType(limit = 8, startDate = null, endDate = null) {
   const db = getDB();
   if (!db) return [];
 
@@ -154,12 +212,14 @@ export function getFilesByType(limit = 8) {
   const safeLimit = validateNumericParam(limit, 8, 100);
 
   try {
+    const dateClause = buildDateRangeClause(startDate, endDate, 'organized_at');
     const result = db.exec(`
-      SELECT 
-        COALESCE(file_type, 'Unknown') as type, 
-        COUNT(*) as count 
-      FROM organized_files 
+      SELECT
+        COALESCE(file_type, 'Unknown') as type,
+        COUNT(*) as count
+      FROM organized_files
       WHERE status = 'moved'
+      ${dateClause}
       GROUP BY file_type
       ORDER BY count DESC
       LIMIT ${safeLimit}
@@ -248,19 +308,23 @@ export function getWatchActivitySummary() {
 
 /**
  * Get the most common file category (based on JD folder destinations)
+ * @param {Date|null} startDate - Start of date range (optional)
+ * @param {Date|null} endDate - End of date range (optional)
  * @returns {string} Most common category name or "None"
  */
-export function getMostCommonCategory() {
+export function getMostCommonCategory(startDate = null, endDate = null) {
   const db = getDB();
   if (!db) return 'None';
 
   try {
+    const dateClause = buildDateRangeClause(startDate, endDate, 'organized_at');
     const result = db.exec(`
-      SELECT 
+      SELECT
         SUBSTR(jd_folder_number, 1, 2) as category_prefix,
         COUNT(*) as count
-      FROM organized_files 
+      FROM organized_files
       WHERE status = 'moved' AND jd_folder_number IS NOT NULL
+      ${dateClause}
       GROUP BY category_prefix
       ORDER BY count DESC
       LIMIT 1
@@ -287,18 +351,21 @@ export function getMostCommonCategory() {
 
 /**
  * Get all dashboard statistics in a single call
+ * @param {Date|null} startDate - Start of date range (optional)
+ * @param {Date|null} endDate - End of date range (optional)
  * @returns {Object} Complete dashboard statistics
  */
-export function getDashboardStats() {
+export function getDashboardStats(startDate = null, endDate = null) {
   return {
-    totalOrganized: getTotalOrganizedFiles(),
+    totalOrganized: getTotalOrganizedFiles(startDate, endDate),
     thisMonth: getFilesOrganizedThisMonth(),
     activeRules: getActiveRulesCount(),
-    topCategory: getMostCommonCategory(),
-    activityByDay: getFilesOrganizedByDay(30),
-    filesByType: getFilesByType(8),
+    topCategory: getMostCommonCategory(startDate, endDate),
+    activityByDay: getFilesOrganizedByDay(startDate, endDate),
+    filesByType: getFilesByType(8, startDate, endDate),
     topRules: getTopRules(5),
     watchActivity: getWatchActivitySummary(),
+    dateRange: { start: startDate, end: endDate },
   };
 }
 

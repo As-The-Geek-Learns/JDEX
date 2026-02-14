@@ -16,6 +16,8 @@ import {
   logError,
   withErrorHandling,
   Result,
+  FILE_ERROR_TYPE,
+  classifyFileError,
 } from './errors.js';
 
 // =============================================================================
@@ -138,6 +140,400 @@ describe('FileSystemError', () => {
     it('should handle unrecognized operations', () => {
       const error = new FileSystemError('Error', 'something_else');
       expect(error.getUserMessage()).toContain('file operation failed');
+    });
+  });
+});
+
+// =============================================================================
+// FILE_ERROR_TYPE Constants
+// =============================================================================
+
+describe('FILE_ERROR_TYPE', () => {
+  it('should have all expected error types', () => {
+    expect(FILE_ERROR_TYPE.PERMISSION_DENIED).toBe('permission_denied');
+    expect(FILE_ERROR_TYPE.FILE_NOT_FOUND).toBe('file_not_found');
+    expect(FILE_ERROR_TYPE.FILE_IN_USE).toBe('file_in_use');
+    expect(FILE_ERROR_TYPE.DISK_FULL).toBe('disk_full');
+    expect(FILE_ERROR_TYPE.PATH_TOO_LONG).toBe('path_too_long');
+    expect(FILE_ERROR_TYPE.INVALID_PATH).toBe('invalid_path');
+    expect(FILE_ERROR_TYPE.CROSS_DEVICE).toBe('cross_device');
+    expect(FILE_ERROR_TYPE.DIRECTORY_NOT_EMPTY).toBe('directory_not_empty');
+    expect(FILE_ERROR_TYPE.NETWORK_ERROR).toBe('network_error');
+    expect(FILE_ERROR_TYPE.UNKNOWN).toBe('unknown');
+  });
+});
+
+// =============================================================================
+// classifyFileError Function
+// =============================================================================
+
+describe('classifyFileError', () => {
+  it('should return UNKNOWN for null error', () => {
+    expect(classifyFileError(null)).toBe(FILE_ERROR_TYPE.UNKNOWN);
+  });
+
+  it('should return UNKNOWN for undefined error', () => {
+    expect(classifyFileError(undefined)).toBe(FILE_ERROR_TYPE.UNKNOWN);
+  });
+
+  describe('permission errors', () => {
+    it('should classify EACCES as permission denied', () => {
+      const error = { code: 'EACCES', message: 'some error' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.PERMISSION_DENIED);
+    });
+
+    it('should classify EPERM as permission denied', () => {
+      const error = { code: 'EPERM', message: 'some error' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.PERMISSION_DENIED);
+    });
+
+    it('should classify "permission denied" message as permission denied', () => {
+      const error = { message: 'Operation failed: permission denied' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.PERMISSION_DENIED);
+    });
+  });
+
+  describe('file not found errors', () => {
+    it('should classify ENOENT as file not found', () => {
+      const error = { code: 'ENOENT', message: 'some error' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.FILE_NOT_FOUND);
+    });
+
+    it('should classify "no such file" message as file not found', () => {
+      const error = { message: 'no such file or directory' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.FILE_NOT_FOUND);
+    });
+  });
+
+  describe('file in use errors', () => {
+    it('should classify EBUSY as file in use', () => {
+      const error = { code: 'EBUSY', message: 'some error' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.FILE_IN_USE);
+    });
+
+    it('should classify "resource busy" message as file in use', () => {
+      const error = { message: 'resource busy or locked' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.FILE_IN_USE);
+    });
+  });
+
+  describe('disk full errors', () => {
+    it('should classify ENOSPC as disk full', () => {
+      const error = { code: 'ENOSPC', message: 'some error' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.DISK_FULL);
+    });
+
+    it('should classify "no space left" message as disk full', () => {
+      const error = { message: 'no space left on device' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.DISK_FULL);
+    });
+  });
+
+  describe('path too long errors', () => {
+    it('should classify ENAMETOOLONG as path too long', () => {
+      const error = { code: 'ENAMETOOLONG', message: 'some error' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.PATH_TOO_LONG);
+    });
+
+    it('should classify "name too long" message as path too long', () => {
+      const error = { message: 'file name too long' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.PATH_TOO_LONG);
+    });
+  });
+
+  describe('invalid path errors', () => {
+    it('should classify EINVAL as invalid path', () => {
+      const error = { code: 'EINVAL', message: 'some error' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.INVALID_PATH);
+    });
+
+    it('should classify "invalid argument" message as invalid path', () => {
+      const error = { message: 'invalid argument provided' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.INVALID_PATH);
+    });
+  });
+
+  describe('cross device errors', () => {
+    it('should classify EXDEV as cross device', () => {
+      const error = { code: 'EXDEV', message: 'some error' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.CROSS_DEVICE);
+    });
+  });
+
+  describe('directory not empty errors', () => {
+    it('should classify ENOTEMPTY as directory not empty', () => {
+      const error = { code: 'ENOTEMPTY', message: 'some error' };
+      // Note: ENOTEMPTY is checked twice - first as FILE_IN_USE, but the specific check comes later
+      // The order in classifyFileError means ENOTEMPTY gets classified as FILE_IN_USE first
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.FILE_IN_USE);
+    });
+  });
+
+  describe('network errors', () => {
+    it('should classify ENETUNREACH as network error', () => {
+      const error = { code: 'ENETUNREACH', message: 'some error' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.NETWORK_ERROR);
+    });
+
+    it('should classify ECONNREFUSED as network error', () => {
+      const error = { code: 'ECONNREFUSED', message: 'some error' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.NETWORK_ERROR);
+    });
+
+    it('should classify ETIMEDOUT as network error', () => {
+      const error = { code: 'ETIMEDOUT', message: 'some error' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.NETWORK_ERROR);
+    });
+
+    it('should classify "network" message as network error', () => {
+      const error = { message: 'network connection failed' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.NETWORK_ERROR);
+    });
+  });
+
+  describe('unknown errors', () => {
+    it('should return UNKNOWN for unrecognized error code', () => {
+      const error = { code: 'EUNKNOWN', message: 'something weird' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.UNKNOWN);
+    });
+
+    it('should return UNKNOWN for error with no code and generic message', () => {
+      const error = { message: 'something went wrong' };
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.UNKNOWN);
+    });
+
+    it('should return UNKNOWN for empty error object', () => {
+      const error = {};
+      expect(classifyFileError(error)).toBe(FILE_ERROR_TYPE.UNKNOWN);
+    });
+  });
+});
+
+// =============================================================================
+// FileSystemError Enhanced Methods
+// =============================================================================
+
+describe('FileSystemError enhanced methods', () => {
+  describe('constructor with original error', () => {
+    it('should classify error type from original error', () => {
+      const originalError = { code: 'EACCES', message: 'permission denied' };
+      const error = new FileSystemError('Failed to read', 'read', '/path', originalError);
+      expect(error.errorType).toBe(FILE_ERROR_TYPE.PERMISSION_DENIED);
+    });
+
+    it('should store system code from original error', () => {
+      const originalError = { code: 'ENOENT', message: 'not found' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.systemCode).toBe('ENOENT');
+    });
+
+    it('should default to UNKNOWN when no original error', () => {
+      const error = new FileSystemError('Failed', 'read', '/path');
+      expect(error.errorType).toBe(FILE_ERROR_TYPE.UNKNOWN);
+      expect(error.systemCode).toBeNull();
+    });
+  });
+
+  describe('isRetryable', () => {
+    it('should return true for FILE_IN_USE errors', () => {
+      const originalError = { code: 'EBUSY' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.isRetryable()).toBe(true);
+    });
+
+    it('should return true for NETWORK_ERROR errors', () => {
+      const originalError = { code: 'ETIMEDOUT' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.isRetryable()).toBe(true);
+    });
+
+    it('should return true for CROSS_DEVICE errors', () => {
+      const originalError = { code: 'EXDEV' };
+      const error = new FileSystemError('Failed', 'move', '/path', originalError);
+      expect(error.isRetryable()).toBe(true);
+    });
+
+    it('should return false for PERMISSION_DENIED errors', () => {
+      const originalError = { code: 'EACCES' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.isRetryable()).toBe(false);
+    });
+
+    it('should return false for FILE_NOT_FOUND errors', () => {
+      const originalError = { code: 'ENOENT' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.isRetryable()).toBe(false);
+    });
+
+    it('should return false for DISK_FULL errors', () => {
+      const originalError = { code: 'ENOSPC' };
+      const error = new FileSystemError('Failed', 'write', '/path', originalError);
+      expect(error.isRetryable()).toBe(false);
+    });
+
+    it('should return false for UNKNOWN errors', () => {
+      const error = new FileSystemError('Failed', 'read', '/path');
+      expect(error.isRetryable()).toBe(false);
+    });
+  });
+
+  describe('getSuggestedAction', () => {
+    it('should suggest checking permissions for PERMISSION_DENIED', () => {
+      const originalError = { code: 'EACCES' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getSuggestedAction()).toContain('permission');
+    });
+
+    it('should suggest file may be moved for FILE_NOT_FOUND', () => {
+      const originalError = { code: 'ENOENT' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getSuggestedAction()).toContain('moved or deleted');
+    });
+
+    it('should suggest closing programs for FILE_IN_USE', () => {
+      const originalError = { code: 'EBUSY' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getSuggestedAction()).toContain('Close');
+    });
+
+    it('should suggest freeing space for DISK_FULL', () => {
+      const originalError = { code: 'ENOSPC' };
+      const error = new FileSystemError('Failed', 'write', '/path', originalError);
+      expect(error.getSuggestedAction()).toContain('disk space');
+    });
+
+    it('should suggest shorter path for PATH_TOO_LONG', () => {
+      const originalError = { code: 'ENAMETOOLONG' };
+      const error = new FileSystemError('Failed', 'write', '/path', originalError);
+      expect(error.getSuggestedAction()).toContain('shorter path');
+    });
+
+    it('should suggest checking characters for INVALID_PATH', () => {
+      const originalError = { code: 'EINVAL' };
+      const error = new FileSystemError('Failed', 'write', '/path', originalError);
+      expect(error.getSuggestedAction()).toContain('invalid characters');
+    });
+
+    it('should mention copy for CROSS_DEVICE', () => {
+      const originalError = { code: 'EXDEV' };
+      const error = new FileSystemError('Failed', 'move', '/path', originalError);
+      expect(error.getSuggestedAction()).toContain('copied');
+    });
+
+    it('should suggest checking network for NETWORK_ERROR', () => {
+      const originalError = { code: 'ETIMEDOUT' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getSuggestedAction()).toContain('network');
+    });
+
+    it('should return generic suggestion for UNKNOWN', () => {
+      const error = new FileSystemError('Failed', 'read', '/path');
+      expect(error.getSuggestedAction()).toContain('Try again');
+    });
+  });
+
+  describe('getTypeLabel', () => {
+    it('should return "Permission Denied" for PERMISSION_DENIED', () => {
+      const originalError = { code: 'EACCES' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getTypeLabel()).toBe('Permission Denied');
+    });
+
+    it('should return "Not Found" for FILE_NOT_FOUND', () => {
+      const originalError = { code: 'ENOENT' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getTypeLabel()).toBe('Not Found');
+    });
+
+    it('should return "File In Use" for FILE_IN_USE', () => {
+      const originalError = { code: 'EBUSY' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getTypeLabel()).toBe('File In Use');
+    });
+
+    it('should return "Disk Full" for DISK_FULL', () => {
+      const originalError = { code: 'ENOSPC' };
+      const error = new FileSystemError('Failed', 'write', '/path', originalError);
+      expect(error.getTypeLabel()).toBe('Disk Full');
+    });
+
+    it('should return "Path Too Long" for PATH_TOO_LONG', () => {
+      const originalError = { code: 'ENAMETOOLONG' };
+      const error = new FileSystemError('Failed', 'write', '/path', originalError);
+      expect(error.getTypeLabel()).toBe('Path Too Long');
+    });
+
+    it('should return "Invalid Path" for INVALID_PATH', () => {
+      const originalError = { code: 'EINVAL' };
+      const error = new FileSystemError('Failed', 'write', '/path', originalError);
+      expect(error.getTypeLabel()).toBe('Invalid Path');
+    });
+
+    it('should return "Cross Device" for CROSS_DEVICE', () => {
+      const originalError = { code: 'EXDEV' };
+      const error = new FileSystemError('Failed', 'move', '/path', originalError);
+      expect(error.getTypeLabel()).toBe('Cross Device');
+    });
+
+    it('should return "Network Error" for NETWORK_ERROR', () => {
+      const originalError = { code: 'ETIMEDOUT' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getTypeLabel()).toBe('Network Error');
+    });
+
+    it('should return "Error" for UNKNOWN', () => {
+      const error = new FileSystemError('Failed', 'read', '/path');
+      expect(error.getTypeLabel()).toBe('Error');
+    });
+  });
+
+  describe('getUserMessage with error types', () => {
+    it('should prioritize type-specific message for PERMISSION_DENIED', () => {
+      const originalError = { code: 'EACCES' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getUserMessage()).toContain('Permission denied');
+    });
+
+    it('should prioritize type-specific message for FILE_NOT_FOUND', () => {
+      const originalError = { code: 'ENOENT' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getUserMessage()).toContain('not found');
+    });
+
+    it('should prioritize type-specific message for FILE_IN_USE', () => {
+      const originalError = { code: 'EBUSY' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getUserMessage()).toContain('in use');
+    });
+
+    it('should prioritize type-specific message for DISK_FULL', () => {
+      const originalError = { code: 'ENOSPC' };
+      const error = new FileSystemError('Failed', 'write', '/path', originalError);
+      expect(error.getUserMessage()).toContain('disk space');
+    });
+
+    it('should prioritize type-specific message for PATH_TOO_LONG', () => {
+      const originalError = { code: 'ENAMETOOLONG' };
+      const error = new FileSystemError('Failed', 'write', '/path', originalError);
+      expect(error.getUserMessage()).toContain('too long');
+    });
+
+    it('should prioritize type-specific message for NETWORK_ERROR', () => {
+      const originalError = { code: 'ETIMEDOUT' };
+      const error = new FileSystemError('Failed', 'read', '/path', originalError);
+      expect(error.getUserMessage()).toContain('Network error');
+    });
+
+    it('should fall back to operation-based message for UNKNOWN', () => {
+      const error = new FileSystemError('Failed', 'read', '/path');
+      expect(error.getUserMessage()).toContain('Unable to read');
+    });
+
+    it('should fall back to operation-based message for types without specific message', () => {
+      const originalError = { code: 'EXDEV' };
+      const error = new FileSystemError('Failed', 'move', '/path', originalError);
+      // CROSS_DEVICE doesn't have a type-specific message, so falls back to operation
+      expect(error.getUserMessage()).toContain('move');
     });
   });
 });

@@ -15,6 +15,7 @@ import { useState, useCallback, useEffect } from 'react';
 import ScannerPanel from './ScannerPanel.jsx';
 import RulesManager from './RulesManager.jsx';
 import WatchFolders from './WatchFolders.jsx';
+import OrganizationPreview from './OrganizationPreview.jsx';
 import { getMatchingEngine } from '../../services/matchingEngine.js';
 import { formatFileSize } from '../../services/fileScannerService.js';
 import { batchMove, CONFLICT_STRATEGY } from '../../services/fileOperations.js';
@@ -588,26 +589,88 @@ function OrganizePanel({ sessionId, onOrganize }) {
 }
 
 // =============================================================================
+// Error Detail Component
+// =============================================================================
+
+function ErrorDetailCard({ operation, onRetry }) {
+  const error = operation.error;
+  const filename = operation.sourcePath?.split('/').pop() || 'Unknown file';
+
+  // Get error type info if available
+  const errorType = error?.errorType || 'unknown';
+  const isRetryable = error?.isRetryable?.() || false;
+  const suggestedAction = error?.getSuggestedAction?.() || 'Try again or check the file manually.';
+  const typeLabel = error?.getTypeLabel?.() || 'Error';
+
+  // Error type badge colors
+  const badgeColors = {
+    permission_denied: 'bg-orange-900/50 text-orange-400 border-orange-700',
+    file_not_found: 'bg-gray-700 text-gray-400 border-gray-600',
+    file_in_use: 'bg-yellow-900/50 text-yellow-400 border-yellow-700',
+    disk_full: 'bg-red-900/50 text-red-400 border-red-700',
+    network_error: 'bg-blue-900/50 text-blue-400 border-blue-700',
+    unknown: 'bg-slate-700 text-gray-400 border-slate-600',
+  };
+
+  const badgeColor = badgeColors[errorType] || badgeColors.unknown;
+
+  return (
+    <div className="bg-slate-900/80 rounded-lg p-3 border border-slate-700">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-red-400">✗</span>
+            <span className="text-white text-sm font-medium truncate" title={filename}>
+              {filename}
+            </span>
+            <span className={`px-1.5 py-0.5 text-[10px] rounded border ${badgeColor}`}>
+              {typeLabel}
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mb-1">
+            {error?.getUserMessage?.() || error?.message || 'An error occurred'}
+          </p>
+          <p className="text-xs text-gray-500">💡 {suggestedAction}</p>
+        </div>
+        {isRetryable && onRetry && (
+          <button
+            onClick={() => onRetry(operation)}
+            className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-white
+              rounded transition-colors flex-shrink-0"
+          >
+            Retry
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
 // Progress Modal Component
 // =============================================================================
 
-function ProgressModal({ isOpen, progress, result, onClose }) {
+function ProgressModal({ isOpen, progress, result, onClose, onRetry }) {
   if (!isOpen) return null;
 
   const isComplete = !!result;
 
+  // Get failed operations with errors
+  const failedOps = result?.operations?.filter((op) => !op.success) || [];
+  const retryableOps = failedOps.filter((op) => op.error?.isRetryable?.());
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg w-full max-w-lg mx-4 overflow-hidden">
+      <div className="bg-slate-800 rounded-lg w-full max-w-lg mx-4 overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-slate-700">
+        <div className="p-4 border-b border-slate-700 flex-shrink-0">
           <h3 className="text-lg font-semibold text-white">
             {isComplete ? 'Organization Complete' : 'Organizing Files...'}
           </h3>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto flex-1">
           {!isComplete ? (
             // Progress view
             <div className="space-y-4">
@@ -656,37 +719,56 @@ function ProgressModal({ isOpen, progress, result, onClose }) {
                 </div>
               )}
 
-              {result.failed > 0 && (
-                <div className="p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-400">
-                  ⚠️ {result.failed} file(s) could not be moved. Check permissions and paths.
+              {/* Failed operations with enhanced details */}
+              {failedOps.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-red-400">
+                      Failed Operations ({failedOps.length})
+                    </h4>
+                    {retryableOps.length > 0 && onRetry && (
+                      <button
+                        onClick={() => onRetry(retryableOps)}
+                        className="px-3 py-1 text-xs bg-red-900/30 hover:bg-red-900/50
+                          text-red-400 rounded-md transition-colors"
+                      >
+                        Retry All ({retryableOps.length})
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {failedOps.slice(0, 10).map((op, idx) => (
+                      <ErrorDetailCard
+                        key={idx}
+                        operation={op}
+                        onRetry={onRetry ? () => onRetry([op]) : null}
+                      />
+                    ))}
+                    {failedOps.length > 10 && (
+                      <div className="text-center text-gray-500 text-xs py-2">
+                        +{failedOps.length - 10} more errors...
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {/* Details (collapsed by default) */}
-              {result.operations && result.operations.length > 0 && (
+              {/* Success details (collapsed) */}
+              {result.success > 0 && (
                 <details className="text-sm">
                   <summary className="text-gray-400 cursor-pointer hover:text-white">
-                    View details ({result.operations.length} operations)
+                    View successful moves ({result.success})
                   </summary>
-                  <div className="mt-2 max-h-48 overflow-y-auto space-y-1 bg-slate-900 rounded p-2">
-                    {result.operations.slice(0, 50).map((op, idx) => (
-                      <div
-                        key={idx}
-                        className={`text-xs py-1 px-2 rounded ${
-                          op.success ? 'text-green-400' : 'text-red-400 bg-red-900/20'
-                        }`}
-                      >
-                        {op.success ? '✓' : '✗'} {op.sourcePath?.split('/').pop()}
-                        {op.error && (
-                          <span className="text-red-300 ml-2">({op.error.message})</span>
-                        )}
-                      </div>
-                    ))}
-                    {result.operations.length > 50 && (
-                      <div className="text-gray-500 text-center py-1">
-                        +{result.operations.length - 50} more...
-                      </div>
-                    )}
+                  <div className="mt-2 max-h-32 overflow-y-auto space-y-1 bg-slate-900 rounded p-2">
+                    {result.operations
+                      .filter((op) => op.success)
+                      .slice(0, 30)
+                      .map((op, idx) => (
+                        <div key={idx} className="text-xs py-1 px-2 text-green-400">
+                          ✓ {op.sourcePath?.split('/').pop()} → {op.folderNumber}
+                        </div>
+                      ))}
                   </div>
                 </details>
               )}
@@ -696,10 +778,10 @@ function ProgressModal({ isOpen, progress, result, onClose }) {
 
         {/* Footer */}
         {isComplete && (
-          <div className="p-4 border-t border-slate-700">
+          <div className="p-4 border-t border-slate-700 flex-shrink-0">
             <button
               onClick={onClose}
-              className="w-full px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white 
+              className="w-full px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white
                 rounded-md font-medium transition-colors"
             >
               Done
@@ -722,6 +804,9 @@ export default function FileOrganizer({ onClose }) {
   const [_isOrganizing, setIsOrganizing] = useState(false);
   const [organizeProgress, setOrganizeProgress] = useState(null);
   const [showProgressModal, setShowProgressModal] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [allFolders, setAllFolders] = useState([]);
 
   // Handle scan completion
   const handleScanComplete = useCallback((sessionId, _files) => {
@@ -729,10 +814,34 @@ export default function FileOrganizer({ onClose }) {
     setActiveTab('organize');
   }, []);
 
-  // Handle organization - ACTUAL FILE MOVES
-  const handleOrganize = useCallback(async (files) => {
+  // Handle organization - SHOW PREVIEW FIRST
+  const handleOrganize = useCallback((files) => {
+    if (files.length === 0) {
+      alert('No files accepted for organization');
+      return;
+    }
+
+    // Get folders for preview
+    const folders = getFolders();
+    setAllFolders(folders);
+
+    // Store files and show preview
+    setPendingFiles(files);
+    setShowPreview(true);
+  }, []);
+
+  // Handle removing a file from the pending organization
+  const handleRemoveFromPreview = useCallback((fileId) => {
+    setPendingFiles((prev) => prev.filter((f) => f.id !== fileId));
+  }, []);
+
+  // Handle confirmation from preview - ACTUAL FILE MOVES
+  const handleConfirmOrganize = useCallback(async () => {
+    // Close preview
+    setShowPreview(false);
+
     // Build operations list
-    const operations = files
+    const operations = pendingFiles
       .map((file) => ({
         sourcePath: file.path,
         folderNumber: file.user_target_folder || file.suggested_jd_folder,
@@ -765,6 +874,54 @@ export default function FileOrganizer({ onClose }) {
     // Update state with result
     setIsOrganizing(false);
     setOrganizationResult(result);
+
+    // Clear pending files
+    setPendingFiles([]);
+  }, [pendingFiles]);
+
+  // Handle retry of failed operations
+  const handleRetryOperations = useCallback(async (failedOps) => {
+    if (!failedOps || failedOps.length === 0) return;
+
+    // Reset for retry
+    setIsOrganizing(true);
+    setOrganizeProgress({ current: 0, total: failedOps.length, percent: 0 });
+
+    // Build retry operations
+    const retryOperations = failedOps.map((op) => ({
+      sourcePath: op.sourcePath,
+      folderNumber: op.folderNumber,
+    }));
+
+    // Perform retry
+    const retryResult = await batchMove(retryOperations, {
+      onProgress: (progress) => {
+        setOrganizeProgress(progress);
+      },
+      conflictStrategy: CONFLICT_STRATEGY.RENAME,
+      stopOnError: false,
+    });
+
+    // Merge results with previous
+    setOrganizationResult((prev) => {
+      if (!prev) return retryResult;
+
+      // Update the previous result with retry outcomes
+      const newOperations = prev.operations.map((op) => {
+        const retryOp = retryResult.operations.find((r) => r.sourcePath === op.sourcePath);
+        return retryOp || op;
+      });
+
+      return {
+        total: prev.total,
+        success: newOperations.filter((op) => op.success && op.result?.status !== 'skipped').length,
+        failed: newOperations.filter((op) => !op.success).length,
+        skipped: newOperations.filter((op) => op.success && op.result?.status === 'skipped').length,
+        operations: newOperations,
+      };
+    });
+
+    setIsOrganizing(false);
   }, []);
 
   const tabs = [
@@ -848,6 +1005,19 @@ export default function FileOrganizer({ onClose }) {
         </footer>
       )}
 
+      {/* Organization Preview Modal */}
+      <OrganizationPreview
+        isOpen={showPreview}
+        files={pendingFiles}
+        folders={allFolders}
+        onClose={() => {
+          setShowPreview(false);
+          setPendingFiles([]);
+        }}
+        onConfirm={handleConfirmOrganize}
+        onRemoveFile={handleRemoveFromPreview}
+      />
+
       {/* Progress Modal */}
       <ProgressModal
         isOpen={showProgressModal}
@@ -859,6 +1029,7 @@ export default function FileOrganizer({ onClose }) {
           // Refresh the organize panel to show updated states
           setActiveTab('organize');
         }}
+        onRetry={handleRetryOperations}
       />
     </div>
   );

@@ -162,46 +162,60 @@ describe('statisticsService', () => {
     });
 
     it('should return daily counts with missing days filled', () => {
-      // Mock returns only some days with data
+      // Use fixed dates to avoid timezone issues
+      const endDate = new Date(2024, 0, 15); // Jan 15, 2024
+      const startDate = new Date(2024, 0, 13); // Jan 13, 2024 (3 days total)
+      const middleDate = '2024-01-14'; // Middle day has data
+
       const mockDB = createMockDB({
         'GROUP BY DATE': [
           {
             values: [
-              [new Date().toISOString().split('T')[0], 5], // Today
+              [middleDate, 5], // Jan 14 has 5 files
             ],
           },
         ],
       });
       getDB.mockReturnValue(mockDB);
 
-      const result = getFilesOrganizedByDay(3);
+      const result = getFilesOrganizedByDay(startDate, endDate);
 
       // Should have 3 days (filled with 0s for missing days)
       expect(result).toHaveLength(3);
-      expect(result[result.length - 1].count).toBe(5); // Today's count
+      expect(result[0].date).toBe('2024-01-13');
+      expect(result[0].count).toBe(0); // Day 1 has no data
+      expect(result[1].date).toBe('2024-01-14');
+      expect(result[1].count).toBe(5); // Day 2 has 5 files
+      expect(result[2].date).toBe('2024-01-15');
+      expect(result[2].count).toBe(0); // Day 3 has no data
     });
 
-    it('should validate days parameter', () => {
+    it('should handle null date parameters gracefully', () => {
       const mockDB = createMockDB({});
       getDB.mockReturnValue(mockDB);
 
-      // Should not throw with invalid input
-      getFilesOrganizedByDay(-5);
-      getFilesOrganizedByDay('invalid');
-      getFilesOrganizedByDay(null);
+      // Should not throw with null parameters (uses defaults)
+      const result = getFilesOrganizedByDay(null, null);
+      expect(Array.isArray(result)).toBe(true);
     });
 
-    it('should cap days at 365', () => {
+    it('should use date range in SQL query', () => {
       const mockDB = {
         exec: vi.fn().mockReturnValue([]),
       };
       getDB.mockReturnValue(mockDB);
 
-      getFilesOrganizedByDay(500);
+      // Create dates explicitly to avoid timezone issues
+      const startDate = new Date(2024, 0, 1); // Jan 1, 2024 (local time)
+      const endDate = new Date(2024, 0, 31); // Jan 31, 2024 (local time)
+      getFilesOrganizedByDay(startDate, endDate);
 
-      // Check that the SQL was called with capped value
+      // Check that the SQL was called with date range
       const sqlCall = mockDB.exec.mock.calls[0][0];
-      expect(sqlCall).toContain('-365 days');
+      expect(sqlCall).toContain('DATE(organized_at) >=');
+      expect(sqlCall).toContain('DATE(organized_at) <=');
+      expect(sqlCall).toContain('2024-01-01');
+      expect(sqlCall).toContain('2024-01-31');
     });
   });
 
