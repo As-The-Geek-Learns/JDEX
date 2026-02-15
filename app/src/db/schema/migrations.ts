@@ -250,9 +250,8 @@ export function migrationV9(db: MigrationDatabase): void {
   // Add exclude_pattern column to organization_rules
   // SQLite doesn't have ALTER TABLE ADD COLUMN IF NOT EXISTS, so we check first
   const columns = db.exec('PRAGMA table_info(organization_rules)');
-  const hasExcludePattern = columns[0]?.values.some(
-    (row: unknown[]) => row[1] === 'exclude_pattern'
-  );
+  const hasExcludePattern =
+    columns[0]?.values?.some((row: unknown[]) => row[1] === 'exclude_pattern') ?? false;
 
   if (!hasExcludePattern) {
     db.run('ALTER TABLE organization_rules ADD COLUMN exclude_pattern TEXT');

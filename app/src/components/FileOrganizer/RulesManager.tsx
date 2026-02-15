@@ -132,7 +132,7 @@ interface RuleFormData {
   target_id: string;
   priority: number;
   is_active: boolean;
-  exclude_pattern: string;
+  exclude_pattern: string | null;
   // Compound rule fields
   compound_extension: string;
   compound_keyword: string;
@@ -779,7 +779,7 @@ function RuleModal({ isOpen, rule, folders, onSave, onClose }: RuleModalProps): 
       ...formData,
       pattern,
       priority,
-      exclude_pattern: formData.exclude_pattern.trim() || undefined,
+      exclude_pattern: formData.exclude_pattern?.trim() || null,
       id: rule?.id,
     });
   };
@@ -960,7 +960,7 @@ function RuleModal({ isOpen, rule, folders, onSave, onClose }: RuleModalProps): 
             </label>
             <input
               type="text"
-              value={formData.exclude_pattern}
+              value={formData.exclude_pattern ?? ''}
               onChange={(e: ChangeEvent<HTMLInputElement>) =>
                 setFormData({ ...formData, exclude_pattern: e.target.value })
               }
