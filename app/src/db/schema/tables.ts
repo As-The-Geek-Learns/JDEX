@@ -174,13 +174,14 @@ export const ORGANIZATION_RULES_TABLE = `
   CREATE TABLE IF NOT EXISTS organization_rules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    rule_type TEXT NOT NULL CHECK (rule_type IN ('extension', 'keyword', 'path', 'regex')),
+    rule_type TEXT NOT NULL CHECK (rule_type IN ('extension', 'keyword', 'path', 'regex', 'compound', 'date')),
     pattern TEXT NOT NULL,
     target_type TEXT NOT NULL CHECK (target_type IN ('folder', 'category', 'area')),
     target_id TEXT NOT NULL,
     priority INTEGER DEFAULT 50,
     is_active INTEGER DEFAULT 1,
     match_count INTEGER DEFAULT 0,
+    exclude_pattern TEXT,
     notes TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP

@@ -92,6 +92,7 @@ describe('getOrganizationRules', () => {
             80,
             1,
             15,
+            null, // exclude_pattern
             'For documents',
             '2024-01-01',
             '2024-01-02',
@@ -106,6 +107,7 @@ describe('getOrganizationRules', () => {
             60,
             1,
             8,
+            '*.tmp', // exclude_pattern
             null,
             '2024-01-01',
             '2024-01-02',
@@ -127,6 +129,7 @@ describe('getOrganizationRules', () => {
       priority: 80,
       is_active: true,
       match_count: 15,
+      exclude_pattern: null,
       notes: 'For documents',
       created_at: '2024-01-01',
       updated_at: '2024-01-02',

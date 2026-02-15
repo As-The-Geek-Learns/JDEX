@@ -77,11 +77,15 @@ describe('Table SQL Definitions', () => {
     it('ORGANIZATION_RULES_TABLE has CHECK constraints', () => {
       expect(ORGANIZATION_RULES_TABLE).toContain('CREATE TABLE IF NOT EXISTS organization_rules');
       expect(ORGANIZATION_RULES_TABLE).toContain(
-        "CHECK (rule_type IN ('extension', 'keyword', 'path', 'regex'))"
+        "CHECK (rule_type IN ('extension', 'keyword', 'path', 'regex', 'compound', 'date'))"
       );
       expect(ORGANIZATION_RULES_TABLE).toContain(
         "CHECK (target_type IN ('folder', 'category', 'area'))"
       );
+    });
+
+    it('ORGANIZATION_RULES_TABLE has exclude_pattern column', () => {
+      expect(ORGANIZATION_RULES_TABLE).toContain('exclude_pattern TEXT');
     });
 
     it('ORGANIZED_FILES_TABLE tracks file movements', () => {

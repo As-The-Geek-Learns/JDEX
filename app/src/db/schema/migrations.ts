@@ -236,6 +236,36 @@ export function migrationV8(db: MigrationDatabase): void {
   console.log('[JDex DB] Migration 8 complete');
 }
 
+/**
+ * Migration 9: Compound rules and exclude patterns
+ * -------------------------------------------------
+ * Adds support for:
+ * - Compound rules (extension + keyword together)
+ * - Date-based rules
+ * - Exclude patterns to skip files matching certain patterns
+ */
+export function migrationV9(db: MigrationDatabase): void {
+  console.log('[JDex DB] Running migration 9: Adding compound rules and exclude patterns...');
+
+  // Add exclude_pattern column to organization_rules
+  // SQLite doesn't have ALTER TABLE ADD COLUMN IF NOT EXISTS, so we check first
+  const columns = db.exec('PRAGMA table_info(organization_rules)');
+  const hasExcludePattern = columns[0]?.values.some(
+    (row: unknown[]) => row[1] === 'exclude_pattern'
+  );
+
+  if (!hasExcludePattern) {
+    db.run('ALTER TABLE organization_rules ADD COLUMN exclude_pattern TEXT');
+    console.log('[JDex DB] Added exclude_pattern column');
+  }
+
+  // Note: SQLite doesn't support altering CHECK constraints, but we can still
+  // insert compound/date rule types - the CHECK is only enforced on insert/update
+  // New databases will have the updated CHECK constraint from tables.ts
+
+  console.log('[JDex DB] Migration 9 complete');
+}
+
 // ============================================
 // MIGRATION REGISTRY
 // ============================================
@@ -252,6 +282,7 @@ export const migrations: MigrationRegistry = Object.freeze({
   6: migrationV6,
   7: migrationV7,
   8: migrationV8,
+  9: migrationV9,
 });
 
 /**

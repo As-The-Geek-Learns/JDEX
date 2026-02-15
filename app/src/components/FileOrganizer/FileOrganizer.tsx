@@ -23,7 +23,8 @@ import { formatFileSize } from '../../services/fileScannerService.js';
 import { batchMove, CONFLICT_STRATEGY } from '../../services/fileOperations.js';
 import { getScannedFiles, updateScannedFileDecision, getFolders } from '../../db.js';
 import type { ScannedFile as RepositoryScannedFile } from '../../db/repositories/scanned-files.js';
-import { sanitizeErrorForUser } from '../../utils/errors.js';
+import { sanitizeErrorForUser, FILE_ERROR_TYPE } from '../../utils/errors.js';
+import type { FileErrorType } from '../../utils/errors.js';
 
 // =============================================================================
 // Type Definitions
@@ -123,10 +124,11 @@ interface OrganizeProgress {
 }
 
 /**
- * File operation error
+ * File operation error (matches FileSystemError interface)
  */
 interface OperationError extends Error {
-  errorType?: string;
+  errorType?: FileErrorType;
+  systemCode?: string | null;
   isRetryable?: () => boolean;
   getSuggestedAction?: () => string;
   getTypeLabel?: () => string;
@@ -822,17 +824,24 @@ function ErrorDetailCard({ operation, onRetry }: ErrorDetailCardProps): JSX.Elem
   const suggestedAction = error?.getSuggestedAction?.() || 'Try again or check the file manually.';
   const typeLabel = error?.getTypeLabel?.() || 'Error';
 
-  // Error type badge colors
-  const badgeColors: Record<string, string> = {
-    permission_denied: 'bg-orange-900/50 text-orange-400 border-orange-700',
-    file_not_found: 'bg-gray-700 text-gray-400 border-gray-600',
-    file_in_use: 'bg-yellow-900/50 text-yellow-400 border-yellow-700',
-    disk_full: 'bg-red-900/50 text-red-400 border-red-700',
-    network_error: 'bg-blue-900/50 text-blue-400 border-blue-700',
-    unknown: 'bg-slate-700 text-gray-400 border-slate-600',
+  // Error type badge colors - covers all FILE_ERROR_TYPE values
+  const badgeColors: Record<FileErrorType, string> = {
+    [FILE_ERROR_TYPE.PERMISSION_DENIED]: 'bg-orange-900/50 text-orange-400 border-orange-700',
+    [FILE_ERROR_TYPE.FILE_NOT_FOUND]: 'bg-gray-700 text-gray-400 border-gray-600',
+    [FILE_ERROR_TYPE.FILE_IN_USE]: 'bg-yellow-900/50 text-yellow-400 border-yellow-700',
+    [FILE_ERROR_TYPE.DISK_FULL]: 'bg-red-900/50 text-red-400 border-red-700',
+    [FILE_ERROR_TYPE.PATH_TOO_LONG]: 'bg-purple-900/50 text-purple-400 border-purple-700',
+    [FILE_ERROR_TYPE.INVALID_PATH]: 'bg-pink-900/50 text-pink-400 border-pink-700',
+    [FILE_ERROR_TYPE.CROSS_DEVICE]: 'bg-cyan-900/50 text-cyan-400 border-cyan-700',
+    [FILE_ERROR_TYPE.DIRECTORY_NOT_EMPTY]: 'bg-amber-900/50 text-amber-400 border-amber-700',
+    [FILE_ERROR_TYPE.NETWORK_ERROR]: 'bg-blue-900/50 text-blue-400 border-blue-700',
+    [FILE_ERROR_TYPE.UNKNOWN]: 'bg-slate-700 text-gray-400 border-slate-600',
   };
 
-  const badgeColor = badgeColors[errorType] || badgeColors.unknown;
+  const badgeColor = badgeColors[errorType as FileErrorType] || badgeColors[FILE_ERROR_TYPE.UNKNOWN];
+
+  // System code for debugging (only shown in expandable details)
+  const systemCode = error?.systemCode;
 
   return (
     <div className="bg-slate-900/80 rounded-lg p-3 border border-slate-700">
@@ -851,6 +860,17 @@ function ErrorDetailCard({ operation, onRetry }: ErrorDetailCardProps): JSX.Elem
             {error?.getUserMessage?.() || error?.message || 'An error occurred'}
           </p>
           <p className="text-xs text-gray-500">💡 {suggestedAction}</p>
+          {/* Debug details - expandable */}
+          {systemCode && (
+            <details className="mt-2">
+              <summary className="text-[10px] text-gray-600 cursor-pointer hover:text-gray-400">
+                Technical details
+              </summary>
+              <div className="mt-1 px-2 py-1 bg-slate-950 rounded text-[10px] font-mono text-gray-500">
+                Code: {systemCode}
+              </div>
+            </details>
+          )}
         </div>
         {isRetryable && onRetry && (
           <button

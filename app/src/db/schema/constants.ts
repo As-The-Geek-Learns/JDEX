@@ -13,7 +13,7 @@
  * Current database schema version.
  * Increment when adding new migrations.
  */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 // ============================================
 // CLOUD DRIVE TYPES
@@ -45,7 +45,14 @@ export const DEFAULT_DRIVE_TYPE: DriveType = 'generic';
 /**
  * Valid rule types for file organization rules.
  */
-export const RULE_TYPES = Object.freeze(['extension', 'keyword', 'path', 'regex'] as const);
+export const RULE_TYPES = Object.freeze([
+  'extension',
+  'keyword',
+  'path',
+  'regex',
+  'compound',
+  'date',
+] as const);
 
 export type RuleType = (typeof RULE_TYPES)[number];
 

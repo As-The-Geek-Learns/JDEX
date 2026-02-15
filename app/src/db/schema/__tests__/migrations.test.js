@@ -14,6 +14,7 @@ import {
   migrationV6,
   migrationV7,
   migrationV8,
+  migrationV9,
   migrations,
   getPendingMigrations,
   runMigrations,
@@ -171,6 +172,53 @@ describe('Individual Migrations', () => {
       );
     });
   });
+
+  describe('migrationV9', () => {
+    let mockDbWithExec;
+
+    beforeEach(() => {
+      mockDbWithExec = {
+        run: vi.fn(),
+        exec: vi.fn(),
+      };
+    });
+
+    it('adds exclude_pattern column if not exists', () => {
+      // Simulate table without exclude_pattern column
+      mockDbWithExec.exec.mockReturnValue([
+        {
+          values: [
+            [0, 'id', 'INTEGER', 0, null, 1],
+            [1, 'name', 'TEXT', 1, null, 0],
+            [2, 'rule_type', 'TEXT', 1, null, 0],
+          ],
+        },
+      ]);
+
+      migrationV9(mockDbWithExec);
+
+      expect(mockDbWithExec.run).toHaveBeenCalledWith(
+        'ALTER TABLE organization_rules ADD COLUMN exclude_pattern TEXT'
+      );
+    });
+
+    it('skips adding column if already exists', () => {
+      // Simulate table with exclude_pattern column already present
+      mockDbWithExec.exec.mockReturnValue([
+        {
+          values: [
+            [0, 'id', 'INTEGER', 0, null, 1],
+            [1, 'name', 'TEXT', 1, null, 0],
+            [2, 'exclude_pattern', 'TEXT', 0, null, 0],
+          ],
+        },
+      ]);
+
+      migrationV9(mockDbWithExec);
+
+      expect(mockDbWithExec.run).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('Migration Registry', () => {
@@ -178,7 +226,7 @@ describe('Migration Registry', () => {
     expect(Object.isFrozen(migrations)).toBe(true);
   });
 
-  it('contains migrations 2 through 8', () => {
+  it('contains migrations 2 through 9', () => {
     expect(migrations[2]).toBeDefined();
     expect(migrations[3]).toBeDefined();
     expect(migrations[4]).toBeDefined();
@@ -186,6 +234,7 @@ describe('Migration Registry', () => {
     expect(migrations[6]).toBeDefined();
     expect(migrations[7]).toBeDefined();
     expect(migrations[8]).toBeDefined();
+    expect(migrations[9]).toBeDefined();
   });
 
   it('all migrations are functions', () => {
@@ -198,12 +247,12 @@ describe('Migration Registry', () => {
 describe('getPendingMigrations', () => {
   it('returns all migrations for version 1', () => {
     const pending = getPendingMigrations(1);
-    expect(pending).toEqual([2, 3, 4, 5, 6, 7, 8]);
+    expect(pending).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
   it('returns remaining migrations for version 4', () => {
     const pending = getPendingMigrations(4);
-    expect(pending).toEqual([5, 6, 7, 8]);
+    expect(pending).toEqual([5, 6, 7, 8, 9]);
   });
 
   it('returns empty array for current version', () => {
@@ -249,7 +298,7 @@ describe('runMigrations', () => {
 
     expect(result.fromVersion).toBe(1);
     expect(result.toVersion).toBe(SCHEMA_VERSION);
-    expect(result.migrationsRun).toEqual([2, 3, 4, 5, 6, 7, 8]);
+    expect(result.migrationsRun).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
   it('runs remaining migrations from version 5', () => {
@@ -259,7 +308,7 @@ describe('runMigrations', () => {
 
     expect(result.fromVersion).toBe(5);
     expect(result.toVersion).toBe(SCHEMA_VERSION);
-    expect(result.migrationsRun).toEqual([6, 7, 8]);
+    expect(result.migrationsRun).toEqual([6, 7, 8, 9]);
   });
 
   it('calls save callback after migrations', () => {
@@ -317,8 +366,8 @@ describe('getMigrationStatus', () => {
 
     expect(status.currentVersion).toBe(1);
     expect(status.targetVersion).toBe(SCHEMA_VERSION);
-    expect(status.pendingCount).toBe(7);
-    expect(status.pendingVersions).toEqual([2, 3, 4, 5, 6, 7, 8]);
+    expect(status.pendingCount).toBe(8);
+    expect(status.pendingVersions).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
   it('returns zero pending for current version', () => {

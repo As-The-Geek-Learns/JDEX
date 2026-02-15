@@ -37,7 +37,7 @@ type IconComponent = () => JSX.Element;
 /**
  * Rule type identifier
  */
-type RuleTypeId = 'extension' | 'keyword' | 'path' | 'regex';
+type RuleTypeId = 'extension' | 'keyword' | 'path' | 'regex' | 'compound' | 'date';
 
 /**
  * Rule type configuration
@@ -90,6 +90,7 @@ interface OrganizationRule {
   priority: number;
   is_active: boolean | number;
   match_count?: number;
+  exclude_pattern?: string;
 }
 
 /**
@@ -131,6 +132,10 @@ interface RuleFormData {
   target_id: string;
   priority: number;
   is_active: boolean;
+  exclude_pattern: string;
+  // Compound rule fields
+  compound_extension: string;
+  compound_keyword: string;
 }
 
 /**
@@ -250,6 +255,20 @@ const RULE_TYPES: Record<RuleTypeId, RuleTypeConfig> = {
     placeholder: '^IMG_\\d{4}\\.(jpg|png)$',
     icon: '🔧',
     color: '#8B5CF6',
+  },
+  compound: {
+    label: 'Compound',
+    description: 'Match files by BOTH extension AND keyword (most specific)',
+    placeholder: 'Extension + keyword combination',
+    icon: '🔗',
+    color: '#EC4899',
+  },
+  date: {
+    label: 'Date',
+    description: 'Match files with date patterns in filename (e.g., 2024-01, Jan_2024)',
+    placeholder: '2024-01 or year:2024,month:01',
+    icon: '📅',
+    color: '#06B6D4',
   },
 };
 
@@ -662,12 +681,32 @@ function RuleModal({
     target_id: '',
     priority: 50,
     is_active: true,
+    exclude_pattern: '',
+    compound_extension: '',
+    compound_keyword: '',
   });
   const [error, setError] = useState('');
 
   // Initialize form when rule changes
   useEffect(() => {
     if (rule) {
+      // Parse compound pattern if editing a compound rule
+      let compoundExt = '';
+      let compoundKeyword = '';
+      if (rule.rule_type === 'compound' && rule.pattern) {
+        // Pattern format: ext:pdf,keyword:invoice
+        const parts = rule.pattern.split(',');
+        parts.forEach((part: string) => {
+          if (part.startsWith('ext:')) {
+            compoundExt = part.replace('ext:', '');
+          } else if (part.startsWith('keyword:')) {
+            compoundKeyword = compoundKeyword
+              ? `${compoundKeyword}, ${part.replace('keyword:', '')}`
+              : part.replace('keyword:', '');
+          }
+        });
+      }
+
       setFormData({
         name: rule.name || '',
         rule_type: rule.rule_type || 'extension',
@@ -676,6 +715,9 @@ function RuleModal({
         target_id: rule.target_id || '',
         priority: rule.priority || 50,
         is_active: rule.is_active !== false && rule.is_active !== 0,
+        exclude_pattern: (rule as OrganizationRule & { exclude_pattern?: string }).exclude_pattern || '',
+        compound_extension: compoundExt,
+        compound_keyword: compoundKeyword,
       });
     } else {
       setFormData({
@@ -686,6 +728,9 @@ function RuleModal({
         target_id: '',
         priority: 50,
         is_active: true,
+        exclude_pattern: '',
+        compound_extension: '',
+        compound_keyword: '',
       });
     }
     setError('');
@@ -700,24 +745,46 @@ function RuleModal({
       setError('Rule name is required');
       return;
     }
-    if (!formData.pattern.trim()) {
-      setError('Pattern is required');
-      return;
-    }
     if (!formData.target_id) {
       setError('Please select a target folder');
       return;
     }
 
-    // For extension rules, remove leading dot if present
+    // Build pattern based on rule type
     let pattern = formData.pattern.trim();
-    if (formData.rule_type === 'extension') {
+    let priority = formData.priority;
+
+    if (formData.rule_type === 'compound') {
+      // Validate compound fields
+      if (!formData.compound_extension.trim() || !formData.compound_keyword.trim()) {
+        setError('Compound rules require both extension and keyword');
+        return;
+      }
+      // Build compound pattern: ext:pdf,keyword:invoice,keyword:receipt
+      const ext = formData.compound_extension.trim().replace(/^\./, '').toLowerCase();
+      const keywords = formData.compound_keyword
+        .split(',')
+        .map((k) => k.trim())
+        .filter((k) => k);
+      pattern = `ext:${ext},${keywords.map((k) => `keyword:${k}`).join(',')}`;
+      priority = 70; // Compound rules are most specific
+    } else if (formData.rule_type === 'extension') {
+      // Remove leading dot if present
+      if (!pattern) {
+        setError('Pattern is required');
+        return;
+      }
       pattern = pattern.replace(/^\./, '').toLowerCase();
+    } else if (!pattern) {
+      setError('Pattern is required');
+      return;
     }
 
     onSave({
       ...formData,
       pattern,
+      priority,
+      exclude_pattern: formData.exclude_pattern.trim() || undefined,
       id: rule?.id,
     });
   };
@@ -783,30 +850,70 @@ function RuleModal({
             </div>
           </div>
 
-          {/* Pattern */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Pattern *</label>
-            <input
-              type="text"
-              value={formData.pattern}
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                setFormData({ ...formData, pattern: e.target.value })
-              }
-              placeholder={typeConfig?.placeholder || 'Enter pattern...'}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md
-                text-white placeholder-gray-500 focus:border-teal-500 focus:ring-1
-                focus:ring-teal-500 font-mono"
-            />
-            <p className="text-xs text-gray-500 mt-1">{typeConfig?.description}</p>
-
-            {/* Regex Helper - only shown for regex type */}
-            {formData.rule_type === 'regex' && (
-              <RegexHelper
-                pattern={formData.pattern}
-                onSelectPattern={(p) => setFormData({ ...formData, pattern: p })}
+          {/* Pattern - different UI for compound rules */}
+          {formData.rule_type === 'compound' ? (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Extension *
+                </label>
+                <input
+                  type="text"
+                  value={formData.compound_extension}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setFormData({ ...formData, compound_extension: e.target.value })
+                  }
+                  placeholder="pdf (without the dot)"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md
+                    text-white placeholder-gray-500 focus:border-teal-500 focus:ring-1
+                    focus:ring-teal-500 font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Keywords * (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={formData.compound_keyword}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    setFormData({ ...formData, compound_keyword: e.target.value })
+                  }
+                  placeholder="invoice, receipt, statement"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md
+                    text-white placeholder-gray-500 focus:border-teal-500 focus:ring-1
+                    focus:ring-teal-500 font-mono"
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                Files must match BOTH the extension AND contain one of the keywords
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Pattern *</label>
+              <input
+                type="text"
+                value={formData.pattern}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setFormData({ ...formData, pattern: e.target.value })
+                }
+                placeholder={typeConfig?.placeholder || 'Enter pattern...'}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md
+                  text-white placeholder-gray-500 focus:border-teal-500 focus:ring-1
+                  focus:ring-teal-500 font-mono"
               />
-            )}
-          </div>
+              <p className="text-xs text-gray-500 mt-1">{typeConfig?.description}</p>
+
+              {/* Regex Helper - only shown for regex type */}
+              {formData.rule_type === 'regex' && (
+                <RegexHelper
+                  pattern={formData.pattern}
+                  onSelectPattern={(p) => setFormData({ ...formData, pattern: p })}
+                />
+              )}
+            </div>
+          )}
 
           {/* Target Folder */}
           <div>
@@ -851,6 +958,27 @@ function RuleModal({
               <span>Lower</span>
               <span>Higher (checked first)</span>
             </div>
+          </div>
+
+          {/* Exclude Pattern */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Exclude Pattern (optional)
+            </label>
+            <input
+              type="text"
+              value={formData.exclude_pattern}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setFormData({ ...formData, exclude_pattern: e.target.value })
+              }
+              placeholder="temp, backup, ~$ (comma-separated)"
+              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md
+                text-white placeholder-gray-500 focus:border-teal-500 focus:ring-1
+                focus:ring-teal-500 font-mono"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Skip files that contain any of these patterns (comma-separated)
+            </p>
           </div>
 
           {/* Active toggle */}

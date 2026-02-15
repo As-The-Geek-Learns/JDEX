@@ -37,6 +37,7 @@ export interface OrganizationRule {
   priority: number;
   is_active: boolean;
   match_count: number;
+  exclude_pattern: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -52,6 +53,7 @@ export interface CreateOrganizationRuleInput {
   target_type: TargetType;
   target_id: string;
   priority?: number;
+  exclude_pattern?: string | null;
   notes?: string | null;
 }
 
@@ -66,6 +68,7 @@ export interface UpdateOrganizationRuleInput {
   target_id?: string;
   priority?: number;
   is_active?: boolean;
+  exclude_pattern?: string | null;
   notes?: string | null;
 }
 
@@ -109,9 +112,10 @@ function mapRowToRule(row: unknown[]): OrganizationRule {
     priority: row[6] as number,
     is_active: row[7] === 1,
     match_count: row[8] as number,
-    notes: row[9] as string | null,
-    created_at: row[10] as string,
-    updated_at: row[11] as string,
+    exclude_pattern: row[9] as string | null,
+    notes: row[10] as string | null,
+    created_at: row[11] as string,
+    updated_at: row[12] as string,
   };
 }
 
@@ -263,12 +267,15 @@ export function createOrganizationRule(rule: CreateOrganizationRuleInput): numbe
       validateRegexPattern(pattern);
     }
 
+    // Validate exclude_pattern (optional)
+    const excludePattern = validateOptionalString(rule.exclude_pattern ?? null, 'Exclude Pattern', 500);
+
     const stmt = db.prepare(`
-      INSERT INTO organization_rules (name, rule_type, pattern, target_type, target_id, priority, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO organization_rules (name, rule_type, pattern, target_type, target_id, priority, exclude_pattern, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run([name, rule.rule_type, pattern, rule.target_type, targetId, priority, notes]);
+    stmt.run([name, rule.rule_type, pattern, rule.target_type, targetId, priority, excludePattern, notes]);
     stmt.free();
 
     const newId = getLastInsertId();
@@ -302,6 +309,7 @@ export function updateOrganizationRule(ruleId: number | string, updates: UpdateO
       'target_id',
       'priority',
       'is_active',
+      'exclude_pattern',
       'notes',
     ];
     const fields: string[] = [];
@@ -320,6 +328,8 @@ export function updateOrganizationRule(ruleId: number | string, updates: UpdateO
           processedValue = validateRequiredString(value as string, 'Target ID', 50);
         } else if (key === 'notes') {
           processedValue = validateOptionalString(value as string | null, 'Notes', 500);
+        } else if (key === 'exclude_pattern') {
+          processedValue = validateOptionalString(value as string | null, 'Exclude Pattern', 500);
         } else if (key === 'rule_type') {
           if (!VALID_RULE_TYPES.includes(value as RuleType)) {
             throw new DatabaseError(`Invalid rule type: ${value}`, 'update');

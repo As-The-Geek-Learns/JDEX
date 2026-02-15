@@ -42,8 +42,8 @@ describe('Schema Constants', () => {
       expect(Number.isInteger(SCHEMA_VERSION)).toBe(true);
     });
 
-    it('is currently version 8', () => {
-      expect(SCHEMA_VERSION).toBe(8);
+    it('is currently version 9', () => {
+      expect(SCHEMA_VERSION).toBe(9);
     });
   });
 
@@ -74,7 +74,7 @@ describe('Schema Constants', () => {
     });
 
     it('contains all rule types', () => {
-      expect(RULE_TYPES).toEqual(['extension', 'keyword', 'path', 'regex']);
+      expect(RULE_TYPES).toEqual(['extension', 'keyword', 'path', 'regex', 'compound', 'date']);
     });
   });
 
