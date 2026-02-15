@@ -20,9 +20,9 @@
 | Layer | Technology | Notes |
 |-------|-----------|-------|
 | Desktop Framework | Electron 35.7 | Main process in `app/electron/main.js` |
-| Frontend | React 18.2 (JSX, no TypeScript) | Single-page app in `app/src/` |
+| Frontend | React 18.2 + TypeScript | Single-page app in `app/src/` |
 | Styling | Tailwind CSS 3.4 | Custom JD theme (navy/teal/orange), glass morphism |
-| Database | SQLite via sql.js (WebAssembly) | Loaded from CDN, stored in localStorage |
+| Database | SQLite via sql.js (WebAssembly) | Bundled WASM, stored in localStorage |
 | Build Tool | Vite 7.3 | Config in `app/vite.config.js` |
 | Packaging | electron-builder 26.7 | macOS (DMG/ZIP), Windows (NSIS/portable), Linux (AppImage/deb) |
 | Icons | Lucide React 0.563 | Consistent icon system throughout UI |
@@ -321,16 +321,13 @@ The project uses a dark theme with custom design tokens in `tailwind.config.js`:
 
 ## Known Structural Debt
 
-These are acknowledged issues, not bugs:
-
-| Issue | File | Lines | Impact |
-|-------|------|-------|--------|
-| No TypeScript | All `.jsx`/`.js` | -- | No compile-time type checking |
+No major structural debt remaining.
 
 ### Resolved Debt
+- ~~No TypeScript~~ → Full TypeScript migration completed (Feb 2026)
 - ~~Monolithic root component~~ → Refactored to hooks + components (283 lines, Feb 2026)
 - ~~All DB logic in one file~~ → Refactored to modular `db/` structure (Feb 2026)
-- ~~No automated tests~~ → 3,135 tests across database layer (Feb 2026)
+- ~~No automated tests~~ → 3,387 tests across all layers (Feb 2026)
 - ~~Service layer tests~~ → 94.46% coverage, 98.56% function coverage (Feb 2026)
 - ~~Repository layer tests~~ → Full coverage with 415 tests across all repos (Feb 2026)
 - ~~sql.js loaded from CDN~~ → Bundled WASM in `public/sql-wasm.wasm` (Feb 2026)
