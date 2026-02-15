@@ -1,5 +1,5 @@
 // Electron main process for JDex desktop app
-import { app, BrowserWindow, Menu, shell } from 'electron';
+import { app, BrowserWindow, Menu, shell, session } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -159,6 +159,24 @@ const menuTemplate = [
 ];
 
 app.whenReady().then(() => {
+  // Security: Set Content Security Policy headers
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self';" +
+            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval';" +
+            "style-src 'self' 'unsafe-inline';" +
+            "img-src 'self' data: blob:;" +
+            "font-src 'self';" +
+            "connect-src 'self';" +
+            "frame-ancestors 'none';",
+        ],
+      },
+    });
+  });
+
   const menu = Menu.buildFromTemplate(menuTemplate);
   Menu.setApplicationMenu(menu);
 

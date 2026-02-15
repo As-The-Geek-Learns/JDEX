@@ -20,9 +20,9 @@
 | Layer | Technology | Notes |
 |-------|-----------|-------|
 | Desktop Framework | Electron 35.7 | Main process in `app/electron/main.js` |
-| Frontend | React 18.2 (JSX, no TypeScript) | Single-page app in `app/src/` |
+| Frontend | React 18.2 + TypeScript | Single-page app in `app/src/` |
 | Styling | Tailwind CSS 3.4 | Custom JD theme (navy/teal/orange), glass morphism |
-| Database | SQLite via sql.js (WebAssembly) | Loaded from CDN, stored in localStorage |
+| Database | SQLite via sql.js (WebAssembly) | Bundled WASM, stored in localStorage |
 | Build Tool | Vite 7.3 | Config in `app/vite.config.js` |
 | Packaging | electron-builder 26.7 | macOS (DMG/ZIP), Windows (NSIS/portable), Linux (AppImage/deb) |
 | Icons | Lucide React 0.563 | Consistent icon system throughout UI |
@@ -43,9 +43,17 @@ jdex-complete-package/          # Monorepo root
 │   │   ├── main.js             # Main process entry, IPC handlers, window management
 │   │   └── electron-main.js    # Entry point config
 │   ├── src/                    # React frontend
-│   │   ├── App.jsx             # Root component (2,622 lines - monolithic, needs refactoring)
-│   │   ├── db.js               # Database layer (3,344 lines - all CRUD + migrations)
-│   │   ├── index.css            # Global styles + Tailwind directives
+│   │   ├── App.jsx             # Root component (283 lines - orchestrates hooks/components)
+│   │   ├── db.js               # Database facade (451 lines - init, save, re-exports)
+│   │   ├── db/                 # Modular database layer (see Database Architecture below)
+│   │   ├── hooks/              # Custom React hooks (594 lines total)
+│   │   │   ├── useAppData.js   # Database init, data loading, refresh
+│   │   │   ├── useFolderCRUD.js # Folder create/update/delete
+│   │   │   ├── useItemCRUD.js  # Item create/update/delete
+│   │   │   ├── useModalState.js # All modal visibility states
+│   │   │   ├── useNavigation.js # View state, breadcrumbs
+│   │   │   └── useSearch.js    # Search query and results
+│   │   ├── index.css           # Global styles + Tailwind directives
 │   │   ├── main.jsx            # React entry point
 │   │   ├── components/         # Feature-grouped React components
 │   │   │   ├── BatchRename/    # BatchRenameModal, FileSelector, RenamePreview
@@ -102,15 +110,94 @@ Areas (10-19, 20-29, ...)       # Broad life/work categories
 ### Database
 - **Engine**: sql.js (SQLite compiled to WebAssembly)
 - **Storage**: Serialized to `localStorage` key `jdex_database_v2`
-- **Schema Version**: 7 (migrations in `db.js`)
-- **Key Tables**: areas, categories, folders, items, file_organization_rules, activity_log, statistics
+- **Schema Version**: 7 (migrations in `db/schema/migrations.js`)
+- **Key Tables**: areas, categories, folders, items, organization_rules, activity_log, cloud_drives, watched_folders
 - **All queries use parameterized statements** (no SQL injection risk)
+- **Test Coverage**: 1,422 tests across the database layer
+
+### Database Architecture
+
+The database layer follows a modular repository pattern:
+
+```
+app/src/db/                          (13,329 lines total)
+├── core/                            # Infrastructure (1,945 lines + 1,440 tests)
+│   ├── cache.js                     # TTL cache for query results
+│   ├── database.js                  # DB instance management (getDB, setDB)
+│   ├── query-builder.js             # Fluent query API
+│   ├── result-mapper.js             # Row-to-object mapping
+│   └── transaction.js               # Transaction support
+│
+├── repositories/                    # CRUD operations (3,907 lines + 2,687 tests)
+│   ├── activity-log.js              # Activity logging
+│   ├── area-storage.js              # Area-to-cloud-drive mappings
+│   ├── areas.js                     # Area CRUD
+│   ├── categories.js                # Category CRUD
+│   ├── cloud-drives.js              # Cloud drive configurations
+│   ├── db-utils.js                  # Database utilities (vacuum, integrity)
+│   ├── folders.js                   # Folder CRUD
+│   ├── import-export.js             # Backup and JSON export
+│   ├── items.js                     # Item CRUD
+│   ├── organization-rules.js        # File organization rules
+│   ├── organized-files.js           # Organized file records
+│   ├── scanned-files.js             # Scanned files working set
+│   ├── search.js                    # Search operations
+│   ├── statistics.js                # Database statistics
+│   ├── storage-locations.js         # Storage location CRUD
+│   ├── watch-activity.js            # Watch activity logs
+│   ├── watched-folders.js           # Watch folder configurations
+│   └── utils.js                     # Shared helpers (getDB, saveDatabase)
+│
+└── schema/                          # Schema definitions (1,424 lines + 1,103 tests)
+    ├── constants.js                 # Schema version, validation constants
+    ├── migrations.js                # v2-v7 migrations
+    ├── seeds.js                     # Default data (areas, categories, locations)
+    └── tables.js                    # DDL definitions
+```
+
+The main `db.js` file (451 lines) is now a thin facade that:
+- Initializes sql.js and loads/creates the database
+- Re-exports all repository functions for backward compatibility
+- Provides `getDB()`, `initDatabase()`, `saveDatabase()`, `resetDatabase()`
 
 ### Key Design Decisions
 - **Local-first**: No server, no cloud by default. Data lives in the browser's localStorage.
 - **sql.js loaded from CDN**: `https://sql.js.org/dist/sql-wasm.js` (not bundled)
-- **No ORM**: Direct SQL via sql.js API. All queries in `db.js`.
+- **Repository pattern**: Each domain has its own module with CRUD operations
 - **Single database file**: All tables in one logical unit, exportable as JSON.
+
+### Architectural Principles
+
+#### Repository Pattern
+All database operations follow the repository pattern:
+- One repository module per domain (areas, folders, items, etc.)
+- Each repository handles CRUD for its entity only
+- Repositories import from `utils.js` for shared helpers
+- New entities get new files, not modifications to existing ones
+
+#### SOLID Guidelines
+
+| Principle | How We Apply It |
+|-----------|-----------------|
+| **Single Responsibility** | Each module has one reason to change |
+| **Open/Closed** | Add features via new files, not modifying existing |
+| **Interface Segregation** | Import only what you need from repositories |
+| **Dependency Inversion** | Use `getDB()` abstraction, not direct db access |
+
+#### Testing Expectations
+- All repository functions must have unit tests
+- Use mocks for database access (`vi.mock('../utils.js')`)
+- Follow AAA pattern: Arrange, Act, Assert
+- Test happy path, edge cases, and error conditions
+- Aim for tests that run fast (no real database)
+
+#### Adding a New Repository
+1. Create `db/repositories/your-entity.js`
+2. Import helpers from `./utils.js`
+3. Export CRUD functions: `getEntities`, `getEntity`, `createEntity`, etc.
+4. Add exports to `db/repositories/index.js`
+5. Create `db/repositories/__tests__/your-entity.test.js`
+6. Re-export from `db.js` for backward compatibility
 
 ---
 
@@ -178,6 +265,24 @@ npm run icons            # Regenerate app icons from source PNG
 - **Tailwind utility classes** for all styling (no CSS modules, no styled-components)
 - **Lucide React** for all icons (consistent import pattern)
 - **sql.js parameterized queries** for all database operations
+- **Underscore prefix for unused variables**: Use `_` prefix to signal intentionally unused bindings
+
+### Underscore Convention for Unused Variables
+ESLint is configured to allow variables prefixed with `_` to be unused. Use this pattern for:
+```javascript
+// Unused callback parameters
+const handleClick = (_event) => { /* event not needed */ };
+
+// Unused destructured values
+const { loading: _loading, data } = useQuery();
+
+// Unused catch errors (when you just need to handle the error case)
+try { ... } catch (_e) { showGenericError(); }
+
+// Unused loop variables
+items.forEach((_item, index) => { /* only need index */ });
+```
+This is configured in `eslint.config.js` via `argsIgnorePattern`, `varsIgnorePattern`, and `caughtErrorsIgnorePattern`.
 
 ### Custom Tailwind Theme
 The project uses a dark theme with custom design tokens in `tailwind.config.js`:
@@ -210,21 +315,22 @@ The project uses a dark theme with custom design tokens in `tailwind.config.js`:
 - No secrets in codebase; `.gitignore` covers `.env`, `*.db`, `*.sqlite`
 
 ### Known Technical Debt
-- **sql.js loaded from CDN** at runtime rather than bundled (external dependency risk)
 - **localStorage for database storage** has a ~5-10MB limit depending on browser/Electron
 
 ---
 
 ## Known Structural Debt
 
-These are acknowledged issues, not bugs:
+No major structural debt remaining.
 
-| Issue | File | Lines | Impact |
-|-------|------|-------|--------|
-| Monolithic root component | `App.jsx` | 2,622 | Hard to navigate, no routing |
-| All DB logic in one file | `db.js` | 3,344 | Migrations, queries, schema mixed |
-| No automated tests | -- | 0 | No safety net for refactoring |
-| No TypeScript | All `.jsx`/`.js` | -- | No compile-time type checking |
+### Resolved Debt
+- ~~No TypeScript~~ → Full TypeScript migration completed (Feb 2026)
+- ~~Monolithic root component~~ → Refactored to hooks + components (283 lines, Feb 2026)
+- ~~All DB logic in one file~~ → Refactored to modular `db/` structure (Feb 2026)
+- ~~No automated tests~~ → 3,387 tests across all layers (Feb 2026)
+- ~~Service layer tests~~ → 94.46% coverage, 98.56% function coverage (Feb 2026)
+- ~~Repository layer tests~~ → Full coverage with 415 tests across all repos (Feb 2026)
+- ~~sql.js loaded from CDN~~ → Bundled WASM in `public/sql-wasm.wasm` (Feb 2026)
 
 ---
 
@@ -252,27 +358,34 @@ main ─────────────────────────
 1. Create a feature branch: `feature/your-feature`
 2. If it needs UI: Add component(s) in `app/src/components/YourFeature/`
 3. If it needs business logic: Add service in `app/src/services/yourFeatureService.js`
-4. If it needs database changes: Add migration in `db.js` (increment `SCHEMA_VERSION`)
+4. If it needs database changes:
+   - Add migration in `db/schema/migrations.js`
+   - Update `SCHEMA_VERSION` in `db/schema/constants.js`
+   - Add/update repository in `db/repositories/`
+   - Export from `db/repositories/index.js` and re-export from `db.js`
 5. If it's premium-gated: Check license in component via `useLicense()` from `LicenseContext`
 6. Wire into `App.jsx` (currently all top-level routing/state lives here)
 7. Run `npm run lint:fix && npm run format` before committing
 
 ### Adding a Database Migration
-In `db.js`, migrations are numbered. The current schema version is **7**.
+Migrations are in `db/schema/migrations.js`. The current schema version is **7**.
 ```javascript
-// In the runMigrations() function:
+// In the runMigrations() function in db/schema/migrations.js:
 if (currentVersion < 8) {
   db.run("ALTER TABLE ... ");
   db.run("UPDATE schema_version SET version = 8");
 }
+// Also update SCHEMA_VERSION in db/schema/constants.js
 ```
 
 ### Key Files to Read First
 When starting a new session, these files give the most context:
-1. `app/src/App.jsx` - All UI state, navigation, feature integration
-2. `app/src/db.js` - Database schema, queries, migrations
-3. `app/src/services/licenseService.js` - Premium feature gating logic
-4. `app/tailwind.config.js` - Design system tokens
+1. `app/src/App.jsx` - Root component (orchestrates hooks and components)
+2. `app/src/hooks/` - Custom hooks (useAppData, useNavigation, useFolderCRUD, etc.)
+3. `app/src/db.js` - Database facade (init, save, re-exports)
+4. `app/src/db/repositories/index.js` - All database CRUD operations
+5. `app/src/services/licenseService.js` - Premium feature gating logic
+6. `app/tailwind.config.js` - Design system tokens
 
 ---
 
