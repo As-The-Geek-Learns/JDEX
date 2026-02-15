@@ -111,7 +111,9 @@ export function mapRows<T extends string>(
     return [];
   }
 
-  return resultSet.values.map((row) => mapRow(row, columns)).filter((r): r is MappedRow<T> => r !== null);
+  return resultSet.values
+    .map((row) => mapRow(row, columns))
+    .filter((r): r is MappedRow<T> => r !== null);
 }
 
 /**
@@ -203,9 +205,25 @@ export function getScalar<T = unknown>(
  * Use these with mapRows/mapSingle for consistent mapping.
  */
 export const COLUMNS = {
-  areas: ['id', 'range_start', 'range_end', 'name', 'description', 'created_at', 'updated_at'] as const,
+  areas: [
+    'id',
+    'range_start',
+    'range_end',
+    'name',
+    'description',
+    'created_at',
+    'updated_at',
+  ] as const,
 
-  categories: ['id', 'number', 'area_id', 'name', 'description', 'created_at', 'updated_at'] as const,
+  categories: [
+    'id',
+    'number',
+    'area_id',
+    'name',
+    'description',
+    'created_at',
+    'updated_at',
+  ] as const,
 
   // Extended with area info for joined queries
   categoriesWithArea: [

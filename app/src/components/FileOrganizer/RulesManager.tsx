@@ -664,13 +664,7 @@ function RuleCard({ rule, folders, onEdit, onDelete, onToggle }: RuleCardProps):
 /**
  * Modal for creating/editing rules.
  */
-function RuleModal({
-  isOpen,
-  rule,
-  folders,
-  onSave,
-  onClose,
-}: RuleModalProps): JSX.Element | null {
+function RuleModal({ isOpen, rule, folders, onSave, onClose }: RuleModalProps): JSX.Element | null {
   const isEditing = !!rule?.id;
 
   const [formData, setFormData] = useState<RuleFormData>({
@@ -715,7 +709,8 @@ function RuleModal({
         target_id: rule.target_id || '',
         priority: rule.priority || 50,
         is_active: rule.is_active !== false && rule.is_active !== 0,
-        exclude_pattern: (rule as OrganizationRule & { exclude_pattern?: string }).exclude_pattern || '',
+        exclude_pattern:
+          (rule as OrganizationRule & { exclude_pattern?: string }).exclude_pattern || '',
         compound_extension: compoundExt,
         compound_keyword: compoundKeyword,
       });
@@ -854,9 +849,7 @@ function RuleModal({
           {formData.rule_type === 'compound' ? (
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Extension *
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Extension *</label>
                 <input
                   type="text"
                   value={formData.compound_extension}

@@ -363,11 +363,7 @@ export function cacheKey(...parts: (string | number)[]): string {
 /**
  * Create a cache key for a database query.
  */
-export function queryCacheKey(
-  table: string,
-  operation: string,
-  params: unknown = null
-): string {
+export function queryCacheKey(table: string, operation: string, params: unknown = null): string {
   const base = `query:${table}:${operation}`;
   if (params === null || params === undefined) {
     return base;

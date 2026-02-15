@@ -319,5 +319,5 @@ export function getTables(): string[] {
     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
   );
 
-  return (result[0]?.values?.map((row) => row[0] as string)) || [];
+  return result[0]?.values?.map((row) => row[0] as string) || [];
 }

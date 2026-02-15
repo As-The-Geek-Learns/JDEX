@@ -41,7 +41,14 @@ vi.mock('../activity-log.js', () => ({
   logActivity: vi.fn(),
 }));
 
-import { getDB, requireDB, saveDatabase, mapResults, buildUpdateQuery, getLastInsertId } from '../utils.js';
+import {
+  getDB,
+  requireDB,
+  saveDatabase,
+  mapResults,
+  buildUpdateQuery,
+  getLastInsertId,
+} from '../utils.js';
 import { logActivity } from '../activity-log.js';
 
 describe('getCategories', () => {

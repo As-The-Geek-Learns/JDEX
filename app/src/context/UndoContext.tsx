@@ -122,7 +122,9 @@ export interface UndoContextValue {
   lastActionTimestamp: number | null;
 
   // Actions
-  pushAction: (action: Omit<UndoAction, 'id' | 'timestamp'> & { id?: string; timestamp?: number }) => void;
+  pushAction: (
+    action: Omit<UndoAction, 'id' | 'timestamp'> & { id?: string; timestamp?: number }
+  ) => void;
   undo: () => void;
   redo: () => void;
   clearHistory: () => void;
@@ -253,12 +255,7 @@ function executeUndo(action: UndoAction): void {
         if (!parentFolder) {
           throw new Error(`Cannot undo: parent folder no longer exists`);
         }
-        const {
-          id: _id,
-          created_at: _created,
-          updated_at: _updated,
-          ...cleanItemData
-        } = itemData;
+        const { id: _id, created_at: _created, updated_at: _updated, ...cleanItemData } = itemData;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         createItem(cleanItemData as any);
       }

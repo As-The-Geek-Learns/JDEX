@@ -257,11 +257,14 @@ describe('CategoriesTab', () => {
       const saveButton = container.querySelector('svg.lucide-check').closest('button');
       fireEvent.click(saveButton);
 
-      expect(updateCategory).toHaveBeenCalledWith(1, expect.objectContaining({
-        name: 'Finance',
-        number: 11,
-        area_id: 1,
-      }));
+      expect(updateCategory).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          name: 'Finance',
+          number: 11,
+          area_id: 1,
+        })
+      );
     });
 
     it('should call onDataChange after successful update', () => {

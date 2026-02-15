@@ -34,7 +34,14 @@ vi.mock('../utils.js', () => ({
   getLastInsertId: vi.fn(),
 }));
 
-import { getDB, requireDB, saveDatabase, mapResults, buildUpdateQuery, getLastInsertId } from '../utils.js';
+import {
+  getDB,
+  requireDB,
+  saveDatabase,
+  mapResults,
+  buildUpdateQuery,
+  getLastInsertId,
+} from '../utils.js';
 
 describe('getStorageLocations', () => {
   let mockDb;

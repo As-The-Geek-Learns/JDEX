@@ -19,7 +19,10 @@ import {
   hasFileSystemAccess,
   listSubdirectories,
 } from '../../services/fileScannerService.js';
-import type { ScanProgress as ServiceScanProgress, ScanResult } from '../../services/fileScannerService.js';
+import type {
+  ScanProgress as ServiceScanProgress,
+  ScanResult,
+} from '../../services/fileScannerService.js';
 import { getCloudDrives, getScannedFiles } from '../../db.js';
 import type { CloudDrive } from '../../db/repositories/cloud-drives.js';
 import type { ScannedFile } from '../../db/repositories/scanned-files.js';
@@ -586,7 +589,8 @@ export default function ScannerPanel({ onScanComplete }: ScannerPanelProps): JSX
         const electronWindow = window as Window & {
           require: (module: string) => unknown;
         };
-        const electron = (electronWindow.require('@electron/remote') || electronWindow.require('electron')) as ElectronModule;
+        const electron = (electronWindow.require('@electron/remote') ||
+          electronWindow.require('electron')) as ElectronModule;
         const dialog = electron.dialog || electron.remote?.dialog;
         if (dialog) {
           const result = await dialog.showOpenDialog({
@@ -648,7 +652,9 @@ export default function ScannerPanel({ onScanComplete }: ScannerPanelProps): JSX
       )}
 
       {/* Scan in progress */}
-      {isScanning && progress && <ScanProgressComponent progress={progress} onCancel={handleCancel} />}
+      {isScanning && progress && (
+        <ScanProgressComponent progress={progress} onCancel={handleCancel} />
+      )}
 
       {/* Scan results */}
       {!isScanning && scanResult && (

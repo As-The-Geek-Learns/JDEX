@@ -65,7 +65,14 @@ export interface UpdateCloudDriveInput {
 /**
  * Valid drive types for cloud_drives.drive_type column.
  */
-export const VALID_DRIVE_TYPES: readonly DriveType[] = ['icloud', 'dropbox', 'onedrive', 'google', 'proton', 'generic'];
+export const VALID_DRIVE_TYPES: readonly DriveType[] = [
+  'icloud',
+  'dropbox',
+  'onedrive',
+  'google',
+  'proton',
+  'generic',
+];
 
 // ============================================
 // HELPER FUNCTIONS

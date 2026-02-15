@@ -84,7 +84,11 @@ export interface GetWatchedFoldersOptions {
 /**
  * Valid confidence thresholds for auto-organization.
  */
-export const VALID_CONFIDENCE_THRESHOLDS: readonly ConfidenceThreshold[] = ['low', 'medium', 'high'];
+export const VALID_CONFIDENCE_THRESHOLDS: readonly ConfidenceThreshold[] = [
+  'low',
+  'medium',
+  'high',
+];
 
 // ============================================
 // HELPER FUNCTIONS
@@ -255,7 +259,10 @@ export function createWatchedFolder(folder: CreateWatchedFolderInput): number {
     if ((error as Error).name === 'ValidationError' || error instanceof DatabaseError) {
       throw error;
     }
-    throw new DatabaseError(`Failed to create watched folder: ${(error as Error).message}`, 'insert');
+    throw new DatabaseError(
+      `Failed to create watched folder: ${(error as Error).message}`,
+      'insert'
+    );
   }
 }
 

@@ -257,11 +257,14 @@ describe('AreasTab', () => {
       const saveButton = container.querySelector('svg.lucide-check').closest('button');
       fireEvent.click(saveButton);
 
-      expect(updateArea).toHaveBeenCalledWith(1, expect.objectContaining({
-        name: 'Personal',
-        range_start: 10,
-        range_end: 19,
-      }));
+      expect(updateArea).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          name: 'Personal',
+          range_start: 10,
+          range_end: 19,
+        })
+      );
     });
 
     it('should call onDataChange after successful update', () => {

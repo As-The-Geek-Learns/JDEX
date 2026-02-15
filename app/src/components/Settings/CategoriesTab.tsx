@@ -124,17 +124,11 @@ function CategoriesTab({ areas, categories, onDataChange }: CategoriesTabProps):
     }
   };
 
-  const handleNewCategoryChange = (
-    field: keyof NewCategoryFormData,
-    value: string
-  ): void => {
+  const handleNewCategoryChange = (field: keyof NewCategoryFormData, value: string): void => {
     setNewCategory({ ...newCategory, [field]: value });
   };
 
-  const handleEditingCategoryChange = (
-    field: keyof EditingCategory,
-    value: string
-  ): void => {
+  const handleEditingCategoryChange = (field: keyof EditingCategory, value: string): void => {
     if (!editingCategory) return;
     setEditingCategory({ ...editingCategory, [field]: value });
   };

@@ -243,14 +243,17 @@ export function getOrganizedFilesStats(): OrganizedFilesStats {
   const db = requireDB();
 
   const totalMoved =
-    db.exec("SELECT COUNT(*) FROM organized_files WHERE status = 'moved'")[0]?.values?.[0]?.[0] || 0;
-  const totalTracked =
-    db.exec("SELECT COUNT(*) FROM organized_files WHERE status = 'tracked'")[0]?.values?.[0]?.[0] || 0;
-  const totalUndone =
-    db.exec("SELECT COUNT(*) FROM organized_files WHERE status = 'undone'")[0]?.values?.[0]?.[0] || 0;
-  const totalSize =
-    db.exec("SELECT SUM(file_size) FROM organized_files WHERE status = 'moved'")[0]?.values?.[0]?.[0] ||
+    db.exec("SELECT COUNT(*) FROM organized_files WHERE status = 'moved'")[0]?.values?.[0]?.[0] ||
     0;
+  const totalTracked =
+    db.exec("SELECT COUNT(*) FROM organized_files WHERE status = 'tracked'")[0]?.values?.[0]?.[0] ||
+    0;
+  const totalUndone =
+    db.exec("SELECT COUNT(*) FROM organized_files WHERE status = 'undone'")[0]?.values?.[0]?.[0] ||
+    0;
+  const totalSize =
+    db.exec("SELECT SUM(file_size) FROM organized_files WHERE status = 'moved'")[0]
+      ?.values?.[0]?.[0] || 0;
 
   // Get breakdown by file type
   const byTypeResults = db.exec(`
@@ -262,10 +265,13 @@ export function getOrganizedFilesStats(): OrganizedFilesStats {
   `);
 
   const byType: Record<string, number> =
-    byTypeResults[0]?.values?.reduce((acc, row) => {
-      acc[row[0] as string] = row[1] as number;
-      return acc;
-    }, {} as Record<string, number>) || {};
+    byTypeResults[0]?.values?.reduce(
+      (acc, row) => {
+        acc[row[0] as string] = row[1] as number;
+        return acc;
+      },
+      {} as Record<string, number>
+    ) || {};
 
   // Get breakdown by JD folder
   const byFolderResults = db.exec(`
@@ -310,7 +316,11 @@ export function recordOrganizedFile(file: RecordOrganizedFileInput): number {
     const currentPath = validateRequiredString(file.current_path, 'Current path', 1000);
 
     // Validate optional fields
-    const jdFolderNumber = validateOptionalString(file.jd_folder_number ?? null, 'JD folder number', 20);
+    const jdFolderNumber = validateOptionalString(
+      file.jd_folder_number ?? null,
+      'JD folder number',
+      20
+    );
     const fileExtension = validateOptionalString(file.file_extension ?? null, 'Extension', 20);
     const fileType = validateOptionalString(file.file_type ?? null, 'File type', 50);
     const cloudDriveId = validateOptionalString(file.cloud_drive_id ?? null, 'Cloud drive ID', 50);
@@ -357,7 +367,10 @@ export function recordOrganizedFile(file: RecordOrganizedFileInput): number {
     if ((error as Error).name === 'ValidationError' || error instanceof DatabaseError) {
       throw error;
     }
-    throw new DatabaseError(`Failed to record organized file: ${(error as Error).message}`, 'insert');
+    throw new DatabaseError(
+      `Failed to record organized file: ${(error as Error).message}`,
+      'insert'
+    );
   }
 }
 
@@ -381,7 +394,10 @@ export function markFileUndone(fileId: number | string): void {
 /**
  * Update an organized file record.
  */
-export function updateOrganizedFile(fileId: number | string, updates: UpdateOrganizedFileInput): void {
+export function updateOrganizedFile(
+  fileId: number | string,
+  updates: UpdateOrganizedFileInput
+): void {
   const db = requireDB();
   const id = validatePositiveInteger(fileId, 'File ID');
 

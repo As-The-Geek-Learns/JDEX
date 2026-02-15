@@ -236,10 +236,7 @@ export default function StatsDashboard({ onClose }: StatsDashboardProps): JSX.El
 
             {/* Upgrade prompt modal */}
             {showUpgradeModal && (
-              <UpgradePrompt
-                feature="statistics"
-                onClose={() => setShowUpgradeModal(false)}
-              />
+              <UpgradePrompt feature="statistics" onClose={() => setShowUpgradeModal(false)} />
             )}
           </div>
         </div>

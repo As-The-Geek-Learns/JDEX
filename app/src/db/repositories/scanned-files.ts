@@ -105,7 +105,12 @@ export const VALID_DECISIONS: readonly Decision[] = ['pending', 'accepted', 'cha
 /**
  * Valid confidence levels for suggestions.
  */
-export const VALID_CONFIDENCE_LEVELS: readonly ConfidenceLevel[] = ['none', 'low', 'medium', 'high'];
+export const VALID_CONFIDENCE_LEVELS: readonly ConfidenceLevel[] = [
+  'none',
+  'low',
+  'medium',
+  'high',
+];
 
 // ============================================
 // HELPER FUNCTIONS
@@ -168,7 +173,10 @@ export function clearScannedFiles(sessionId: string | null = null): void {
 /**
  * Get scanned files for the current session.
  */
-export function getScannedFiles(sessionId: string, options: GetScannedFilesOptions = {}): ScannedFile[] {
+export function getScannedFiles(
+  sessionId: string,
+  options: GetScannedFilesOptions = {}
+): ScannedFile[] {
   const db = requireDB();
   const id = validateRequiredString(sessionId, 'Session ID', 50);
   const { decision, fileType, hasSuggestion } = options;

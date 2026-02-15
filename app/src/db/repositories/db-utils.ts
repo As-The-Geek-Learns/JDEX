@@ -113,7 +113,7 @@ export function executeSQL(sql: string): SQLExecutionResult {
 export function getTables(): string[] {
   const db = requireDB();
   const results = db.exec("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
-  return (results[0]?.values?.map((row) => row[0] as string) || []);
+  return results[0]?.values?.map((row) => row[0] as string) || [];
 }
 
 /**

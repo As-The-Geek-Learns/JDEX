@@ -128,11 +128,7 @@ function ActivityTrend({ data, label, color }: ActivityTrendProps): JSX.Element 
 /**
  * File types breakdown comparison.
  */
-function FileTypesCompare({
-  data,
-  label,
-  isPrevious = false,
-}: FileTypesCompareProps): JSX.Element {
+function FileTypesCompare({ data, label, isPrevious = false }: FileTypesCompareProps): JSX.Element {
   const total = data.reduce((sum, d) => sum + (d.count || 0), 0);
 
   return (
@@ -288,11 +284,7 @@ export default function ComparisonView({
       {/* File Types Comparison */}
       <div className="grid grid-cols-2 gap-4">
         <FileTypesCompare data={currentStats.filesByType || []} label={currentLabel} />
-        <FileTypesCompare
-          data={previousStats.filesByType || []}
-          label={previousLabel}
-          isPrevious
-        />
+        <FileTypesCompare data={previousStats.filesByType || []} label={previousLabel} isPrevious />
       </div>
     </div>
   );

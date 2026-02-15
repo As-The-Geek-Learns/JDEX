@@ -250,7 +250,8 @@ export default function FileSelector({
           <div className="bg-slate-800/50 rounded-lg border border-slate-700 max-h-48 overflow-y-auto">
             {availableFiles.map((file) => {
               const isSelected = selectedFiles.some((f) => f.path === file.path);
-              const isDisabled = !isSelected && maxFiles !== null && selectedFiles.length >= maxFiles;
+              const isDisabled =
+                !isSelected && maxFiles !== null && selectedFiles.length >= maxFiles;
 
               return (
                 <div

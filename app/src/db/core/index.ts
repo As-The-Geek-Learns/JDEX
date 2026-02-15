@@ -147,9 +147,4 @@ export {
   getTables,
 } from './database.js';
 
-export type {
-  SqlJsDatabase,
-  SqlJsQueryResult,
-  SqlJsModule,
-  DatabaseStats,
-} from './database.js';
+export type { SqlJsDatabase, SqlJsQueryResult, SqlJsModule, DatabaseStats } from './database.js';

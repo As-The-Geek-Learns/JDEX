@@ -546,9 +546,7 @@ export default function WatchFolders(): JSX.Element {
               key={folder.id}
               folder={folder}
               queuedCount={queuedCounts.find((q) => q.id === folder.id)?.queued_count || 0}
-              onToggleActive={(active) =>
-                handleToggleActive(folder.id, active, folder.is_running)
-              }
+              onToggleActive={(active) => handleToggleActive(folder.id, active, folder.is_running)}
               onEdit={() => setEditingFolder(folder)}
               onDelete={() => handleDeleteFolder(folder.id)}
               onProcessExisting={() => handleProcessExisting(folder.id)}
@@ -573,9 +571,7 @@ export default function WatchFolders(): JSX.Element {
         <WatchFolderModal
           folder={editingFolder}
           onSave={
-            editingFolder
-              ? (data) => handleUpdateFolder(editingFolder.id, data)
-              : handleAddFolder
+            editingFolder ? (data) => handleUpdateFolder(editingFolder.id, data) : handleAddFolder
           }
           onClose={() => {
             setShowAddModal(false);

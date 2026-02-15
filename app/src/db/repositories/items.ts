@@ -149,7 +149,8 @@ function addEffectiveSensitivity(item: RowObject): Item {
 
   return {
     ...(item as unknown as Omit<Item, 'effective_sensitivity'>),
-    effective_sensitivity: sensitivity === 'inherit' ? folderSensitivity : (sensitivity as SensitivityLevel),
+    effective_sensitivity:
+      sensitivity === 'inherit' ? folderSensitivity : (sensitivity as SensitivityLevel),
   };
 }
 

@@ -15,14 +15,7 @@ import { formatDistanceToNow } from 'date-fns';
 /**
  * Status type identifier
  */
-type StatusType =
-  | 'watching'
-  | 'syncing'
-  | 'ready'
-  | 'paused'
-  | 'error'
-  | 'notFound'
-  | 'offline';
+type StatusType = 'watching' | 'syncing' | 'ready' | 'paused' | 'error' | 'notFound' | 'offline';
 
 /**
  * Color identifier
@@ -268,10 +261,7 @@ export function StatusBadge({
 // Connection Status Component
 // =============================================================================
 
-export function ConnectionStatus({
-  isConnected,
-  lastChecked,
-}: ConnectionStatusProps): JSX.Element {
+export function ConnectionStatus({ isConnected, lastChecked }: ConnectionStatusProps): JSX.Element {
   const colors = isConnected ? COLOR_CLASSES.green : COLOR_CLASSES.red;
   const label = isConnected ? 'Connected' : 'Disconnected';
 

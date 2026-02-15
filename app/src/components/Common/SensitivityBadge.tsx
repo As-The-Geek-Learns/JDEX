@@ -39,8 +39,7 @@ export interface SensitivityBadgeProps {
 const CONFIG: Record<SensitivityKey, BadgeConfig> = {
   standard: {
     label: 'Standard',
-    class:
-      'bg-gradient-to-r from-slate-600/30 to-slate-700/20 text-slate-300 border-slate-500/30',
+    class: 'bg-gradient-to-r from-slate-600/30 to-slate-700/20 text-slate-300 border-slate-500/30',
     icon: Cloud,
   },
   sensitive: {
@@ -69,7 +68,11 @@ function SensitivityBadge({
   sensitivity,
   isInherited = false,
 }: SensitivityBadgeProps): JSX.Element {
-  const { label, class: className, icon: Icon } = CONFIG[sensitivity || 'standard'] || CONFIG.standard;
+  const {
+    label,
+    class: className,
+    icon: Icon,
+  } = CONFIG[sensitivity || 'standard'] || CONFIG.standard;
 
   return (
     <span

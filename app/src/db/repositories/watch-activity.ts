@@ -98,7 +98,13 @@ export interface UpdateWatchActivityUpdates {
 /**
  * Valid actions for watch activity.
  */
-export const VALID_WATCH_ACTIONS: readonly WatchAction[] = ['detected', 'queued', 'auto_organized', 'skipped', 'error'];
+export const VALID_WATCH_ACTIONS: readonly WatchAction[] = [
+  'detected',
+  'queued',
+  'auto_organized',
+  'skipped',
+  'error',
+];
 
 // ============================================
 // HELPER FUNCTIONS
@@ -157,7 +163,9 @@ export function getWatchActivity(
 /**
  * Get recent watch activity across all folders.
  */
-export function getRecentWatchActivity(options: GetRecentWatchActivityOptions = {}): WatchActivity[] {
+export function getRecentWatchActivity(
+  options: GetRecentWatchActivityOptions = {}
+): WatchActivity[] {
   const db = requireDB();
   const limit = Math.min(Math.max(1, options.limit || 50), 1000);
 

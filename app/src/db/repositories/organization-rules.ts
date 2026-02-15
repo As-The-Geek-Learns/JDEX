@@ -87,7 +87,14 @@ export interface GetOrganizationRulesOptions {
 /**
  * Valid rule types for organization_rules.
  */
-export const VALID_RULE_TYPES: readonly RuleType[] = ['extension', 'keyword', 'path', 'regex', 'date', 'compound'];
+export const VALID_RULE_TYPES: readonly RuleType[] = [
+  'extension',
+  'keyword',
+  'path',
+  'regex',
+  'date',
+  'compound',
+];
 
 /**
  * Valid target types (what the rule points to).
@@ -148,7 +155,9 @@ function validateRegexPattern(pattern: string): void {
  * Get all organization rules, optionally filtered by type.
  * Rules are returned in priority order (highest first).
  */
-export function getOrganizationRules(options: GetOrganizationRulesOptions = {}): OrganizationRule[] {
+export function getOrganizationRules(
+  options: GetOrganizationRulesOptions = {}
+): OrganizationRule[] {
   const db = requireDB();
   const { ruleType, activeOnly = true } = options;
 
@@ -193,7 +202,10 @@ export function getOrganizationRule(ruleId: number | string): OrganizationRule |
 /**
  * Get organization rules by target.
  */
-export function getOrganizationRulesByTarget(targetType: TargetType, targetId: string): OrganizationRule[] {
+export function getOrganizationRulesByTarget(
+  targetType: TargetType,
+  targetId: string
+): OrganizationRule[] {
   const db = requireDB();
 
   if (!VALID_TARGET_TYPES.includes(targetType)) {
@@ -268,14 +280,27 @@ export function createOrganizationRule(rule: CreateOrganizationRuleInput): numbe
     }
 
     // Validate exclude_pattern (optional)
-    const excludePattern = validateOptionalString(rule.exclude_pattern ?? null, 'Exclude Pattern', 500);
+    const excludePattern = validateOptionalString(
+      rule.exclude_pattern ?? null,
+      'Exclude Pattern',
+      500
+    );
 
     const stmt = db.prepare(`
       INSERT INTO organization_rules (name, rule_type, pattern, target_type, target_id, priority, exclude_pattern, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run([name, rule.rule_type, pattern, rule.target_type, targetId, priority, excludePattern, notes]);
+    stmt.run([
+      name,
+      rule.rule_type,
+      pattern,
+      rule.target_type,
+      targetId,
+      priority,
+      excludePattern,
+      notes,
+    ]);
     stmt.free();
 
     const newId = getLastInsertId();
@@ -295,7 +320,10 @@ export function createOrganizationRule(rule: CreateOrganizationRuleInput): numbe
 /**
  * Update an organization rule.
  */
-export function updateOrganizationRule(ruleId: number | string, updates: UpdateOrganizationRuleInput): void {
+export function updateOrganizationRule(
+  ruleId: number | string,
+  updates: UpdateOrganizationRuleInput
+): void {
   const db = requireDB();
 
   try {

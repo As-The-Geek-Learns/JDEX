@@ -257,7 +257,12 @@ export {
   vacuumDatabase,
   checkDatabaseIntegrity,
 } from './db-utils.js';
-export type { TableData, ColumnSchema, DatabaseSizeInfo, IntegrityCheckResult } from './db-utils.js';
+export type {
+  TableData,
+  ColumnSchema,
+  DatabaseSizeInfo,
+  IntegrityCheckResult,
+} from './db-utils.js';
 
 // Import/Export
 export {

@@ -69,7 +69,9 @@ const ItemCard = memo(
     const [expanded, setExpanded] = useState(false);
 
     const displaySensitivity: Sensitivity | undefined =
-      item.sensitivity === 'inherit' ? item.effective_sensitivity : (item.sensitivity as Sensitivity);
+      item.sensitivity === 'inherit'
+        ? item.effective_sensitivity
+        : (item.sensitivity as Sensitivity);
     const isInherited = item.sensitivity === 'inherit';
 
     return (

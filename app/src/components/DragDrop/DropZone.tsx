@@ -255,7 +255,14 @@ export default function DropZone({
     try {
       // If overwrite, we need to handle deletion first
       if (action === 'overwrite') {
-        const fs = (window as { require?: (mod: string) => { existsSync: (path: string) => boolean; unlinkSync: (path: string) => void } }).require?.('fs');
+        const fs = (
+          window as {
+            require?: (mod: string) => {
+              existsSync: (path: string) => boolean;
+              unlinkSync: (path: string) => void;
+            };
+          }
+        ).require?.('fs');
         if (fs?.existsSync(originalDest)) {
           fs.unlinkSync(originalDest);
         }
@@ -362,9 +369,7 @@ export default function DropZone({
       </div>
 
       {/* Upgrade Prompt Modal */}
-      {showUpgrade && (
-        <UpgradePrompt feature="dragDrop" onClose={() => setShowUpgrade(false)} />
-      )}
+      {showUpgrade && <UpgradePrompt feature="dragDrop" onClose={() => setShowUpgrade(false)} />}
 
       {/* Conflict Resolution Modal */}
       {showConflictModal && conflictData && (

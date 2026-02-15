@@ -596,9 +596,7 @@ function OrganizePanel({ sessionId, onOrganize }: OrganizePanelProps): JSX.Eleme
     try {
       updateScannedFileDecision(fileId, 'skipped');
       setFiles((prev) =>
-        prev.map((f) =>
-          f.id === fileId ? { ...f, user_decision: 'skipped' as UserDecision } : f
-        )
+        prev.map((f) => (f.id === fileId ? { ...f, user_decision: 'skipped' as UserDecision } : f))
       );
     } catch (e) {
       const errorMsg = e instanceof Error ? e : String(e);
@@ -838,7 +836,8 @@ function ErrorDetailCard({ operation, onRetry }: ErrorDetailCardProps): JSX.Elem
     [FILE_ERROR_TYPE.UNKNOWN]: 'bg-slate-700 text-gray-400 border-slate-600',
   };
 
-  const badgeColor = badgeColors[errorType as FileErrorType] || badgeColors[FILE_ERROR_TYPE.UNKNOWN];
+  const badgeColor =
+    badgeColors[errorType as FileErrorType] || badgeColors[FILE_ERROR_TYPE.UNKNOWN];
 
   // System code for debugging (only shown in expandable details)
   const systemCode = error?.systemCode;

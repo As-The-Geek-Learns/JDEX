@@ -107,12 +107,7 @@ export const DEFAULT_CONFIDENCE: ConfidenceLevel = 'none';
 /**
  * User decision states for scanned files.
  */
-export const USER_DECISIONS = Object.freeze([
-  'pending',
-  'accepted',
-  'changed',
-  'skipped',
-] as const);
+export const USER_DECISIONS = Object.freeze(['pending', 'accepted', 'changed', 'skipped'] as const);
 
 export type UserDecision = (typeof USER_DECISIONS)[number];
 

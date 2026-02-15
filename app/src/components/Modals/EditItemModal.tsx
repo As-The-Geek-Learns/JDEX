@@ -54,12 +54,7 @@ export interface EditItemModalProps {
 // Component
 // =============================================================================
 
-function EditItemModal({
-  item,
-  isOpen,
-  onClose,
-  onSave,
-}: EditItemModalProps): JSX.Element | null {
+function EditItemModal({ item, isOpen, onClose, onSave }: EditItemModalProps): JSX.Element | null {
   const [formData, setFormData] = useState<Partial<EditItemFormData>>({});
 
   useEffect(() => {

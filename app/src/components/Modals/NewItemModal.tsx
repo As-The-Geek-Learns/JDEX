@@ -44,7 +44,10 @@ interface NewItemFormData {
 /**
  * Data passed to onSave callback.
  */
-export interface NewItemData extends Omit<NewItemFormData, 'folder_id' | 'file_size' | 'sensitivity'> {
+export interface NewItemData extends Omit<
+  NewItemFormData,
+  'folder_id' | 'file_size' | 'sensitivity'
+> {
   folder_id: number;
   item_number: string;
   sequence: number;

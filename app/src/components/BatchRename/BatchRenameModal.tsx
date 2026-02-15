@@ -184,10 +184,8 @@ export default function BatchRenameModal({ onClose }: BatchRenameModalProps): JS
     setProgress({ current: 0, total: preview.filter((p) => p.willChange).length });
     setResult(null);
 
-    const execResult = (await executeBatchRename(
-      preview,
-      {},
-      (current: number, total: number) => setProgress({ current, total })
+    const execResult = (await executeBatchRename(preview, {}, (current: number, total: number) =>
+      setProgress({ current, total })
     )) as ExecutionResult;
 
     setIsExecuting(false);
