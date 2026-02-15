@@ -19,6 +19,8 @@ import {
   logWatchActivity,
   incrementWatchedFolderStats,
 } from '../db.js';
+import type { WatchedFolder } from '../db/repositories/watched-folders.js';
+import type { LogWatchActivityInput } from '../db/repositories/watch-activity.js';
 import { getMatchingEngine, CONFIDENCE, FileSuggestion } from './matchingEngine.js';
 import { moveFile } from './fileOperations.js';
 
@@ -78,21 +80,7 @@ type FileType =
   | 'video'
   | 'other';
 
-/**
- * Watched folder from database.
- */
-interface WatchedFolder {
-  id: number;
-  name: string;
-  path: string;
-  is_active: number;
-  include_subdirs: number;
-  file_types?: string[];
-  auto_organize: boolean;
-  confidence_threshold: string;
-  notify_on_organize: boolean;
-  last_checked_at?: string;
-}
+// WatchedFolder type imported from repository
 
 /**
  * Pending file entry (for debouncing).
@@ -193,21 +181,7 @@ export interface ProcessExistingResult {
   results?: ProcessingResults;
 }
 
-/**
- * Activity log parameters.
- */
-interface ActivityLogParams {
-  watched_folder_id: number;
-  filename: string;
-  path: string;
-  file_extension?: string;
-  file_type?: string;
-  file_size?: number;
-  action: string;
-  matched_rule_id?: number;
-  target_folder?: string;
-  error_message?: string;
-}
+// ActivityLogParams: Using LogWatchActivityInput from repository
 
 // ============================================
 // CONSTANTS
@@ -436,7 +410,7 @@ export function startWatcher(folderId: number): boolean {
     // Create the watcher
     const watcher = fs.watch(
       folder.path,
-      { recursive: folder.include_subdirs === 1 },
+      { recursive: folder.include_subdirs },
       (eventType: string, filename: string | null) => {
         if (eventType === 'rename' && filename) {
           handleFileEvent(folderId, folder.path, filename);
@@ -570,7 +544,7 @@ async function processFile(folderId: number, fullPath: string, filename: string)
           file_type: fileType,
           file_size: stats.size,
           action: 'skipped',
-        } as ActivityLogParams);
+        } as LogWatchActivityInput);
         return;
       }
     }
@@ -584,7 +558,7 @@ async function processFile(folderId: number, fullPath: string, filename: string)
       file_type: fileType,
       file_size: stats.size,
       action: 'detected',
-    } as ActivityLogParams);
+    } as LogWatchActivityInput);
 
     // Find matching rule using the matching engine
     const engine = getMatchingEngine();
@@ -618,7 +592,7 @@ async function processFile(folderId: number, fullPath: string, filename: string)
         file_type: fileType,
         file_size: stats.size,
         action: 'queued',
-      } as ActivityLogParams);
+      } as LogWatchActivityInput);
       incrementWatchedFolderStats(folderId, false);
 
       // Emit event for UI notification
@@ -644,7 +618,7 @@ async function processFile(folderId: number, fullPath: string, filename: string)
         action: 'queued',
         matched_rule_id: match.ruleId,
         target_folder: match.targetFolder,
-      } as ActivityLogParams);
+      } as LogWatchActivityInput);
       incrementWatchedFolderStats(folderId, false);
 
       emitWatchEvent('file_queued', { folderId, filename, path: fullPath, suggestion: match });
@@ -671,7 +645,7 @@ async function processFile(folderId: number, fullPath: string, filename: string)
             action: 'auto_organized',
             matched_rule_id: match.ruleId,
             target_folder: match.targetFolder,
-          } as ActivityLogParams);
+          } as LogWatchActivityInput);
           incrementWatchedFolderStats(folderId, true);
 
           console.log(`[WatcherService] Auto-organized: ${filename} → ${match.targetFolder}`);
@@ -701,7 +675,7 @@ async function processFile(folderId: number, fullPath: string, filename: string)
           matched_rule_id: match.ruleId,
           target_folder: match.targetFolder,
           error_message: (error as Error).message,
-        } as ActivityLogParams);
+        } as LogWatchActivityInput);
 
         emitWatchEvent('file_error', { folderId, filename, error: (error as Error).message });
       }
@@ -717,7 +691,7 @@ async function processFile(folderId: number, fullPath: string, filename: string)
         action: 'queued',
         matched_rule_id: match.ruleId,
         target_folder: match.targetFolder,
-      } as ActivityLogParams);
+      } as LogWatchActivityInput);
       incrementWatchedFolderStats(folderId, false);
 
       console.log(
@@ -734,7 +708,7 @@ async function processFile(folderId: number, fullPath: string, filename: string)
       path: fullPath,
       action: 'error',
       error_message: (error as Error).message,
-    } as ActivityLogParams);
+    } as LogWatchActivityInput);
   }
 }
 

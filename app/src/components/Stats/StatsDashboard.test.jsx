@@ -37,12 +37,18 @@ afterAll(() => {
 });
 
 // Mock the LicenseContext
-const mockShowUpgradePrompt = vi.fn();
 vi.mock('../../context/LicenseContext.jsx', () => ({
   useLicense: vi.fn(() => ({
     isPremium: true,
-    showUpgradePrompt: mockShowUpgradePrompt,
   })),
+  UpgradePrompt: function MockUpgradePrompt({ feature, onClose }) {
+    return (
+      <div data-testid="upgrade-prompt">
+        <span>Upgrade to Premium for {feature}</span>
+        <button onClick={onClose}>Close Upgrade</button>
+      </div>
+    );
+  },
 }));
 
 // Mock the statistics service
@@ -81,7 +87,6 @@ describe('StatsDashboard', () => {
     // Reset to premium user by default
     useLicense.mockReturnValue({
       isPremium: true,
-      showUpgradePrompt: mockShowUpgradePrompt,
     });
   });
 
@@ -93,7 +98,6 @@ describe('StatsDashboard', () => {
     beforeEach(() => {
       useLicense.mockReturnValue({
         isPremium: false,
-        showUpgradePrompt: mockShowUpgradePrompt,
       });
     });
 
@@ -120,13 +124,15 @@ describe('StatsDashboard', () => {
       expect(mockOnClose).toHaveBeenCalled();
     });
 
-    it('should call showUpgradePrompt when Upgrade clicked', () => {
+    it('should show UpgradePrompt when Upgrade clicked', () => {
       render(<StatsDashboard onClose={mockOnClose} />);
 
       const upgradeButton = screen.getByText('Upgrade');
       fireEvent.click(upgradeButton);
 
-      expect(mockShowUpgradePrompt).toHaveBeenCalledWith('Statistics Dashboard');
+      // Should show the upgrade prompt modal
+      expect(screen.getByTestId('upgrade-prompt')).toBeInTheDocument();
+      expect(screen.getByText('Upgrade to Premium for statistics')).toBeInTheDocument();
     });
 
     it('should have close button in premium gate', () => {

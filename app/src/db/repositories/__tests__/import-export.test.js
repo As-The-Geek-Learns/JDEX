@@ -21,6 +21,7 @@ import {
 // Mock dependencies
 vi.mock('../../core/database.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   setDB: vi.fn(),
   getSQL: vi.fn(),
   saveDatabase: vi.fn(),
@@ -46,7 +47,7 @@ vi.mock('../storage-locations.js', () => ({
   getStorageLocations: vi.fn(() => [{ id: 1, name: 'Local' }]),
 }));
 
-import { getDB, setDB, getSQL, saveDatabase } from '../../core/database.js';
+import { getDB, requireDB, setDB, getSQL, saveDatabase } from '../../core/database.js';
 import { getAreas } from '../areas.js';
 import { getCategories } from '../categories.js';
 import { getFolders } from '../folders.js';
@@ -80,6 +81,7 @@ describe('exportDatabase', () => {
       export: vi.fn(() => new Uint8Array([1, 2, 3, 4])),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
 
     // Mock DOM APIs
     global.Blob = vi.fn((content, options) => ({ content, options }));
@@ -100,7 +102,7 @@ describe('exportDatabase', () => {
     exportDatabase();
 
     expect(mockDb.export).toHaveBeenCalled();
-    expect(global.Blob).toHaveBeenCalledWith([expect.any(Uint8Array)], {
+    expect(global.Blob).toHaveBeenCalledWith([expect.any(ArrayBuffer)], {
       type: 'application/octet-stream',
     });
     expect(global.URL.createObjectURL).toHaveBeenCalled();
@@ -181,6 +183,7 @@ describe('exportDatabaseBytes', () => {
     const mockBytes = new Uint8Array([1, 2, 3]);
     const mockDb = { export: vi.fn(() => mockBytes) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
 
     const result = exportDatabaseBytes();
 

@@ -23,6 +23,7 @@ import { DatabaseError } from '../../../utils/errors.js';
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
   validatePositiveInteger: vi.fn((val, name) => {
     if (val === null || val === undefined) {
@@ -48,7 +49,7 @@ vi.mock('../../../utils/validation.js', () => ({
   sanitizeText: vi.fn((val) => (val ? val.trim() : '')),
 }));
 
-import { getDB, saveDatabase, getLastInsertId } from '../utils.js';
+import { getDB, requireDB, saveDatabase, getLastInsertId } from '../utils.js';
 
 describe('Constants', () => {
   it('exports valid confidence thresholds', () => {
@@ -63,6 +64,7 @@ describe('getWatchedFolders', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn(), run: vi.fn(), prepare: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns all watched folders', () => {
@@ -169,6 +171,7 @@ describe('getWatchedFolder', () => {
     };
     mockDb = { exec: vi.fn(), prepare: vi.fn(() => mockStmt), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns a watched folder by ID', () => {
@@ -220,6 +223,7 @@ describe('getWatchedFolderByPath', () => {
     };
     mockDb = { exec: vi.fn(), prepare: vi.fn(() => mockStmt), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns a watched folder by path', () => {
@@ -257,6 +261,7 @@ describe('getWatchedFolderCount', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns count of all folders', () => {
@@ -297,6 +302,7 @@ describe('createWatchedFolder', () => {
     mockStmt = { run: vi.fn(), free: vi.fn() };
     mockDb = { exec: vi.fn(), prepare: vi.fn(() => mockStmt), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     getLastInsertId.mockReturnValue(1);
   });
 
@@ -393,6 +399,7 @@ describe('updateWatchedFolder', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn(), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('updates folder with valid fields', () => {
@@ -468,6 +475,7 @@ describe('deleteWatchedFolder', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn(), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes a folder by ID', () => {
@@ -495,6 +503,7 @@ describe('incrementWatchedFolderStats', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn(), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('increments files_processed only by default', () => {
@@ -540,6 +549,7 @@ describe('toggleWatchedFolder', () => {
     mockStmt = { bind: vi.fn(), step: vi.fn(), get: vi.fn(), free: vi.fn() };
     mockDb = { exec: vi.fn(), prepare: vi.fn(() => mockStmt), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('toggles active status and returns new state', () => {
@@ -602,6 +612,7 @@ describe('resetWatchedFolderStats', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn(), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('resets both counters to 0', () => {

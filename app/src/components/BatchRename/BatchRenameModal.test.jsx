@@ -12,8 +12,15 @@ import BatchRenameModal from './BatchRenameModal.jsx';
 vi.mock('../../context/LicenseContext.jsx', () => ({
   useLicense: vi.fn(() => ({
     isPremium: false,
-    showUpgradePrompt: vi.fn(),
   })),
+  UpgradePrompt: function MockUpgradePrompt({ feature, onClose }) {
+    return (
+      <div data-testid="upgrade-prompt">
+        <span>Upgrade to Premium for {feature}</span>
+        <button onClick={onClose}>Close</button>
+      </div>
+    );
+  },
 }));
 
 // Mock the batchRenameService
@@ -68,7 +75,6 @@ describe('BatchRenameModal', () => {
     vi.clearAllMocks();
     useLicense.mockReturnValue({
       isPremium: false,
-      showUpgradePrompt: vi.fn(),
     });
     getMostRecentUndoLog.mockReturnValue(null);
     checkBatchLimit.mockReturnValue({ allowed: true, limit: 5 });
@@ -342,11 +348,9 @@ describe('BatchRenameModal', () => {
       });
     });
 
-    it('should show error when batch limit not allowed', async () => {
-      const mockShowUpgrade = vi.fn();
+    it('should show upgrade prompt when batch limit not allowed', async () => {
       useLicense.mockReturnValue({
         isPremium: false,
-        showUpgradePrompt: mockShowUpgrade,
       });
       checkBatchLimit.mockReturnValue({ allowed: false, limit: 5 });
 
@@ -355,7 +359,9 @@ describe('BatchRenameModal', () => {
       fireEvent.click(screen.getByText('Mock Select Files'));
       fireEvent.click(screen.getByText('Rename 1 File'));
 
-      expect(mockShowUpgrade).toHaveBeenCalledWith('Batch Rename');
+      // Should show the upgrade prompt
+      expect(screen.getByTestId('upgrade-prompt')).toBeInTheDocument();
+      expect(screen.getByText('Upgrade to Premium for batchRename')).toBeInTheDocument();
     });
   });
 

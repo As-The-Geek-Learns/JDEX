@@ -9,6 +9,7 @@ import { searchFolders, searchItems, searchAll } from '../search.js';
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   mapResults: vi.fn(),
 }));
 
@@ -17,7 +18,7 @@ vi.mock('../../../utils/validation.js', () => ({
   sanitizeText: vi.fn((text) => text),
 }));
 
-import { getDB, mapResults } from '../utils.js';
+import { getDB, requireDB, mapResults } from '../utils.js';
 import { sanitizeText } from '../../../utils/validation.js';
 
 describe('searchFolders', () => {
@@ -27,6 +28,7 @@ describe('searchFolders', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -119,6 +121,7 @@ describe('searchItems', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -211,6 +214,7 @@ describe('searchAll', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 

@@ -19,6 +19,7 @@ import {
 // Mock dependencies
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
 }));
 
@@ -52,7 +53,7 @@ vi.mock('../../../utils/errors.js', () => ({
   },
 }));
 
-import { getDB, saveDatabase } from '../utils.js';
+import { getDB, requireDB, saveDatabase } from '../utils.js';
 import { logActivity } from '../activity-log.js';
 import { validateRequiredString } from '../../../utils/validation.js';
 
@@ -84,6 +85,7 @@ describe('getCloudDrives', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns all active cloud drives', () => {
@@ -175,6 +177,7 @@ describe('getCloudDrive', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns a cloud drive by ID', () => {
@@ -233,6 +236,7 @@ describe('getDefaultCloudDrive', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns the default cloud drive', () => {
@@ -284,6 +288,7 @@ describe('getCloudDriveCount', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns count of active cloud drives', () => {
@@ -338,6 +343,7 @@ describe('createCloudDrive', () => {
       run: vi.fn(),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('creates a cloud drive with required fields', () => {
@@ -469,6 +475,7 @@ describe('updateCloudDrive', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('updates cloud drive name', () => {
@@ -568,6 +575,7 @@ describe('deleteCloudDrive', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('soft deletes a cloud drive', () => {
@@ -609,6 +617,7 @@ describe('setDefaultCloudDrive', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('sets a cloud drive as default', () => {

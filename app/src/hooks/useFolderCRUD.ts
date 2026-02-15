@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { createFolder, updateFolder, deleteFolder, getFolder } from '../db.js';
 import { useUndo, ACTION_TYPES, ENTITY_TYPES } from '../context/UndoContext.jsx';
-import type { Folder, Category } from '../types/index.js';
+import type { Folder, Category, Sensitivity } from '../types/index.js';
 import type { ViewType } from './useNavigation.js';
 
 // Type for undo actions (UndoContext.jsx is not typed)
@@ -33,7 +33,7 @@ export interface CreateFolderData {
   category_id: number;
   sequence: number;
   description?: string;
-  sensitivity?: string;
+  sensitivity?: Sensitivity;
   location?: string;
   storage_path?: string;
   keywords?: string;

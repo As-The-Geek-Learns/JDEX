@@ -38,6 +38,7 @@ import type {
   TargetType,
   ConfidenceLevel,
 } from '../types/index.js';
+import type { UpdateOrganizationRuleInput } from '../db/repositories/organization-rules.js';
 
 // =============================================================================
 // Types
@@ -805,7 +806,7 @@ export class MatchingEngine {
   /**
    * Updates a rule and invalidates cache.
    */
-  updateRule(id: number, updates: Partial<OrganizationRule>): void {
+  updateRule(id: number, updates: UpdateOrganizationRuleInput): void {
     updateOrganizationRule(id, updates);
     this.invalidateCache();
   }

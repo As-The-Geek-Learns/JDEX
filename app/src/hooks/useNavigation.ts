@@ -9,7 +9,7 @@ import type { Area, Category, Folder, Item } from '../types/index.js';
 /**
  * Navigation view types in the JD hierarchy.
  */
-export type ViewType = 'home' | 'area' | 'category' | 'folder';
+export type ViewType = 'home' | 'area' | 'category' | 'folder' | 'search';
 
 /**
  * Breadcrumb item for navigation trail.

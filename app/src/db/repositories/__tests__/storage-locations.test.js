@@ -17,6 +17,7 @@ import { DatabaseError } from '../../../utils/errors.js';
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
   mapResults: vi.fn(),
   validatePositiveInteger: vi.fn((val, name) => {
@@ -33,7 +34,7 @@ vi.mock('../utils.js', () => ({
   getLastInsertId: vi.fn(),
 }));
 
-import { getDB, saveDatabase, mapResults, buildUpdateQuery, getLastInsertId } from '../utils.js';
+import { getDB, requireDB, saveDatabase, mapResults, buildUpdateQuery, getLastInsertId } from '../utils.js';
 
 describe('getStorageLocations', () => {
   let mockDb;
@@ -42,6 +43,7 @@ describe('getStorageLocations', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -86,6 +88,7 @@ describe('getStorageLocation', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -132,6 +135,7 @@ describe('createStorageLocation', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     getLastInsertId.mockReturnValue(42);
   });
 
@@ -188,6 +192,7 @@ describe('updateStorageLocation', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('updates storage location with valid fields', () => {
@@ -249,6 +254,7 @@ describe('deleteStorageLocation', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes storage location by ID', () => {
@@ -278,6 +284,7 @@ describe('getStorageLocationCount', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns count of storage locations', () => {

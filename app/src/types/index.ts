@@ -19,7 +19,7 @@ export interface Area {
   range_end: number;
   name: string;
   description?: string;
-  color?: string;
+  color: string;
   created_at: string;
 }
 
@@ -41,6 +41,9 @@ export interface Category {
  */
 export type Sensitivity = 'standard' | 'sensitive' | 'work';
 export type ItemSensitivity = 'inherit' | Sensitivity;
+
+// Alias for repository compatibility
+export type SensitivityLevel = Sensitivity;
 
 /**
  * Folder - Level 3 of Johnny Decimal hierarchy.

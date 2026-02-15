@@ -9,9 +9,10 @@ import { getStats, getAreaStats, getCategoryStats, getFolderStats } from '../sta
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
 }));
 
-import { getDB } from '../utils.js';
+import { getDB, requireDB } from '../utils.js';
 
 describe('getStats', () => {
   let mockDb;
@@ -20,6 +21,7 @@ describe('getStats', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns all statistics with counts', () => {
@@ -159,6 +161,7 @@ describe('getAreaStats', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns area statistics with category counts', () => {
@@ -258,6 +261,7 @@ describe('getCategoryStats', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns category statistics with folder counts', () => {
@@ -361,6 +365,7 @@ describe('getFolderStats', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns folder statistics with item counts', () => {

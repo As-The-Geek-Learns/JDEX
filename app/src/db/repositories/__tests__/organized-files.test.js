@@ -23,6 +23,7 @@ import { DatabaseError } from '../../../utils/errors.js';
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
   validatePositiveInteger: vi.fn((val, name) => {
     const num = parseInt(val, 10);
@@ -62,7 +63,7 @@ vi.mock('../../../utils/validation.js', () => ({
   sanitizeText: vi.fn((val) => val),
 }));
 
-import { getDB, saveDatabase, getLastInsertId } from '../utils.js';
+import { getDB, requireDB, saveDatabase, getLastInsertId } from '../utils.js';
 import { logActivity } from '../activity-log.js';
 import { incrementRuleMatchCount } from '../organization-rules.js';
 
@@ -83,6 +84,7 @@ describe('getOrganizedFiles', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns all organized files by default', () => {
@@ -218,6 +220,7 @@ describe('getOrganizedFile', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns organized file by ID', () => {
@@ -283,6 +286,7 @@ describe('findOrganizedFileByPath', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns organized file by original path', () => {
@@ -347,6 +351,7 @@ describe('getRecentOrganizedFiles', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns recent moved files with default limit', () => {
@@ -390,6 +395,7 @@ describe('getOrganizedFileCount', () => {
       prepare: vi.fn(() => mockStmt),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns total count when no status provided', () => {
@@ -442,6 +448,7 @@ describe('getOrganizedFilesStats', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns complete statistics object', () => {
@@ -524,6 +531,7 @@ describe('recordOrganizedFile', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     getLastInsertId.mockReturnValue(1);
   });
 
@@ -719,6 +727,7 @@ describe('markFileUndone', () => {
       prepare: vi.fn(() => mockStmt),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('updates file status to undone', () => {
@@ -759,6 +768,7 @@ describe('updateOrganizedFile', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('updates allowed fields', () => {
@@ -810,6 +820,7 @@ describe('deleteOrganizedFile', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes file by ID', () => {
@@ -839,6 +850,7 @@ describe('clearOldOrganizedFiles', () => {
       run: vi.fn(),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes files older than specified days', () => {

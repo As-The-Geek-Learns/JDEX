@@ -18,6 +18,7 @@ import { DatabaseError } from '../../../utils/errors.js';
 // Mock the database module
 vi.mock('../../core/database.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
 }));
 

@@ -18,6 +18,7 @@ import { DatabaseError } from '../../../utils/errors.js';
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
   mapResults: vi.fn(),
   validatePositiveInteger: vi.fn((val, name) => {
@@ -39,7 +40,7 @@ vi.mock('../activity-log.js', () => ({
   logActivity: vi.fn(),
 }));
 
-import { getDB, saveDatabase, mapResults, buildUpdateQuery, getLastInsertId } from '../utils.js';
+import { getDB, requireDB, saveDatabase, mapResults, buildUpdateQuery, getLastInsertId } from '../utils.js';
 import { logActivity } from '../activity-log.js';
 
 describe('getAreas', () => {
@@ -49,6 +50,7 @@ describe('getAreas', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -102,6 +104,7 @@ describe('getArea', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -149,6 +152,7 @@ describe('createArea', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     getLastInsertId.mockReturnValue(42);
   });
 
@@ -195,6 +199,7 @@ describe('updateArea', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('updates area with valid fields', () => {
@@ -237,6 +242,7 @@ describe('deleteArea', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes area by ID when no categories exist', () => {
@@ -274,6 +280,7 @@ describe('getAreaCount', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns count of areas', () => {
@@ -301,6 +308,7 @@ describe('isAreaRangeAvailable', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns true when range is available', () => {

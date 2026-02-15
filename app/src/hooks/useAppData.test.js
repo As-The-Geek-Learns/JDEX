@@ -58,10 +58,21 @@ describe('useAppData', () => {
       });
     });
 
-    it('should start with empty stats object', async () => {
+    it('should start with default stats values', async () => {
       const { result } = renderHook(() => useAppData());
 
-      expect(result.current.stats).toEqual({});
+      expect(result.current.stats).toEqual({
+        totalFolders: 0,
+        totalItems: 0,
+        totalCategories: 0,
+        sensitiveFolders: 0,
+        workFolders: 0,
+        standardFolders: 0,
+        inheritItems: 0,
+        sensitiveItems: 0,
+        workItems: 0,
+        standardItems: 0,
+      });
 
       // Wait for async effects to complete
       await waitFor(() => {

@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import AreasTab from './AreasTab.jsx';
+import AreasTab from './AreasTab.js';
 
 // Mock the db.js functions
 vi.mock('../../db.js', () => ({
@@ -257,7 +257,11 @@ describe('AreasTab', () => {
       const saveButton = container.querySelector('svg.lucide-check').closest('button');
       fireEvent.click(saveButton);
 
-      expect(updateArea).toHaveBeenCalledWith(1, expect.objectContaining({ id: 1 }));
+      expect(updateArea).toHaveBeenCalledWith(1, expect.objectContaining({
+        name: 'Personal',
+        range_start: 10,
+        range_end: 19,
+      }));
     });
 
     it('should call onDataChange after successful update', () => {

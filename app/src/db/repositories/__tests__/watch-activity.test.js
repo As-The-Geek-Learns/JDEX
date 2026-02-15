@@ -22,6 +22,7 @@ import { DatabaseError } from '../../../utils/errors.js';
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
   validatePositiveInteger: vi.fn((val, name) => {
     const num = parseInt(val, 10);
@@ -44,7 +45,7 @@ vi.mock('../../../utils/validation.js', () => ({
   sanitizeText: vi.fn((val) => val),
 }));
 
-import { getDB, saveDatabase, getLastInsertId } from '../utils.js';
+import { getDB, requireDB, saveDatabase, getLastInsertId } from '../utils.js';
 
 describe('Constants', () => {
   it('exports valid watch actions', () => {
@@ -64,6 +65,7 @@ describe('getWatchActivity', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns activity for a watched folder', () => {
@@ -177,6 +179,7 @@ describe('getRecentWatchActivity', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns recent activity across all folders', () => {
@@ -261,6 +264,7 @@ describe('getQueuedFileCounts', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns counts by watched folder', () => {
@@ -322,6 +326,7 @@ describe('getWatchActivityById', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns activity by ID', () => {
@@ -389,6 +394,7 @@ describe('getWatchActivityCount', () => {
       prepare: vi.fn(() => mockStmt),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns total count when no folder ID', () => {
@@ -440,6 +446,7 @@ describe('logWatchActivity', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     getLastInsertId.mockReturnValue(1);
   });
 
@@ -575,6 +582,7 @@ describe('updateWatchActivityAction', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('updates action only', () => {
@@ -630,6 +638,7 @@ describe('deleteWatchActivity', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes activity by ID', () => {
@@ -654,6 +663,7 @@ describe('clearOldWatchActivity', () => {
       run: vi.fn(),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes old activity and returns count', () => {
@@ -718,6 +728,7 @@ describe('clearWatchActivityForFolder', () => {
       run: vi.fn(),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('clears activity for specific folder', () => {

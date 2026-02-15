@@ -6,10 +6,10 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import DropZone from './DropZone.jsx';
+import DropZone from './DropZone.js';
 
 // Mock the contexts
-vi.mock('../../context/DragDropContext.jsx', () => ({
+vi.mock('../../context/DragDropContext.js', () => ({
   useDragDrop: vi.fn(() => ({
     isDraggingFiles: false,
     setHoverTarget: vi.fn(),
@@ -17,11 +17,16 @@ vi.mock('../../context/DragDropContext.jsx', () => ({
   })),
 }));
 
-vi.mock('../../context/LicenseContext.jsx', () => ({
+vi.mock('../../context/LicenseContext.js', () => ({
   useLicense: vi.fn(() => ({
     isPremium: true,
     showUpgradePrompt: vi.fn(),
   })),
+  UpgradePrompt: ({ feature, onClose }) => (
+    <div data-testid="upgrade-prompt" data-feature={feature}>
+      <button onClick={onClose}>Close</button>
+    </div>
+  ),
 }));
 
 // Mock the drag drop service
@@ -41,8 +46,8 @@ vi.mock('../../services/dragDropService.js', () => ({
   incrementDragDropUsage: vi.fn(),
 }));
 
-import { useDragDrop } from '../../context/DragDropContext.jsx';
-import { useLicense } from '../../context/LicenseContext.jsx';
+import { useDragDrop } from '../../context/DragDropContext.js';
+import { useLicense } from '../../context/LicenseContext.js';
 import {
   validateDroppedFile,
   canPerformDragDrop,
@@ -138,7 +143,8 @@ describe('DropZone', () => {
 
       expect(mockSetHoverTarget).toHaveBeenCalledWith({
         type: 'folder',
-        folder: mockFolder,
+        id: mockFolder.id,
+        name: mockFolder.name,
       });
     });
 
@@ -314,7 +320,8 @@ describe('DropZone', () => {
         dataTransfer: { files: [mockFile] },
       });
 
-      expect(mockShowUpgradePrompt).toHaveBeenCalledWith('Drag & Drop');
+      // The component shows an UpgradePrompt component, not calls showUpgradePrompt
+      expect(screen.getByTestId('upgrade-prompt')).toBeInTheDocument();
     });
 
     it('should allow premium users unlimited drops', async () => {

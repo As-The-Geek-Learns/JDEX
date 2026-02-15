@@ -222,7 +222,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test Folder',
         path: '/test/folder',
-        is_active: 1,
+        is_active: true,
         file_types: [],
       });
 
@@ -314,13 +314,13 @@ describe('watcherService', () => {
       initWatcherService();
 
       getWatchedFolders.mockReturnValue([
-        { id: 1, name: 'Folder 1', path: '/path1', is_active: 1 },
-        { id: 2, name: 'Folder 2', path: '/path2', is_active: 1 },
+        { id: 1, name: 'Folder 1', path: '/path1', is_active: true },
+        { id: 2, name: 'Folder 2', path: '/path2', is_active: true },
       ]);
       getWatchedFolder.mockImplementation((id) =>
         id === 1
-          ? { id: 1, name: 'Folder 1', path: '/path1', is_active: 1, include_subdirs: 0 }
-          : { id: 2, name: 'Folder 2', path: '/path2', is_active: 1, include_subdirs: 0 }
+          ? { id: 1, name: 'Folder 1', path: '/path1', is_active: true, include_subdirs: false }
+          : { id: 2, name: 'Folder 2', path: '/path2', is_active: true, include_subdirs: false }
       );
 
       startAllWatchers();
@@ -339,14 +339,14 @@ describe('watcherService', () => {
 
       // Only return active folders
       getWatchedFolders.mockReturnValue([
-        { id: 1, name: 'Active Folder', path: '/active', is_active: 1 },
+        { id: 1, name: 'Active Folder', path: '/active', is_active: true },
       ]);
       getWatchedFolder.mockReturnValue({
         id: 1,
         name: 'Active Folder',
         path: '/active',
-        is_active: 1,
-        include_subdirs: 0,
+        is_active: true,
+        include_subdirs: false,
       });
 
       startAllWatchers();
@@ -373,8 +373,8 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
-        include_subdirs: 0,
+        is_active: true,
+        include_subdirs: false,
       });
 
       startWatcher(1);
@@ -419,7 +419,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Inactive',
         path: '/test',
-        is_active: 0,
+        is_active: false,
       });
 
       const result = startWatcher(1);
@@ -437,7 +437,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Missing Path',
         path: '/missing/path',
-        is_active: 1,
+        is_active: true,
       });
 
       const result = startWatcher(1);
@@ -457,8 +457,8 @@ describe('watcherService', () => {
         id: 1,
         name: 'Valid Folder',
         path: '/valid/path',
-        is_active: 1,
-        include_subdirs: 0,
+        is_active: true,
+        include_subdirs: false,
       });
 
       const result = startWatcher(1);
@@ -484,8 +484,8 @@ describe('watcherService', () => {
         id: 1,
         name: 'Recursive Folder',
         path: '/recursive/path',
-        is_active: 1,
-        include_subdirs: 1,
+        is_active: true,
+        include_subdirs: true,
       });
 
       startWatcher(1);
@@ -516,8 +516,8 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test Folder',
         path: '/test',
-        is_active: 1,
-        include_subdirs: 0,
+        is_active: true,
+        include_subdirs: false,
       });
 
       startWatcher(1);
@@ -541,8 +541,8 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test Folder',
         path: '/test',
-        is_active: 1,
-        include_subdirs: 0,
+        is_active: true,
+        include_subdirs: false,
       });
 
       startWatcher(1);
@@ -573,8 +573,8 @@ describe('watcherService', () => {
         id: 1,
         name: 'Error Folder',
         path: '/error',
-        is_active: 1,
-        include_subdirs: 0,
+        is_active: true,
+        include_subdirs: false,
       });
 
       const result = startWatcher(1);
@@ -600,8 +600,8 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
-        include_subdirs: 0,
+        is_active: true,
+        include_subdirs: false,
       });
 
       startWatcher(1);
@@ -629,8 +629,8 @@ describe('watcherService', () => {
       initWatcherService();
 
       getWatchedFolders.mockReturnValue([
-        { id: 1, name: 'Folder 1', path: '/path1', is_active: 1 },
-        { id: 2, name: 'Folder 2', path: '/path2', is_active: 0 },
+        { id: 1, name: 'Folder 1', path: '/path1', is_active: true },
+        { id: 2, name: 'Folder 2', path: '/path2', is_active: false },
       ]);
 
       const status = getWatcherStatus();
@@ -653,14 +653,14 @@ describe('watcherService', () => {
         id: 1,
         name: 'Running Folder',
         path: '/running',
-        is_active: 1,
-        include_subdirs: 0,
+        is_active: true,
+        include_subdirs: false,
       });
 
       startWatcher(1);
 
       getWatchedFolders.mockReturnValue([
-        { id: 1, name: 'Running Folder', path: '/running', is_active: 1 },
+        { id: 1, name: 'Running Folder', path: '/running', is_active: true },
       ]);
 
       const status = getWatcherStatus();
@@ -676,8 +676,8 @@ describe('watcherService', () => {
       initWatcherService();
 
       getWatchedFolders.mockReturnValue([
-        { id: 1, name: 'Existing', path: '/existing', is_active: 1 },
-        { id: 2, name: 'Missing', path: '/missing', is_active: 1 },
+        { id: 1, name: 'Existing', path: '/existing', is_active: true },
+        { id: 2, name: 'Missing', path: '/missing', is_active: true },
       ]);
 
       const status = getWatcherStatus();
@@ -758,7 +758,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Missing',
         path: '/missing',
-        is_active: 1,
+        is_active: true,
       });
 
       const result = await processExistingFiles(1);
@@ -780,7 +780,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
       });
 
@@ -808,7 +808,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
       });
 
@@ -831,7 +831,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
       });
 
@@ -856,7 +856,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
       });
 
       const result = await processExistingFiles(1);
@@ -878,7 +878,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: false,
         confidence_threshold: 'medium',
@@ -914,7 +914,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: false,
       });
@@ -947,7 +947,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: false,
       });
@@ -980,7 +980,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: false,
       });
@@ -1013,7 +1013,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: false,
       });
@@ -1046,7 +1046,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: false,
       });
@@ -1079,7 +1079,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: false,
       });
@@ -1112,7 +1112,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: false,
       });
@@ -1151,7 +1151,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: ['document'], // Only documents
         auto_organize: false,
       });
@@ -1181,7 +1181,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: ['document'],
         auto_organize: false,
       });
@@ -1221,7 +1221,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: true,
         confidence_threshold: 'medium',
@@ -1256,7 +1256,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: true,
         confidence_threshold: 'high', // Requires high confidence
@@ -1297,7 +1297,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: false, // Disabled
         confidence_threshold: 'medium',
@@ -1339,7 +1339,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: true,
         confidence_threshold: 'medium',
@@ -1386,7 +1386,7 @@ describe('watcherService', () => {
         id: 1,
         name: 'Test',
         path: '/test',
-        is_active: 1,
+        is_active: true,
         file_types: [],
         auto_organize: true,
         confidence_threshold: 'medium',

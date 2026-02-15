@@ -27,6 +27,7 @@ import {
 // Mock dependencies
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
   validatePositiveInteger: vi.fn((val, name) => {
     const num = parseInt(val, 10);
@@ -58,7 +59,7 @@ vi.mock('../../../utils/errors.js', () => ({
   },
 }));
 
-import { getDB, saveDatabase, getLastInsertId } from '../utils.js';
+import { getDB, requireDB, saveDatabase, getLastInsertId } from '../utils.js';
 import { validateRequiredString } from '../../../utils/validation.js';
 
 // ============================================
@@ -100,6 +101,7 @@ describe('clearScannedFiles', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('clears all scanned files when no session ID provided', () => {
@@ -136,6 +138,7 @@ describe('getScannedFiles', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns scanned files for a session', () => {
@@ -283,6 +286,7 @@ describe('getScannedFile', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns a scanned file by ID', () => {
@@ -351,6 +355,7 @@ describe('getFilesReadyToOrganize', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns files with accepted or changed decisions', () => {
@@ -428,6 +433,7 @@ describe('getScanStats', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns comprehensive scan statistics', () => {
@@ -502,6 +508,7 @@ describe('getScannedFileCount', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns count of scanned files in session', () => {
@@ -537,6 +544,7 @@ describe('addScannedFile', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     getLastInsertId.mockReturnValue(1);
   });
 
@@ -634,6 +642,7 @@ describe('addScannedFilesBatch', () => {
     };
     mockDb = { prepare: vi.fn(() => mockStmt) };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     getLastInsertId.mockReturnValue(1);
   });
 
@@ -694,6 +703,7 @@ describe('updateScannedFileDecision', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('updates decision without target folder', () => {
@@ -725,6 +735,7 @@ describe('acceptScannedFileSuggestion', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('sets decision to accepted', () => {
@@ -741,6 +752,7 @@ describe('skipScannedFile', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('sets decision to skipped', () => {
@@ -757,6 +769,7 @@ describe('changeScannedFileTarget', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('sets decision to changed with target folder', () => {
@@ -773,6 +786,7 @@ describe('updateScannedFileSuggestion', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('updates suggestion with default confidence', () => {
@@ -808,6 +822,7 @@ describe('deleteScannedFile', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes a scanned file by ID', () => {

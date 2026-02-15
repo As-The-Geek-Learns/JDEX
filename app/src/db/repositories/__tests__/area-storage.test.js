@@ -18,6 +18,7 @@ import { DatabaseError } from '../../../utils/errors.js';
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
   validatePositiveInteger: vi.fn((val, name) => {
     if (val === null || val === undefined) {
@@ -52,7 +53,7 @@ vi.mock('../../../utils/validation.js', () => ({
   validateOptionalString: vi.fn((val) => (val ? val.trim() : null)),
 }));
 
-import { getDB, saveDatabase } from '../utils.js';
+import { getDB, requireDB, saveDatabase } from '../utils.js';
 import { getDefaultCloudDrive } from '../cloud-drives.js';
 import { logActivity } from '../activity-log.js';
 
@@ -63,6 +64,7 @@ describe('getAreaStorageMappings', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn(), run: vi.fn(), prepare: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns all area storage mappings with joined data', () => {
@@ -186,6 +188,7 @@ describe('getAreaCloudDrive', () => {
     };
     mockDb = { exec: vi.fn(), prepare: vi.fn(() => mockStmt), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns the mapped cloud drive for an area', () => {
@@ -277,6 +280,7 @@ describe('getUnmappedAreas', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns areas without drive mappings', () => {
@@ -338,6 +342,7 @@ describe('getAreaStorageMappingCount', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns the count of mappings', () => {
@@ -383,6 +388,7 @@ describe('setAreaCloudDrive', () => {
       run: vi.fn(),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('creates a new mapping with drive ID and notes', () => {
@@ -506,6 +512,7 @@ describe('removeAreaMappingsForDrive', () => {
       run: vi.fn(),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('removes all mappings for a drive and returns count', () => {

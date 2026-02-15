@@ -19,6 +19,7 @@ import { DatabaseError } from '../../../utils/errors.js';
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
   mapResults: vi.fn(),
   validatePositiveInteger: vi.fn((val, name) => {
@@ -39,7 +40,7 @@ vi.mock('../activity-log.js', () => ({
   logActivity: vi.fn(),
 }));
 
-import { getDB, saveDatabase, mapResults, buildUpdateQuery } from '../utils.js';
+import { getDB, requireDB, saveDatabase, mapResults, buildUpdateQuery } from '../utils.js';
 import { logActivity } from '../activity-log.js';
 
 describe('getItems', () => {
@@ -49,6 +50,7 @@ describe('getItems', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn(), prepare: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -131,6 +133,7 @@ describe('getItem', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -173,6 +176,7 @@ describe('getNextItemNumber', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns next item number for folder', () => {
@@ -217,6 +221,7 @@ describe('createItem', () => {
       prepare: vi.fn().mockReturnValue(mockStmt),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('creates item with all fields', () => {
@@ -297,6 +302,7 @@ describe('updateItem', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('updates item with valid fields', () => {
@@ -338,6 +344,7 @@ describe('deleteItem', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes item by ID', () => {
@@ -380,6 +387,7 @@ describe('getItemCount', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns total count when no folderId', () => {
@@ -416,6 +424,7 @@ describe('isItemNumberAvailable', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns true when number is available', () => {

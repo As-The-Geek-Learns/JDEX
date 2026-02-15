@@ -24,6 +24,7 @@ import { DatabaseError } from '../../../utils/errors.js';
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
   validatePositiveInteger: vi.fn((val, name) => {
     if (val === null || val === undefined) {
@@ -54,12 +55,12 @@ vi.mock('../../../utils/validation.js', () => ({
   validateOptionalString: vi.fn((val) => (val ? val.trim() : null)),
 }));
 
-import { getDB, saveDatabase, getLastInsertId } from '../utils.js';
+import { getDB, requireDB, saveDatabase, getLastInsertId } from '../utils.js';
 import { logActivity } from '../activity-log.js';
 
 describe('Constants', () => {
   it('exports valid rule types', () => {
-    expect(VALID_RULE_TYPES).toEqual(['extension', 'keyword', 'path', 'regex']);
+    expect(VALID_RULE_TYPES).toEqual(['extension', 'keyword', 'path', 'regex', 'date', 'compound']);
   });
 
   it('exports valid target types', () => {
@@ -74,6 +75,7 @@ describe('getOrganizationRules', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn(), run: vi.fn(), prepare: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns all active rules by default', () => {
@@ -237,6 +239,7 @@ describe('getOrganizationRule', () => {
     mockStmt = { bind: vi.fn(), step: vi.fn(), get: vi.fn(), free: vi.fn() };
     mockDb = { exec: vi.fn(), prepare: vi.fn(() => mockStmt), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns a rule by ID', () => {
@@ -294,6 +297,7 @@ describe('getOrganizationRulesByTarget', () => {
     mockStmt = { bind: vi.fn(), step: vi.fn(), get: vi.fn(), free: vi.fn() };
     mockDb = { exec: vi.fn(), prepare: vi.fn(() => mockStmt), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns rules for a target', () => {
@@ -370,6 +374,7 @@ describe('getOrganizationRuleCount', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns count of all rules', () => {
@@ -410,6 +415,7 @@ describe('createOrganizationRule', () => {
     mockStmt = { run: vi.fn(), free: vi.fn() };
     mockDb = { exec: vi.fn(), prepare: vi.fn(() => mockStmt), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     getLastInsertId.mockReturnValue(1);
   });
 
@@ -543,6 +549,7 @@ describe('updateOrganizationRule', () => {
     mockStmt = { bind: vi.fn(), step: vi.fn(), get: vi.fn(), free: vi.fn() };
     mockDb = { exec: vi.fn(), prepare: vi.fn(() => mockStmt), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
 
     // Mock getOrganizationRule for regex validation
     mockStmt.step.mockReturnValue(true);
@@ -641,6 +648,7 @@ describe('deleteOrganizationRule', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn(), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes a rule by ID', () => {
@@ -679,6 +687,7 @@ describe('incrementRuleMatchCount', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn(), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('increments match count for a rule', () => {
@@ -716,6 +725,7 @@ describe('toggleOrganizationRule', () => {
     mockStmt = { bind: vi.fn(), step: vi.fn(), get: vi.fn(), free: vi.fn() };
     mockDb = { exec: vi.fn(), prepare: vi.fn(() => mockStmt), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('toggles active status and returns new state', () => {
@@ -778,6 +788,7 @@ describe('resetRuleMatchCount', () => {
     vi.clearAllMocks();
     mockDb = { exec: vi.fn(), run: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('resets match count to 0', () => {

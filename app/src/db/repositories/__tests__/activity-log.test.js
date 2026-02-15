@@ -14,11 +14,12 @@ import {
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   mapResults: vi.fn(),
   validatePositiveInteger: vi.fn(),
 }));
 
-import { getDB, mapResults } from '../utils.js';
+import { getDB, requireDB, mapResults } from '../utils.js';
 
 describe('logActivity', () => {
   let mockDb;
@@ -30,6 +31,7 @@ describe('logActivity', () => {
       exec: vi.fn(),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('inserts activity with all parameters', () => {
@@ -85,6 +87,7 @@ describe('getRecentActivity', () => {
       exec: vi.fn(),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -178,6 +181,7 @@ describe('clearActivityLog', () => {
       exec: vi.fn(),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes all activity log entries', () => {
@@ -197,6 +201,7 @@ describe('getActivityCount', () => {
       exec: vi.fn(),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns count of activity log entries', () => {

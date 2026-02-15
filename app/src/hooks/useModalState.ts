@@ -1,3 +1,4 @@
+import type React from 'react';
 import { useState, useCallback } from 'react';
 
 // ============================================
@@ -37,7 +38,7 @@ export interface UseModalStateReturn {
 
   // Sidebar state
   sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
+  setSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
   toggleSidebar: () => void;
 
   // Helper functions

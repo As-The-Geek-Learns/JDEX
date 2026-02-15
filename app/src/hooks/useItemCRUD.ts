@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { createItem, updateItem, deleteItem, getItems, getItem } from '../db.js';
 import { useUndo, ACTION_TYPES, ENTITY_TYPES } from '../context/UndoContext.jsx';
-import type { Folder, Item } from '../types/index.js';
+import type { Folder, Item, ItemSensitivity } from '../types/index.js';
 
 // Type for undo actions (UndoContext.jsx is not typed)
 interface UndoAction {
@@ -33,10 +33,10 @@ export interface CreateItemData {
   sequence: number;
   description?: string;
   file_type?: string;
-  sensitivity?: string;
+  sensitivity?: ItemSensitivity;
   location?: string;
   storage_path?: string;
-  file_size?: number;
+  file_size?: number | null;
   keywords?: string;
   notes?: string;
 }

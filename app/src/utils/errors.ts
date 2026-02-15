@@ -283,6 +283,9 @@ export type DatabaseOperation =
   | 'delete'
   | 'connect'
   | 'migrate'
+  | 'transaction'
+  | 'batch'
+  | 'constraint'
   | 'unknown';
 
 /**
@@ -306,6 +309,9 @@ export class DatabaseError extends AppError {
       delete: 'Unable to delete the item. Please try again.',
       connect: 'Unable to connect to the database. Please restart the app.',
       migrate: 'Database update failed. Please contact support.',
+      transaction: 'A database transaction failed. Please try again.',
+      batch: 'A batch operation failed. Please try again.',
+      constraint: 'This item conflicts with existing data. Please check for duplicates.',
       unknown: 'A database error occurred. Please try again.',
     };
     return messages[this.operation] || messages.unknown;

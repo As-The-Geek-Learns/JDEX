@@ -1,21 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { initDatabase, getAreas, getCategories, getFolders, getStats } from '../db.js';
 import type { Area, Category, Folder } from '../types/index.js';
+import type { DatabaseStats } from '../db/repositories/statistics.js';
 
-// ============================================
-// TYPE DEFINITIONS
-// ============================================
-
-/**
- * Database statistics shape.
- */
-export interface DatabaseStats {
-  totalAreas?: number;
-  totalCategories?: number;
-  totalFolders?: number;
-  totalItems?: number;
-  [key: string]: unknown;
-}
+// Re-export for consumers
+export type { DatabaseStats };
 
 /**
  * Return type for the useAppData hook.
@@ -59,7 +48,18 @@ export function useAppData(): UseAppDataReturn {
   const [areas, setAreas] = useState<Area[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
-  const [stats, setStats] = useState<DatabaseStats>({});
+  const [stats, setStats] = useState<DatabaseStats>({
+    totalFolders: 0,
+    totalItems: 0,
+    totalCategories: 0,
+    sensitiveFolders: 0,
+    workFolders: 0,
+    standardFolders: 0,
+    inheritItems: 0,
+    sensitiveItems: 0,
+    workItems: 0,
+    standardItems: 0,
+  });
 
   // Refresh trigger - increment to force data reload
   const [refreshKey, setRefreshKey] = useState(0);

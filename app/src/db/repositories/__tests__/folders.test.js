@@ -20,6 +20,7 @@ import { DatabaseError } from '../../../utils/errors.js';
 // Mock the utils module
 vi.mock('../utils.js', () => ({
   getDB: vi.fn(),
+  requireDB: vi.fn(),
   saveDatabase: vi.fn(),
   mapResults: vi.fn(),
   validatePositiveInteger: vi.fn((val, name) => {
@@ -45,7 +46,7 @@ vi.mock('../../../utils/validation.js', () => ({
   sanitizeText: vi.fn((text) => text),
 }));
 
-import { getDB, saveDatabase, mapResults, buildUpdateQuery } from '../utils.js';
+import { getDB, requireDB, saveDatabase, mapResults, buildUpdateQuery } from '../utils.js';
 import { logActivity } from '../activity-log.js';
 
 describe('getFolders', () => {
@@ -55,6 +56,7 @@ describe('getFolders', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn(), prepare: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -105,6 +107,7 @@ describe('getFolder', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -147,6 +150,7 @@ describe('getFolderByNumber', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
     mapResults.mockReturnValue([]);
   });
 
@@ -190,6 +194,7 @@ describe('getNextFolderNumber', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns next folder number for category', () => {
@@ -244,6 +249,7 @@ describe('createFolder', () => {
       prepare: vi.fn().mockReturnValue(mockStmt),
     };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('creates folder with all fields', () => {
@@ -313,6 +319,7 @@ describe('updateFolder', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('updates folder with valid fields', () => {
@@ -354,6 +361,7 @@ describe('deleteFolder', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('deletes folder when no items exist', () => {
@@ -389,6 +397,7 @@ describe('getFolderCount', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns total count when no categoryId', () => {
@@ -428,6 +437,7 @@ describe('isFolderNumberAvailable', () => {
     vi.clearAllMocks();
     mockDb = { run: vi.fn(), exec: vi.fn() };
     getDB.mockReturnValue(mockDb);
+    requireDB.mockReturnValue(mockDb);
   });
 
   it('returns true when number is available', () => {
