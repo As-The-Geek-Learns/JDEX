@@ -30,6 +30,9 @@ export default [
     rules: {
       ...js.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
+      // Disable new v7 rules - would require significant refactoring
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/static-components': 'off',
       'react/jsx-uses-react': 'error',
       'react/jsx-uses-vars': 'error',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
@@ -68,6 +71,9 @@ export default [
       ...js.configs.recommended.rules,
       ...tseslint.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
+      // Disable new v7 rules - would require significant refactoring
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/static-components': 'off',
       'react/jsx-uses-react': 'error',
       'react/jsx-uses-vars': 'error',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
