@@ -311,7 +311,10 @@ describe('Database Lifecycle', () => {
       };
 
       mockSQL = {
-        Database: vi.fn().mockReturnValue(newDb),
+        // Use mockImplementation with function keyword for constructor compatibility (Vitest 4)
+        Database: vi.fn(function () {
+          return newDb;
+        }),
       };
 
       setDB(oldDb);
@@ -332,7 +335,10 @@ describe('Database Lifecycle', () => {
       };
 
       mockSQL = {
-        Database: vi.fn().mockReturnValue(newDb),
+        // Use mockImplementation with function keyword for constructor compatibility (Vitest 4)
+        Database: vi.fn(function () {
+          return newDb;
+        }),
       };
 
       setDB(null);

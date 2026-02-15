@@ -83,8 +83,10 @@ describe('exportDatabase', () => {
     getDB.mockReturnValue(mockDb);
     requireDB.mockReturnValue(mockDb);
 
-    // Mock DOM APIs
-    global.Blob = vi.fn((content, options) => ({ content, options }));
+    // Mock DOM APIs - use function keyword for constructor compatibility (Vitest 4)
+    global.Blob = vi.fn(function (content, options) {
+      return { content, options };
+    });
     global.URL = {
       createObjectURL: vi.fn(() => 'blob:test'),
       revokeObjectURL: vi.fn(),
@@ -137,7 +139,10 @@ describe('importDatabase', () => {
     vi.clearAllMocks();
     mockNewDb = { id: 'new-db' };
     mockSQL = {
-      Database: vi.fn(() => mockNewDb),
+      // Use function keyword for constructor compatibility (Vitest 4)
+      Database: vi.fn(function () {
+        return mockNewDb;
+      }),
     };
     getSQL.mockReturnValue(mockSQL);
   });
@@ -207,7 +212,10 @@ describe('importDatabaseBytes', () => {
     vi.clearAllMocks();
     mockNewDb = { id: 'new-db' };
     mockSQL = {
-      Database: vi.fn(() => mockNewDb),
+      // Use function keyword for constructor compatibility (Vitest 4)
+      Database: vi.fn(function () {
+        return mockNewDb;
+      }),
     };
     getSQL.mockReturnValue(mockSQL);
   });
@@ -240,8 +248,10 @@ describe('exportToJSON', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Mock DOM APIs
-    global.Blob = vi.fn((content, options) => ({ content, options }));
+    // Mock DOM APIs - use function keyword for constructor compatibility (Vitest 4)
+    global.Blob = vi.fn(function (content, options) {
+      return { content, options };
+    });
     global.URL = {
       createObjectURL: vi.fn(() => 'blob:test'),
       revokeObjectURL: vi.fn(),

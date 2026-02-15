@@ -28,6 +28,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./test/setup.js', './test/setup-integration.js'],
+    // Reset mock implementations between tests (Vitest 4 compatibility)
+    mockReset: true,
     // ONLY include integration tests
     include: ['test/integration/**/*.{test,spec}.{js,jsx}'],
     exclude: ['node_modules', 'dist', 'build', 'src/**'],
