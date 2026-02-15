@@ -1,6 +1,18 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* Tailwind 4 theme configuration */
+@theme {
+  /* Johnny Decimal colors */
+  --color-jd-navy: #1a365d;
+  --color-jd-teal: #0d9488;
+  --color-jd-orange: #ea580c;
+  --color-jd-slate: #475569;
+  --color-jd-light: #f8fafc;
+
+  /* Font families */
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
 
 :root {
   --jd-navy: #1a365d;
