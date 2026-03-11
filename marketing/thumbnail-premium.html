@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .thumbnail {
+      width: 600px;
+      height: 600px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* Decorative elements */
+    .thumbnail::before {
+      content: '';
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(147, 51, 234, 0.4) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    
+    .thumbnail::after {
+      content: '';
+      position: absolute;
+      bottom: -80px;
+      left: -80px;
+      width: 250px;
+      height: 250px;
+      background: radial-gradient(circle, rgba(20, 184, 166, 0.3) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    
+    .content {
+      z-index: 1;
+      text-align: center;
+    }
+    
+    .logo {
+      width: 120px;
+      height: 120px;
+      background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+      border-radius: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 52px;
+      font-weight: 800;
+      color: white;
+      box-shadow: 0 15px 50px rgba(20, 184, 166, 0.5);
+      margin: 0 auto 30px;
+    }
+    
+    .app-name {
+      font-size: 64px;
+      font-weight: 800;
+      color: white;
+      margin-bottom: 16px;
+    }
+    
+    .premium-badge {
+      background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
+      color: white;
+      padding: 10px 28px;
+      border-radius: 30px;
+      font-size: 20px;
+      font-weight: 700;
+      display: inline-block;
+      margin-bottom: 30px;
+      box-shadow: 0 8px 30px rgba(147, 51, 234, 0.4);
+    }
+    
+    .tagline {
+      font-size: 28px;
+      color: #94a3b8;
+      margin-bottom: 40px;
+    }
+    
+    .tagline .highlight {
+      color: #14b8a6;
+    }
+    
+    .price {
+      font-size: 48px;
+      font-weight: 800;
+      color: white;
+    }
+    
+    .price-note {
+      font-size: 18px;
+      color: #64748b;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="thumbnail">
+    <div class="content">
+      <div class="logo">JD</div>
+      <div class="app-name">JDex</div>
+      <div class="premium-badge">PREMIUM</div>
+      <div class="tagline">
+        Your Files, <span class="highlight">Organized</span>
+      </div>
+      <div class="price">$29</div>
+      <div class="price-note">One-time purchase</div>
+    </div>
+  </div>
+</body>
+</html>

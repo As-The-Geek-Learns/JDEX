@@ -2,3 +2,4 @@ dist/
 dist-electron/
 build/
 node_modules/
+.workflow/
