@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "project": "jdex-complete-package",
+  "timestamp": "2026-01-19T18:14:49.269Z",
+  "files": {
+    "count": 0,
+    "hashes": {}
+  },
+  "tests": {
+    "skipped": true,
+    "reason": "no package.json"
+  },
+  "lint": {
+    "skipped": true,
+    "reason": "no package.json"
+  },
+  "audit": {
+    "success": true,
+    "output": ""
+  },
+  "summary": {
+    "filesHashed": 0,
+    "testsPass": true,
+    "lintPass": true,
+    "auditPass": true,
+    "overallPass": true
+  }
+}

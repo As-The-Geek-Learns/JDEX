@@ -1,0 +1,649 @@
+/**
+ * Error Handling Utilities for JDex
+ * ==================================
+ * Custom error classes and sanitization for safe error handling.
+ *
+ * Security: Never expose raw error messages to users. They can contain
+ * sensitive information like file paths, database queries, or system details.
+ * Always use sanitizeErrorForUser() before displaying errors in the UI.
+ */
+
+// Re-export ValidationError from validation module
+export { ValidationError } from './validation.js';
+
+// =============================================================================
+// Custom Error Classes
+// =============================================================================
+
+/**
+ * Error details that can be attached to AppError.
+ */
+export interface ErrorDetails {
+  [key: string]: unknown;
+}
+
+/**
+ * Base class for all JDex application errors.
+ * Provides consistent structure and safe serialization.
+ */
+export class AppError extends Error {
+  readonly code: string;
+  readonly details: ErrorDetails | null;
+  readonly timestamp: string;
+
+  constructor(message: string, code: string = 'APP_ERROR', details: ErrorDetails | null = null) {
+    super(message);
+    this.name = 'AppError';
+    this.code = code;
+    this.details = details;
+    this.timestamp = new Date().toISOString();
+  }
+
+  /**
+   * Convert to a safe object for logging (excludes sensitive data).
+   */
+  toLogObject(): { name: string; code: string; message: string; timestamp: string } {
+    return {
+      name: this.name,
+      code: this.code,
+      message: this.message,
+      timestamp: this.timestamp,
+      // Don't include details in logs by default - may contain sensitive data
+    };
+  }
+}
+
+/**
+ * File system error types for classification.
+ */
+export const FILE_ERROR_TYPE = {
+  PERMISSION_DENIED: 'permission_denied',
+  FILE_NOT_FOUND: 'file_not_found',
+  FILE_IN_USE: 'file_in_use',
+  DISK_FULL: 'disk_full',
+  PATH_TOO_LONG: 'path_too_long',
+  INVALID_PATH: 'invalid_path',
+  CROSS_DEVICE: 'cross_device',
+  DIRECTORY_NOT_EMPTY: 'directory_not_empty',
+  NETWORK_ERROR: 'network_error',
+  UNKNOWN: 'unknown',
+} as const;
+
+export type FileErrorType = (typeof FILE_ERROR_TYPE)[keyof typeof FILE_ERROR_TYPE];
+
+/**
+ * System error with code property (like Node.js errors).
+ */
+interface SystemError extends Error {
+  code?: string;
+}
+
+/**
+ * Classify a system error code into a user-friendly error type.
+ * @param error - The original system error
+ * @returns One of FILE_ERROR_TYPE values
+ */
+export function classifyFileError(error: Error | SystemError | null | undefined): FileErrorType {
+  if (!error) return FILE_ERROR_TYPE.UNKNOWN;
+
+  const code = (error as SystemError).code || '';
+  const message = (error.message || '').toLowerCase();
+
+  // Permission errors
+  if (code === 'EACCES' || code === 'EPERM' || message.includes('permission denied')) {
+    return FILE_ERROR_TYPE.PERMISSION_DENIED;
+  }
+
+  // File not found
+  if (code === 'ENOENT' || message.includes('no such file')) {
+    return FILE_ERROR_TYPE.FILE_NOT_FOUND;
+  }
+
+  // File in use / locked
+  if (code === 'EBUSY' || code === 'ENOTEMPTY' || message.includes('resource busy')) {
+    return FILE_ERROR_TYPE.FILE_IN_USE;
+  }
+
+  // Disk full
+  if (code === 'ENOSPC' || message.includes('no space left')) {
+    return FILE_ERROR_TYPE.DISK_FULL;
+  }
+
+  // Path too long
+  if (code === 'ENAMETOOLONG' || message.includes('name too long')) {
+    return FILE_ERROR_TYPE.PATH_TOO_LONG;
+  }
+
+  // Invalid path
+  if (code === 'EINVAL' || message.includes('invalid argument')) {
+    return FILE_ERROR_TYPE.INVALID_PATH;
+  }
+
+  // Cross-device move (requires copy+delete)
+  if (code === 'EXDEV') {
+    return FILE_ERROR_TYPE.CROSS_DEVICE;
+  }
+
+  // Directory not empty
+  if (code === 'ENOTEMPTY') {
+    return FILE_ERROR_TYPE.DIRECTORY_NOT_EMPTY;
+  }
+
+  // Network errors
+  if (
+    code === 'ENETUNREACH' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ETIMEDOUT' ||
+    message.includes('network')
+  ) {
+    return FILE_ERROR_TYPE.NETWORK_ERROR;
+  }
+
+  return FILE_ERROR_TYPE.UNKNOWN;
+}
+
+/**
+ * File system operation types.
+ */
+export type FileOperation =
+  | 'read'
+  | 'write'
+  | 'move'
+  | 'delete'
+  | 'scan'
+  | 'create'
+  | 'mkdir'
+  | 'buildPath'
+  | 'rename'
+  | 'rollback'
+  | 'unknown';
+
+/**
+ * Error for file system operations.
+ * Use when file read/write/move operations fail.
+ */
+export class FileSystemError extends AppError {
+  readonly operation: FileOperation;
+  readonly hasPath: boolean;
+  readonly errorType: FileErrorType;
+  readonly systemCode: string | null;
+
+  constructor(
+    message: string,
+    operation: FileOperation = 'unknown',
+    path: string | null = null,
+    originalError: Error | SystemError | null = null
+  ) {
+    super(message, 'FILE_SYSTEM_ERROR');
+    this.name = 'FileSystemError';
+    this.operation = operation;
+    // Don't store the actual path - it might be sensitive
+    this.hasPath = path !== null;
+    // Classify the error type
+    this.errorType = originalError ? classifyFileError(originalError) : FILE_ERROR_TYPE.UNKNOWN;
+    // Store system error code for debugging
+    this.systemCode = (originalError as SystemError)?.code || null;
+  }
+
+  /**
+   * Check if this error is likely transient and worth retrying.
+   */
+  isRetryable(): boolean {
+    const retryableTypes: readonly FileErrorType[] = [
+      FILE_ERROR_TYPE.FILE_IN_USE,
+      FILE_ERROR_TYPE.NETWORK_ERROR,
+      FILE_ERROR_TYPE.CROSS_DEVICE,
+    ];
+    return retryableTypes.includes(this.errorType);
+  }
+
+  /**
+   * Get a suggested action for the user based on error type.
+   */
+  getSuggestedAction(): string {
+    const actions: Record<FileErrorType, string> = {
+      [FILE_ERROR_TYPE.PERMISSION_DENIED]:
+        'Check file permissions or try running with admin rights.',
+      [FILE_ERROR_TYPE.FILE_NOT_FOUND]: 'The file may have been moved or deleted.',
+      [FILE_ERROR_TYPE.FILE_IN_USE]: 'Close any programs using this file and try again.',
+      [FILE_ERROR_TYPE.DISK_FULL]: 'Free up disk space and try again.',
+      [FILE_ERROR_TYPE.PATH_TOO_LONG]: 'Move the file to a shorter path or rename it.',
+      [FILE_ERROR_TYPE.INVALID_PATH]: 'Check for invalid characters in the filename.',
+      [FILE_ERROR_TYPE.CROSS_DEVICE]: 'The file will be copied instead of moved.',
+      [FILE_ERROR_TYPE.NETWORK_ERROR]: 'Check your network connection and try again.',
+      [FILE_ERROR_TYPE.DIRECTORY_NOT_EMPTY]: 'The folder contains files that must be moved first.',
+      [FILE_ERROR_TYPE.UNKNOWN]: 'Try again or check the file manually.',
+    };
+    return actions[this.errorType] || actions[FILE_ERROR_TYPE.UNKNOWN];
+  }
+
+  /**
+   * Get a user-friendly message based on the error type and operation.
+   */
+  getUserMessage(): string {
+    // Type-specific messages take priority
+    const typeMessages: Partial<Record<FileErrorType, string>> = {
+      [FILE_ERROR_TYPE.PERMISSION_DENIED]:
+        'Permission denied. You may not have access to this file.',
+      [FILE_ERROR_TYPE.FILE_NOT_FOUND]: 'File not found. It may have been moved or deleted.',
+      [FILE_ERROR_TYPE.FILE_IN_USE]: 'File is in use. Close other programs and try again.',
+      [FILE_ERROR_TYPE.DISK_FULL]: 'Not enough disk space. Free up space and try again.',
+      [FILE_ERROR_TYPE.PATH_TOO_LONG]: 'File path is too long. Try a shorter destination.',
+      [FILE_ERROR_TYPE.NETWORK_ERROR]: 'Network error. Check your connection and try again.',
+    };
+
+    if (typeMessages[this.errorType]) {
+      return typeMessages[this.errorType]!;
+    }
+
+    // Fall back to operation-based messages
+    const operationMessages: Record<FileOperation, string> = {
+      read: 'Unable to read the file. Please check if it exists and you have permission.',
+      write: 'Unable to save the file. Please check if you have write permission.',
+      move: 'Unable to move the file. The destination may not be accessible.',
+      delete: 'Unable to delete the file. It may be in use or protected.',
+      scan: 'Unable to scan the folder. Please check if it exists and you have permission.',
+      create: 'Unable to create the file or folder. Please check permissions.',
+      mkdir: 'Unable to create the folder. Please check permissions.',
+      buildPath: 'Unable to determine destination path.',
+      rename: 'Unable to rename the file.',
+      rollback: 'Unable to undo the file operation.',
+      unknown: 'A file operation failed. Please try again.',
+    };
+    return operationMessages[this.operation] || operationMessages.unknown;
+  }
+
+  /**
+   * Get a short label for the error type (for badges/tags).
+   */
+  getTypeLabel(): string {
+    const labels: Record<FileErrorType, string> = {
+      [FILE_ERROR_TYPE.PERMISSION_DENIED]: 'Permission Denied',
+      [FILE_ERROR_TYPE.FILE_NOT_FOUND]: 'Not Found',
+      [FILE_ERROR_TYPE.FILE_IN_USE]: 'File In Use',
+      [FILE_ERROR_TYPE.DISK_FULL]: 'Disk Full',
+      [FILE_ERROR_TYPE.PATH_TOO_LONG]: 'Path Too Long',
+      [FILE_ERROR_TYPE.INVALID_PATH]: 'Invalid Path',
+      [FILE_ERROR_TYPE.CROSS_DEVICE]: 'Cross Device',
+      [FILE_ERROR_TYPE.NETWORK_ERROR]: 'Network Error',
+      [FILE_ERROR_TYPE.DIRECTORY_NOT_EMPTY]: 'Not Empty',
+      [FILE_ERROR_TYPE.UNKNOWN]: 'Error',
+    };
+    return labels[this.errorType] || 'Error';
+  }
+}
+
+/**
+ * Database operation types.
+ */
+export type DatabaseOperation =
+  | 'query'
+  | 'insert'
+  | 'update'
+  | 'delete'
+  | 'connect'
+  | 'migrate'
+  | 'transaction'
+  | 'batch'
+  | 'constraint'
+  | 'unknown';
+
+/**
+ * Error for database operations.
+ * Use when SQL queries or database connections fail.
+ */
+export class DatabaseError extends AppError {
+  readonly operation: DatabaseOperation;
+
+  constructor(message: string, operation: DatabaseOperation = 'unknown') {
+    super(message, 'DATABASE_ERROR');
+    this.name = 'DatabaseError';
+    this.operation = operation;
+  }
+
+  getUserMessage(): string {
+    const messages: Record<DatabaseOperation, string> = {
+      query: 'Unable to retrieve data. Please try again.',
+      insert: 'Unable to save the new item. Please try again.',
+      update: 'Unable to update the item. Please try again.',
+      delete: 'Unable to delete the item. Please try again.',
+      connect: 'Unable to connect to the database. Please restart the app.',
+      migrate: 'Database update failed. Please contact support.',
+      transaction: 'A database transaction failed. Please try again.',
+      batch: 'A batch operation failed. Please try again.',
+      constraint: 'This item conflicts with existing data. Please check for duplicates.',
+      unknown: 'A database error occurred. Please try again.',
+    };
+    return messages[this.operation] || messages.unknown;
+  }
+}
+
+/**
+ * Cloud drive operation types.
+ */
+export type CloudDriveOperation = 'detect' | 'connect' | 'sync' | 'read' | 'write' | 'unknown';
+
+/**
+ * Error for cloud drive operations.
+ * Use when cloud storage operations fail.
+ */
+export class CloudDriveError extends AppError {
+  readonly driveName: string;
+  readonly operation: CloudDriveOperation;
+
+  constructor(
+    message: string,
+    driveName: string = 'unknown',
+    operation: CloudDriveOperation = 'unknown'
+  ) {
+    super(message, 'CLOUD_DRIVE_ERROR');
+    this.name = 'CloudDriveError';
+    this.driveName = driveName;
+    this.operation = operation;
+  }
+
+  getUserMessage(): string {
+    const driveDisplay = this.driveName === 'unknown' ? 'cloud drive' : this.driveName;
+    const messages: Record<CloudDriveOperation, string> = {
+      detect: `Unable to detect ${driveDisplay}. Please ensure it's installed and running.`,
+      connect: `Unable to connect to ${driveDisplay}. Please check your connection.`,
+      sync: `${driveDisplay} sync may be incomplete. Please check its status.`,
+      read: `Unable to read from ${driveDisplay}. Please check permissions.`,
+      write: `Unable to write to ${driveDisplay}. Please check if you have space and permissions.`,
+      unknown: `An error occurred with ${driveDisplay}. Please try again.`,
+    };
+    return messages[this.operation] || messages.unknown;
+  }
+}
+
+/**
+ * Organization operation types.
+ */
+export type OrganizationOperation = 'match' | 'move' | 'rule' | 'scan' | 'conflict' | 'unknown';
+
+/**
+ * Error for organization/matching operations.
+ * Use when file organization logic fails.
+ */
+export class OrganizationError extends AppError {
+  readonly operation: OrganizationOperation;
+
+  constructor(message: string, operation: OrganizationOperation = 'unknown') {
+    super(message, 'ORGANIZATION_ERROR');
+    this.name = 'OrganizationError';
+    this.operation = operation;
+  }
+
+  getUserMessage(): string {
+    const messages: Record<OrganizationOperation, string> = {
+      match: 'Unable to find a matching folder for this file.',
+      move: 'Unable to organize the file. The destination may not be available.',
+      rule: 'Unable to apply the organization rule.',
+      scan: 'Unable to complete the file scan.',
+      conflict: 'A file with this name already exists in the destination.',
+      unknown: 'An organization error occurred. Please try again.',
+    };
+    return messages[this.operation] || messages.unknown;
+  }
+}
+
+// =============================================================================
+// Error Sanitization
+// =============================================================================
+
+/**
+ * Patterns that indicate sensitive information in error messages.
+ * These will be redacted before showing to users.
+ */
+const SENSITIVE_PATTERNS: RegExp[] = [
+  // File paths
+  /\/Users\/[^/\s]+/gi, // macOS user paths
+  /C:\\Users\\[^\\\s]+/gi, // Windows user paths
+  /\/home\/[^/\s]+/gi, // Linux user paths
+
+  // Database details
+  /sqlite/gi,
+  /sql syntax/gi,
+  /query failed/gi,
+  /constraint/gi,
+
+  // System details
+  /ENOENT/gi, // Node.js file not found
+  /EACCES/gi, // Node.js permission denied
+  /EPERM/gi, // Node.js operation not permitted
+  /errno/gi,
+  /syscall/gi,
+
+  // Stack traces
+  /at\s+\S+\s+\([^)]+\)/g, // Stack trace lines
+  /\s+at\s+.+:\d+:\d+/g, // More stack traces
+];
+
+/**
+ * Error types that have getUserMessage method.
+ */
+interface UserMessageError extends Error {
+  getUserMessage(): string;
+}
+
+/**
+ * Type guard to check if error has getUserMessage.
+ */
+function hasUserMessage(error: unknown): error is UserMessageError {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'getUserMessage' in error &&
+    typeof (error as UserMessageError).getUserMessage === 'function'
+  );
+}
+
+/**
+ * Sanitize an error for safe display to users.
+ * Removes sensitive information like paths, system details, and stack traces.
+ *
+ * @param error - The error to sanitize
+ * @returns A safe, user-friendly error message
+ */
+export function sanitizeErrorForUser(error: Error | string | null | undefined): string {
+  // Handle null/undefined
+  if (!error) {
+    return 'An unexpected error occurred. Please try again.';
+  }
+
+  // If it's one of our custom errors, use the user message
+  if (hasUserMessage(error)) {
+    return error.getUserMessage();
+  }
+
+  // For ValidationError, the message is usually safe to show
+  // (we control what goes into it)
+  if (error instanceof Error && error.name === 'ValidationError') {
+    return error.message;
+  }
+
+  // For generic errors, sanitize the message
+  let message = typeof error === 'string' ? error : (error as Error).message || '';
+
+  // Remove sensitive patterns
+  for (const pattern of SENSITIVE_PATTERNS) {
+    message = message.replace(pattern, '[redacted]');
+  }
+
+  // If the message is now empty or just redactions, use generic message
+  if (!message.trim() || message.replace(/\[redacted\]/g, '').trim().length < 10) {
+    return 'An error occurred. Please try again.';
+  }
+
+  // Limit length
+  if (message.length > 200) {
+    message = message.substring(0, 200) + '...';
+  }
+
+  return message;
+}
+
+// =============================================================================
+// Error Logging (Development/Debug)
+// =============================================================================
+
+/**
+ * Log level constants.
+ */
+export const LogLevel = {
+  DEBUG: 'debug',
+  INFO: 'info',
+  WARN: 'warn',
+  ERROR: 'error',
+} as const;
+
+export type LogLevelType = (typeof LogLevel)[keyof typeof LogLevel];
+
+/**
+ * Log entry structure.
+ */
+interface LogEntry {
+  timestamp: string;
+  level: LogLevelType;
+  context: string;
+  errorName: string;
+  errorCode: string;
+  message?: string;
+  stack?: string;
+}
+
+/**
+ * Error with optional code property.
+ */
+interface ErrorWithCode extends Error {
+  code?: string;
+}
+
+/**
+ * Log an error for debugging purposes.
+ * In development, logs full details. In production, logs sanitized version.
+ *
+ * @param error - The error to log
+ * @param context - Where the error occurred (e.g., 'FileScanner.scan')
+ * @param level - Log level (default 'error')
+ */
+export function logError(
+  error: Error | null | undefined,
+  context: string = 'unknown',
+  level: LogLevelType = LogLevel.ERROR
+): void {
+  const isDev = process.env.NODE_ENV === 'development';
+
+  const logEntry: LogEntry = {
+    timestamp: new Date().toISOString(),
+    level,
+    context,
+    errorName: error?.name || 'Error',
+    errorCode: (error as ErrorWithCode)?.code || 'UNKNOWN',
+  };
+
+  if (isDev) {
+    // In development, log full details for debugging
+    logEntry.message = error?.message;
+    logEntry.stack = error?.stack;
+    console.error('[JDex Error]', logEntry);
+  } else {
+    // In production, log sanitized version
+    logEntry.message = sanitizeErrorForUser(error);
+    console.error('[JDex Error]', JSON.stringify(logEntry));
+  }
+}
+
+// =============================================================================
+// Error Boundary Helper
+// =============================================================================
+
+/**
+ * Async function type for error handling wrapper.
+ */
+type AsyncFunction<T extends unknown[], R> = (...args: T) => Promise<R>;
+
+/**
+ * Wrap an async function to catch and handle errors consistently.
+ *
+ * @param fn - The async function to wrap
+ * @param context - Context for error logging
+ * @returns Wrapped function that handles errors
+ *
+ * @example
+ * const safeScan = withErrorHandling(scanDirectory, 'FileScanner.scan');
+ * const result = await safeScan('/some/path');
+ */
+export function withErrorHandling<T extends unknown[], R>(
+  fn: AsyncFunction<T, R>,
+  context: string
+): AsyncFunction<T, R> {
+  return async (...args: T): Promise<R> => {
+    try {
+      return await fn(...args);
+    } catch (error) {
+      logError(error as Error, context);
+      throw error; // Re-throw so caller can handle
+    }
+  };
+}
+
+/**
+ * Result type for operations that may fail.
+ */
+export interface ResultOk<T> {
+  success: true;
+  data: T;
+  error: null;
+  userMessage: null;
+}
+
+export interface ResultError {
+  success: false;
+  data: null;
+  error: Error;
+  userMessage: string;
+}
+
+export type ResultType<T> = ResultOk<T> | ResultError;
+
+/**
+ * Create a result object for operations that may fail.
+ * Use this pattern instead of throwing errors for expected failures.
+ *
+ * @example
+ * function tryParseFile(path) {
+ *   try {
+ *     const data = parseFile(path);
+ *     return Result.ok(data);
+ *   } catch (e) {
+ *     return Result.error(e);
+ *   }
+ * }
+ *
+ * const result = tryParseFile('/path/to/file');
+ * if (result.success) {
+ *   console.log(result.data);
+ * } else {
+ *   showError(result.userMessage);
+ * }
+ */
+export const Result = {
+  ok<T>(data: T): ResultOk<T> {
+    return {
+      success: true,
+      data,
+      error: null,
+      userMessage: null,
+    };
+  },
+
+  error(error: Error, userMessage: string | null = null): ResultError {
+    return {
+      success: false,
+      data: null,
+      error,
+      userMessage: userMessage || sanitizeErrorForUser(error),
+    };
+  },
+};
