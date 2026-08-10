@@ -10,13 +10,13 @@
   },
   "license": "MIT",
   "private": false,
-  "homepage": "https://github.com/As-The-Geek-Learns/JDEX#readme",
+  "homepage": "https://github.com/Jmeg8r/JDEX#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/As-The-Geek-Learns/JDEX.git"
+    "url": "https://github.com/Jmeg8r/JDEX.git"
   },
   "bugs": {
-    "url": "https://github.com/As-The-Geek-Learns/JDEX/issues"
+    "url": "https://github.com/Jmeg8r/JDEX/issues"
   },
   "keywords": [
     "johnny-decimal",

@@ -3,7 +3,7 @@
 ## ✅ What Claude Just Did
 
 1. **Updated package.json** with:
-   - Repository URL: https://github.com/As-The-Geek-Learns/JDEX
+   - Repository URL: https://github.com/Jmeg8r/JDEX
    - Author information (James Cruce / ASTGL)
    - Enhanced build configuration
    - Proper metadata for distribution
@@ -139,7 +139,7 @@ git push origin main
 
 ## 📦 Next: Create GitHub Release (10 minutes)
 
-1. **Go to:** https://github.com/As-The-Geek-Learns/JDEX/releases/new
+1. **Go to:** https://github.com/Jmeg8r/JDEX/releases/new
 
 2. **Tag version:** `v2.0.0`
 
@@ -182,7 +182,7 @@ Coming soon!
 
 ---
 
-**Full documentation:** See the [README](https://github.com/As-The-Geek-Learns/JDEX#readme)
+**Full documentation:** See the [README](https://github.com/Jmeg8r/JDEX#readme)
 ```
 
 5. **Upload files:**
@@ -231,7 +231,7 @@ Built by James Cruce | As The Geek Learns
 
 7. **Add content:**
    - Installation instructions
-   - Link to GitHub: https://github.com/As-The-Geek-Learns/JDEX
+   - Link to GitHub: https://github.com/Jmeg8r/JDEX
    - Link to documentation
 
 8. **SEO Tags:** johnny decimal, organization, productivity, knowledge management, file organization
@@ -271,7 +271,7 @@ No more nested folders 15 levels deep. Everything gets a simple ID.
 ✓ MIT Licensed
 
 Get it: [Gumroad link]
-Source: https://github.com/As-The-Geek-Learns/JDEX
+Source: https://github.com/Jmeg8r/JDEX
 
 #productivity #organization
 ```

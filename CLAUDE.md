@@ -10,8 +10,8 @@
 - **Version**: 2.1.0
 - **License**: MIT
 - **Author**: James Cruce / As The Geek Learns (astgl.com)
-- **Repo**: https://github.com/As-The-Geek-Learns/JDEX
-- **Premium Repo**: https://github.com/As-The-Geek-Learns/jdex-premium (Gumroad distribution)
+- **Repo**: https://github.com/Jmeg8r/JDEX
+- **Premium Repo**: https://github.com/Jmeg8r/jdex-premium (Gumroad distribution)
 
 ---
 
