@@ -1,0 +1,158 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# ASTGL standard CodeRabbit configuration.
+# Applies to BOTH the PR bot (GitHub) and the CLI (`cr review`) — same file,
+# same rules, so local review and PR review agree with each other.
+#
+# Validate after any edit:  cr config validate
+# Schema drifts. If a key below is rejected, check the live schema URL above.
+
+language: "en-US"
+early_access: false
+
+# HARD LIMIT: 250 characters. The schema rejects anything longer, and the
+# rejection is a CLI error, not a warning — an over-length value here fails
+# `cr config validate`, which fails the validate-coderabbit pre-commit gate.
+# Measure before editing; `>-` avoids a trailing newline eating into the budget.
+# Per-language guidance belongs in path_instructions below, which is not capped.
+tone_instructions: >-
+  Solo maintainer; deep PowerShell/enterprise IT background, building Python
+  fluency. Be direct and specific. Skip praise and restating code. Order:
+  security, correctness, error handling, cleanup, readability. Avoid new deps
+  the stdlib can cover.
+
+reviews:
+  # "assertive" surfaces more; use "chill" on repos where noise annoys you.
+  profile: "assertive"
+
+  # Do not let the bot block merges. You are the only approver here.
+  request_changes_workflow: false
+
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: false
+  poem: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    # Entries are REGEXES matched against the PR's BASE branch. A PR based on
+    # anything unlisted is skipped -- and the skip is silent in the worst way:
+    # CodeRabbit still posts a SUCCESS status check. On a stacked PR that is
+    # indistinguishable from a clean review, because pr_review_gate.py reports
+    # `check CodeRabbit: SUCCESS` right beside `reviewed at head: False`, which
+    # is exactly what a real review with no findings looks like. The only
+    # positive marker is a "Review skipped" comment from the bot.
+    #
+    # This defaulted to main + develop and cost real coverage. In
+    # astgl-animated-channel, PRs #6/#7/#9/#10 all targeted a long-lived docs
+    # branch and have ZERO review objects between them: the entire gitleaks
+    # hardening stack -- version guard, pin, and both self-test suites --
+    # merged unreviewed. Its 11 defects surfaced only when those files were
+    # transplanted into a PR based on main, the first time anything read them.
+    # One was a live scanning hole.
+    #
+    # `.*` rather than a longer list on purpose. A list only protects the
+    # branch names you thought of, and every name you miss fails SILENTLY --
+    # which is the one failure mode this kit exists to eliminate. Guessing the
+    # branch conventions of 43 repos is not a safety property.
+    #
+    # COST, stated plainly: this reviews PRs into every base, so stacked and
+    # scratch branches now consume review budget (the usage add-on bills per
+    # file reviewed). path_filters below still exclude generated and vendored
+    # content, which is where the volume actually is. If a repo's budget makes
+    # this hurt, narrow it HERE and deliberately -- replacing `.*` with the
+    # explicit long-lived branches that repo really uses -- and accept that
+    # anything unlisted goes back to being skipped in silence.
+    base_branches:
+      - ".*"
+
+  # Never spend review budget on generated or vendored content.
+  path_filters:
+    - "!**/*.lock"
+    - "!**/*.min.js"
+    - "!**/*.min.css"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/node_modules/**"
+    - "!**/.venv/**"
+    - "!**/venv/**"
+    - "!**/__pycache__/**"
+    - "!**/*.ipynb_checkpoints/**"
+    - "!**/vendor/**"
+    - "!**/*.svg"
+    - "!**/package-lock.json"
+    - "!**/uv.lock"
+    - "!**/poetry.lock"
+
+  path_instructions:
+    - path: "**/*.py"
+      instructions: >
+        Require type hints on every public function and method. Flag bare
+        `except:` and `except Exception:` without re-raise or logging. Flag file
+        and network handles opened outside a context manager. Flag mutable
+        default arguments. Prefer pathlib over os.path. Flag any subprocess call
+        built by string concatenation. For scripts intended as teaching
+        material, flag anything a reader could not follow without prior context.
+        When recommending a Python idiom that has a PowerShell analogue, name
+        the analogue in one short clause — the reader's fluency is there first.
+
+    - path: "**/*.ps1"
+      instructions: >
+        Require [CmdletBinding()] and typed param blocks on anything reusable.
+        Flag Write-Host where Write-Verbose, Write-Information, or pipeline
+        output is correct. Require -ErrorAction handling around external calls,
+        especially PowerCLI and REST. Flag credentials, tokens, or hostnames
+        appearing as literals. Require Disconnect-VIServer or equivalent cleanup
+        in a finally block whenever a connection is opened.
+
+    - path: "**/*.psm1"
+      instructions: >
+        Same as .ps1, plus: verify Export-ModuleMember matches the intended
+        public surface, and flag any function missing comment-based help.
+
+    - path: ".github/workflows/**"
+      instructions: >
+        Pin third-party actions to a full commit SHA, not a tag. Flag any
+        workflow with `pull_request_target` combined with a checkout of the head
+        ref. Require explicit least-privilege `permissions:` blocks. Flag missing
+        `timeout-minutes` — a hung job burns Actions minutes during an outage.
+        Flag secrets referenced in `run:` steps where an env block is safer.
+
+    - path: "**/*.sh"
+      instructions: >
+        Require `set -euo pipefail`. Flag unquoted variable expansions. Flag
+        commands whose failure is silently ignored.
+
+    - path: "**/*.html"
+      instructions: >
+        These are self-contained single-file teaching artifacts. Flag any
+        external network dependency that would break the file offline. Flag
+        innerHTML assignment from user-controlled input. Do not suggest
+        splitting into multiple files — single-file is intentional.
+
+    - path: "**/*.md"
+      instructions: >
+        Check code fences declare a language. Check that commands shown are
+        copy-pasteable as written. Do not comment on prose style.
+
+  tools:
+    ruff:
+      enabled: true
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: true
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: "auto"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WHAT: Second-pass secret scan over staged binary/document files that the
+# WHAT: Second-pass secret scan over binary/document files that the
 #       primary `secrets` gate provably does not inspect. That gate now runs
 #       `scripts/gitleaks-guard.sh git --staged`; it previously ran
 #       `gitleaks protect --staged`, and `protect` is a deprecated alias. The
@@ -27,6 +27,25 @@
 # CONTRACT: every file lands in exactly one bucket, and the bucket counts are
 #       printed. A zero count reads as UNKNOWN, never as clean.
 #
+# SOURCES: the classification and extraction below are source-agnostic, so the
+#       same logic serves the pre-commit hook and CI. Only WHICH files to look at
+#       and WHERE to read their bytes differ:
+#
+#         (default)            git diff --cached      blobs from the index  (pre-commit)
+#         --range BASE HEAD    git diff BASE...HEAD   blobs from HEAD       (CI, pull_request)
+#         --tree [REF]         git ls-tree -r REF     blobs from REF        (CI, push / full audit)
+#
+#       --config PATH overrides .gitleaks.toml. CI needs it: the workflow runs the
+#       BASE branch's copy of this script against the CANDIDATE's tree, and a config
+#       read from the candidate would be the very allowlist a PR could widen. See
+#       the TRUST BOUNDARY note in secret-scan.yml.
+#
+#       CI must run this too. Verified on gitleaks 8.30.1: a secret-bearing .xlsx is
+#       reported as `scanned ~0 bytes` / exit 0 by the primary scan, so before this
+#       existed in CI a PR adding one was blocked locally and PASSED the job this kit
+#       calls authoritative -- the local gate strictly stronger than the "reproducible
+#       by construction" one, which is backwards.
+#
 # RESIDUAL LIMIT, stated plainly: a scanned/image-only PDF carries no text
 #       layer. pdftotext returns nothing but page separators, which this script
 #       reports as UNKNOWN rather than clean. A MOSTLY-image PDF that happens to
@@ -37,16 +56,149 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-CONFIG="$REPO_ROOT/.gitleaks.toml"
+# ---------------------------------------------------------------------------
+# Arguments.
+#
+# UNKNOWN ARGUMENTS ARE FATAL, and that is the whole reason this block is not a
+# three-line case statement. Before it existed the script ignored every argument
+# it did not expect: `scan-staged-binaries.sh --range A B` printed "no binary or
+# document files staged" and exited 0. Measured, on the version this replaces.
+# So the obvious way to close the CI gap -- point the existing script at a range --
+# produced a green check that had enumerated nothing and said so in the reassuring
+# words of a clean result. A gate that silently ignores the flag telling it WHAT TO
+# SCAN is the same defect as one that scans zero bytes and reports clean.
+# ---------------------------------------------------------------------------
+MODE=staged
+RANGE_BASE=""
+RANGE_HEAD=""
+TREE_REF="HEAD"
+CONFIG_OVERRIDE=""
 
-# `git diff --cached --name-only` prints paths relative to the REPO ROOT, but
-# `git cat-file blob :<path>` resolves :<path> relative to the CURRENT DIRECTORY.
-# Those agree only when invoked from the root -- which lefthook does today, so this
-# is defensive. Run from a subdirectory the blob lookup fails and, under `set -e`,
-# aborts the whole scan: a security gate that exits non-zero for a reason unrelated
-# to any finding. Anchoring here makes the two agree wherever it is invoked from.
-cd "$REPO_ROOT" || { echo "  ✗ cannot cd to repo root $REPO_ROOT" >&2; exit 1; }
+usage() {
+  cat >&2 <<'USAGE'
+usage: scan-staged-binaries.sh [--config PATH]
+       scan-staged-binaries.sh --range BASE HEAD [--config PATH]
+       scan-staged-binaries.sh --tree [REF] [--config PATH]
+
+  (default)  scan files staged in the index          (pre-commit)
+  --range    scan files changed in BASE...HEAD       (CI, pull_request)
+  --tree     scan every file in REF, default HEAD    (CI, push / full audit)
+  --config   use PATH instead of <repo root>/.gitleaks.toml
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --range)
+      # Both operands are required. Accepting one would leave the other empty and
+      # produce a `git diff BASE...` that means something quite different.
+      [ "$#" -ge 3 ] || { echo "✗ --range needs BASE and HEAD" >&2; usage; exit 2; }
+      # PRESENT IS NOT THE SAME AS NON-EMPTY, and the empty case fails silently
+      # clean. `--range "" HEAD` passes the count check, and the enumeration then
+      # runs `git diff ...HEAD`, which git resolves as HEAD...HEAD -- an empty diff,
+      # exit 0, no error. An empty HEAD is as bad from the other end: BLOB_PREFIX
+      # degrades from "$RANGE_HEAD:" to ":", so the walk silently reads the INDEX
+      # while reporting the range it was asked for. Empty operands are how a CI
+      # expression that resolved to nothing arrives here.
+      [ -n "$2" ] && [ -n "$3" ] || {
+        echo "✗ --range BASE and HEAD must both be non-empty" >&2
+        echo "  Got BASE='$2' HEAD='$3'. An unset CI expression lands here." >&2
+        exit 2; }
+      MODE=range; RANGE_BASE="$2"; RANGE_HEAD="$3"; shift 3 ;;
+    --tree)
+      MODE=tree
+      # Optional operand: treat a following `--flag` as the next option, not a ref.
+      # -n as well: an empty operand is not `--`-prefixed, so without it `--tree ""`
+      # sets TREE_REF="" and BLOB_PREFIX=":" -- the same silent fall-through to the
+      # index as the --range case above.
+      if [ "$#" -ge 2 ] && [ -n "$2" ] && [ "${2#--}" = "$2" ]; then
+        TREE_REF="$2"; shift 2
+      else
+        shift
+      fi ;;
+    --config)
+      [ "$#" -ge 2 ] || { echo "✗ --config needs a path" >&2; usage; exit 2; }
+      CONFIG_OVERRIDE="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *)
+      printf '\n✗ scan-staged-binaries: unrecognised argument: %s\n' "$1" >&2
+      printf '  Refusing to run. An ignored argument here means scanning the wrong\n' >&2
+      printf '  thing — or nothing — and reporting it as clean.\n\n' >&2
+      usage
+      exit 2 ;;
+  esac
+done
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+# No cd. Every path this script touches is either absolute ($TMPDIR_SCAN,
+# $CONFIG, the probe copies) or resolved by git itself: `git diff --cached`
+# prints root-relative names from any cwd, and `git cat-file blob ":<path>"`
+# is ROOT-relative by definition (`:./<path>` is the cwd-relative form --
+# measured from a nested subdirectory during this rollout). An advisory
+# `cd || true` briefly lived here and earned a review finding for swallowing
+# its own failure; the correct amount of cd is none.
+
+# Version pre-flight, in the guard's ASSERTION-ONLY mode (no arguments). The
+# canaries below prove BEHAVIOUR -- stdin and archive traversal work -- but not
+# the floor: a supported-but-below-floor gitleaks passes them and then scans
+# with different allowlist semantics than .gitleaks.toml documents. This is a
+# separate pre-flight rather than routing the scan calls through the guard,
+# because the canaries read exit 1 as "toolchain works" and the guard also
+# exits 1 on rejection -- wrapping would turn a version failure into a false OK
+# (recorded at length in gitleaks-version.env).
+# Resolved against THIS SCRIPT's directory, not REPO_ROOT: the guard ships next
+# to the scanner wherever the scanner is (the self-test runs it from fixture
+# repos that have no scripts/ tree -- resolving by repo root failed 13 of 14
+# suite cases the first time, which is itself the lesson: probe the resolver
+# from somewhere other than the happy path).
+_SELF_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
+if ! "$_SELF_DIR/gitleaks-guard.sh" >/dev/null 2>&1; then
+  echo "  ✗ gitleaks on PATH fails the version guard — refusing to scan binaries with it"
+  echo "      Run scripts/gitleaks-guard.sh for the specific reason."
+  exit 1
+fi
+CONFIG="${CONFIG_OVERRIDE:-$REPO_ROOT/.gitleaks.toml}"
+# Name the missing config. Handing a nonexistent --config to gitleaks makes it fall
+# back to its BUILT-IN ruleset, which still finds plenty and still exits 0 on a clean
+# file -- so a typo'd path would scan with silently different coverage than the
+# .gitleaks.toml this repo documents, and nothing in the output would say so.
+#
+# -f as well as -r, for the reason gitleaks-guard.sh records at its own version-file
+# check: `[ -r ]` is true for a directory, and truer still for a FIFO -- and a FIFO
+# here fails in the worst possible direction. This script reads $CONFIG SEVERAL
+# times (the canary probe, then once per scanned file). A process substitution --
+# `--config <(git show base:.gitleaks.toml)`, which is exactly how someone wires a
+# config from another ref in CI -- serves the first read and returns EOF to every
+# read after it. gitleaks then parses an empty config, loads no rules, finds nothing
+# and exits 0. Measured while building the live test for this very change: a green
+# "no leaks found" over a file carrying the canary. A one-shot config is UNKNOWN
+# coverage wearing a clean result, so require a real, re-readable file.
+# stderr, like every other refusal in this script: at pre-commit the hook
+# multiplexes streams, and a refusal on stdout can sort below the clean chatter it
+# contradicts.
+if [ ! -f "$CONFIG" ] || [ ! -r "$CONFIG" ]; then
+  echo "  ✗ cannot read gitleaks config as a regular file: $CONFIG" >&2
+  echo "      Refusing to scan with unknown coverage. If you meant to use a config" >&2
+  echo "      from another ref, write it to a real file first — a pipe or process" >&2
+  echo "      substitution is read once and silently empty thereafter." >&2
+  exit 1
+fi
+
+# Where to read each file's bytes. `:path` is the index; `REF:path` is that commit's
+# blob. The three call sites below share this prefix, so the walk does not care which
+# source it is reading.
+case "$MODE" in
+  staged) BLOB_PREFIX=":" ;;
+  range)  BLOB_PREFIX="$RANGE_HEAD:" ;;
+  tree)   BLOB_PREFIX="$TREE_REF:" ;;
+  # Same argument in_list() makes for its list names: that $MODE holds one of three
+  # literals is a property of the PARSER, not of this block, and a comment cannot
+  # fail. Without this branch a fourth mode added later leaves BLOB_PREFIX unset,
+  # `git cat-file blob "$path"` fails per file, and the run reports a pile of
+  # UNKNOWNs instead of naming the actual fault.
+  *) printf '\n✗ scan-staged-binaries: no blob source for mode: %s\n\n' "$MODE" >&2
+     exit 2 ;;
+esac
 
 # Archive-shaped documents. gitleaks can read inside these once the path
 # allowlist stops skipping them, so they are fully inspectable.
@@ -57,34 +209,32 @@ ARCHIVE_EXTS=(xlsx xlsm docx docm pptx pptm odt ods odp jar war zip)
 # shellcheck disable=SC2034  # read indirectly by in_list; see its definition
 PDF_EXTS=(pdf)
 
-# PLAIN TEXT that gitleaks' BUILT-IN allowlist skips by path anyway.
-#
-# Removing `svg` from .gitleaks.toml was necessary and NOT sufficient -- the same
-# trap as pdf. Measured 2026-08-08 on 8.30.1: identical token in a.txt and a.svg,
-# scanned with this repo's config, flags ONLY a.txt; via `gitleaks stdin`, the svg
-# is flagged. So the surviving exclusion is upstream, inherited through
-# `[extend] useDefault`, and no local edit reaches it.
-#
-# These need no extraction -- they are already text. They just need to arrive by a
-# route the path allowlist cannot match, which is exactly what stdin is.
-# shellcheck disable=SC2034  # read indirectly by in_list; see its definition
-TEXT_ALLOWLISTED_EXTS=(svg)
-
 # Formats no text scanner can meaningfully read. Reported, never inspected,
 # and deliberately NOT blocking -- a credential in a screenshot is invisible to
 # a text scanner either way, so blocking here buys noise, not coverage.
 # shellcheck disable=SC2034  # read indirectly by in_list; see its definition
-# NOTE: svg is deliberately ABSENT. It is XML text, not an opaque raster -- a
-# credential in a <text>, <desc> or <metadata> node is plain readable content. It
-# was listed here AND allowlisted in .gitleaks.toml, so it had no scanning gate at
-# all. Both exclusions were removed together; the justification for keeping the
-# raster formats ("invisible to a text scanner either way") was never true of SVG.
-OPAQUE_EXTS=(png jpg jpeg gif webp ico bmp tif tiff avif heic
+# doc/xls/suo/wsuo/v2/vsidx are here for a sharper reason than the images: the
+# BUILT-IN allowlist path-skips them (measured on 8.30.1 -- a canary in probe.doc
+# is invisible to the primary scan), and until this line they were in no bucket
+# here either, so they fell through the "anything else is text" comment while
+# provably uncovered. The svg double-miss, in legacy-Office form. OLE compound
+# files have no extractor in this stack yet, so they are REPORTED rather than
+# read; ppt/dot/xlt/pot/vsd were probed too and are NOT built-in-skipped, so
+# they stay with the primary scan.
+OPAQUE_EXTS=(doc xls suo wsuo v2 vsidx
+             png jpg jpeg gif webp ico bmp tif tiff avif heic
              mp3 mp4 mov avi mkv wav aiff flac
              exe dll so dylib bin dmg pkg iso
              woff woff2 ttf otf eot
              fbx blend casc obj glb gltf psd ai sketch
              pyc pdb class o a)
+
+# Text formats the PRIMARY gate skips by path. They need no extractor -- they are
+# already text -- but gitleaks' built-in allowlist refuses to read them, so they
+# reach neither scanner unless routed here. svg is the live case: XML, often
+# hand-edited, and a credential in one is plainly readable.
+# shellcheck disable=SC2034  # read indirectly by in_list
+TEXT_SKIPPED_EXTS=(svg)
 
 MAX_ARCHIVE_DEPTH=5
 
@@ -175,7 +325,7 @@ PY
 in_list() {
   local needle="$1" listname="$2" i item count
   # Enforce the invariant the comment above only asserted. `listname` reaching
-  # eval must be one of the three literals defined at the top of this file, and
+  # eval must be one of the bucket literals defined at the top of this file, and
   # today it always is — but that is a property of the current call sites, not
   # of the function, and a comment cannot fail. A future caller passing a
   # variable now gets a loud error instead of an eval. Cost is three string
@@ -187,16 +337,8 @@ in_list() {
   # scrolling past in hook output. An unknown list name is a programming mistake,
   # not a data condition, and this script's contract is that a bucket it cannot
   # classify is never reported clean.
-  # ⚠️ FRAGILE COUPLING, do not break it: this `exit 2` aborts the SCRIPT only because
-  # the classification loop is fed by PROCESS SUBSTITUTION (`done < <(git diff …)`), which
-  # keeps the loop in the current shell. Rewrite that as a pipe (`git diff … | while …`)
-  # and the loop moves to a subshell: `exit 2` then kills only the subshell, the parent
-  # continues, and an unclassifiable bucket is silently skipped — precisely the failure
-  # the comment above says this prevents. The guard would still LOOK correct while doing
-  # nothing. If you ever change how that loop is fed, re-verify this path by planting an
-  # unknown list name and confirming the script actually stops.
   case "$listname" in
-    ARCHIVE_EXTS|PDF_EXTS|TEXT_ALLOWLISTED_EXTS|OPAQUE_EXTS) ;;
+    ARCHIVE_EXTS|PDF_EXTS|TEXT_SKIPPED_EXTS|OPAQUE_EXTS) ;;
     *) printf '\n✗ in_list: refusing to expand unknown list name: %s\n' "$listname" >&2
        printf '  Add it to the allowlist in in_list() if it is legitimate.\n\n' >&2
        exit 2 ;;
@@ -243,7 +385,15 @@ run_gitleaks_stdin() {
   inspected_bytes=$((inspected_bytes + bytes))
   if [ "$rc" -eq 1 ]; then
     leaks=$((leaks + 1))
-    echo "  ✗ SECRET in $label"
+    # Quote ONLY when the name carries a control character. A newline or CR would
+    # break the diagnostic across lines and hide which file holds the secret;
+    # spaces are harmless and %q would render every ordinary name with
+    # backslashes, making the common case worse to read to fix a case that
+    # needs a deliberately hostile filename.
+    case "$label" in
+      *[[:cntrl:]]*) printf '  ✗ SECRET in %q\n' "$label" ;;
+      *)             printf '  ✗ SECRET in %s\n' "$label" ;;
+    esac
     sed 's/^/      /' "$out"
   fi
 }
@@ -276,36 +426,85 @@ run_gitleaks_archive() {
   inspected_bytes=$((inspected_bytes + bytes))
   if [ "$rc" -eq 1 ]; then
     leaks=$((leaks + 1))
-    echo "  ✗ SECRET in $label"
+    # %q for the same reason as the sed rewrite below: $label is a staged
+    # filename and may carry newlines or control characters.
+    printf '  ✗ SECRET in %q\n' "$label"
     # Findings name the temp probe path; point them back at the real file.
-    #
-    # Both sides are interpolated into a sed s/// expression, so both are escaped
-    # first. $probe is ours, but $label is a STAGED FILENAME -- attacker-influenced
-    # in any repo that takes contributions, and a name containing `|` or `\` would
-    # otherwise corrupt the expression or error out mid-report. Escaping only the
-    # delimiter is not enough: `&` in the replacement means "the whole match".
-    esc_probe=$(printf '%s' "$probe" | sed 's/[|\\.^$*[]/\\&/g')
-    esc_label=$(printf '%s' "$label" | sed 's/[|\\&]/\\&/g')
-    sed "s|$esc_probe|$esc_label|g; s/^/      /" "$out"
+    # Both sides are escaped: $label is a STAGED FILENAME, so a `|` ends the s
+    # command, a `&` in the replacement re-inserts the whole match, and a `\`
+    # escapes the next character -- corrupting the one message that tells you
+    # which file holds the secret.
+    _pat=$(printf '%s' "$probe" | sed 's/[|\\.*^$[]/\\&/g')
+    # %q, not %s: a filename may contain a NEWLINE, which would split the sed
+    # program itself. %q renders it as a single shell-quoted token, so the
+    # diagnostic stays on one line and still names the file unambiguously.
+    _rep=$(printf '%q' "$label" | sed 's/[|\\&]/\\&/g')
+    sed "s|$_pat|$_rep|g; s/^/      /" "$out"
   fi
 }
 
-# ---------------------------------------------------------------------------
-# Walk the staged tree. -z because this repo family has filenames with spaces.
-# Scan the STAGED BLOB, not the worktree file: they differ whenever a file was
-# edited after `git add`, and it is the staged bytes that are about to ship.
-# ---------------------------------------------------------------------------
-# ENUMERATION FAILS CLOSED. This was inlined as a process substitution, whose exit
-# status the loop cannot see: if `git diff --cached` failed -- a corrupt index, a
-# broken repo, a bad filter -- the loop simply read nothing, every bucket stayed
-# empty, and the script printed "no binary or document files staged" and exited 0.
-# An enumeration that did not run is not an empty enumeration.
-if ! git diff --cached --name-only -z --no-renames --diff-filter=ACMT \
-     > "$TMPDIR_SCAN/staged.list"; then
-  echo "  ✗ UNKNOWN: could not enumerate staged files — refusing to report a clean scan" >&2
+# Enumerate FIRST, and fail closed if git itself fails. With the loop fed
+# straight from a process substitution, a git that exits non-zero produced an
+# empty stream -- so the walk ran zero times and the script reported "no binary
+# or document files staged" and exited 0. Verified with a git shim returning
+# 128: clean verdict over an unknown index. A scan that enumerated nothing is
+# UNKNOWN, never clean; that is this file's whole contract.
+STAGED_LIST="$TMPDIR_SCAN/staged.list"
+case "$MODE" in
+  staged)
+    enum_desc="the index"
+    git diff --cached --name-only -z --diff-filter=ACMRT > "$STAGED_LIST" ;;
+  range)
+    enum_desc="$RANGE_BASE...$RANGE_HEAD"
+    # Three dots: changes introduced ON the head side since the merge base, which
+    # is the PR's own diff. Two dots would also enumerate everything that landed on
+    # the base branch since the fork point -- files this PR never touched, reported
+    # against its author.
+    git diff --name-only -z --diff-filter=ACMRT "$RANGE_BASE...$RANGE_HEAD" > "$STAGED_LIST" ;;
+  tree)
+    enum_desc="every file in $TREE_REF"
+    # --full-tree is load-bearing, and its absence fails silently clean. Unlike
+    # `git diff`, `git ls-tree` is CWD-SENSITIVE: from a subdirectory it lists only
+    # that subtree, and names entries relative to it. Measured in a two-file repo --
+    # from `sub/`, `ls-tree -r HEAD` returned `nested.txt` and omitted `root.txt`
+    # entirely. So a --tree run from anywhere but the root would scan a SUBSET and
+    # report it as the whole tree, and the surviving paths would then miss
+    # `git cat-file blob "REF:path"` because that is root-relative.
+    # --full-tree makes it behave from the root regardless of cwd, which restores
+    # the "no cd, every path resolved by git itself" property the rest of this file
+    # relies on.
+    git ls-tree --full-tree -r -z --name-only "$TREE_REF" > "$STAGED_LIST" ;;
+esac || {
+  # Fail closed on an enumeration that errored. With the loop fed straight from a
+  # process substitution, a git that exits non-zero produced an EMPTY stream -- so
+  # the walk ran zero times and the script reported "no binary or document files
+  # staged" and exited 0. Verified with a git shim returning 128: a clean verdict
+  # over an unknown index. This applies to all three sources; a bad --range ref is
+  # the new way to reach it, and it must not read as "nothing to scan".
+  echo "  ✗ could not enumerate files from $enum_desc (git exited non-zero)"
+  echo "      Refusing to report clean over a file list this script could not read."
+  exit 1
+}
+
+# The redirect that feeds the loop below already fails closed: under
+# `set -euo pipefail` an unreadable STAGED_LIST aborts before the summary
+# (verified, rc=1, for both a missing and an unreadable file). But it aborts
+# ANONYMOUSLY -- a bare "No such file or directory" naming neither this script
+# nor what it was doing -- which is the failure mode gitleaks-guard.sh exists to
+# replace. This check runs first so the cause has a name.
+if [ ! -r "$STAGED_LIST" ]; then
+  echo "  ✗ staged-file list is unreadable ($STAGED_LIST)"
+  echo "      Refusing to report clean over an index this script could not read."
   exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# Walk the enumerated files. -z because this repo family has filenames with spaces.
+# Scan the BLOB named by $BLOB_PREFIX, not the worktree file. In the default mode
+# those differ whenever a file was edited after `git add`, and it is the staged bytes
+# that are about to ship; in --range/--tree the worktree may not even hold the
+# revision under review.
+# ---------------------------------------------------------------------------
 while IFS= read -r -d '' path; do
   ext="${path##*.}"
   ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
@@ -342,14 +541,13 @@ while IFS= read -r -d '' path; do
         unknown+=("$path (archive probe scanned clean: .gitleaks.toml no longer carries the rule the canary matches — fix the config, not the scanner)")
         continue ;;
     esac
-    # A blob that cannot be read is UNKNOWN, not a reason to abort. Under `set -e`
-    # a failure here killed the whole scan, so one unreadable file suppressed the
-    # verdict on every other staged file -- and the caller saw a non-zero exit with
-    # no finding, which reads as "the gate broke" rather than "this was not read".
-    if ! git cat-file blob ":$path" > "$staged" 2>/dev/null; then
-      unknown+=("$path (staged blob could not be read)")
+    git cat-file blob "$BLOB_PREFIX$path" > "$staged" || {
+      # Without this the failure is a bare git diagnostic under set -e, naming
+      # neither this script nor the file it could not read -- and an unreadable
+      # staged blob is UNKNOWN, not clean.
+      unknown+=("$path (could not read the staged blob)")
       continue
-    fi
+    }
     run_gitleaks_archive "$path" "$staged"
   elif in_list "$ext" PDF_EXTS; then
     if ! command -v pdftotext >/dev/null 2>&1; then
@@ -363,14 +561,13 @@ while IFS= read -r -d '' path; do
       unknown+=("$path (gitleaks on PATH has no working \`stdin\` scan — needs 8.x)")
       continue
     fi
-    # A blob that cannot be read is UNKNOWN, not a reason to abort. Under `set -e`
-    # a failure here killed the whole scan, so one unreadable file suppressed the
-    # verdict on every other staged file -- and the caller saw a non-zero exit with
-    # no finding, which reads as "the gate broke" rather than "this was not read".
-    if ! git cat-file blob ":$path" > "$staged" 2>/dev/null; then
-      unknown+=("$path (staged blob could not be read)")
+    git cat-file blob "$BLOB_PREFIX$path" > "$staged" || {
+      # Without this the failure is a bare git diagnostic under set -e, naming
+      # neither this script nor the file it could not read -- and an unreadable
+      # staged blob is UNKNOWN, not clean.
+      unknown+=("$path (could not read the staged blob)")
       continue
-    fi
+    }
     text="$TMPDIR_SCAN/extracted.txt"
     if ! pdftotext -q "$staged" "$text" 2>/dev/null; then
       unknown+=("$path (pdftotext could not parse it)")
@@ -385,9 +582,7 @@ while IFS= read -r -d '' path; do
       continue
     fi
     run_gitleaks_stdin "$path" "$text"
-  elif in_list "$ext" TEXT_ALLOWLISTED_EXTS; then
-    # Already text: no extractor, no canary for a missing tool. It only needs the
-    # stdin route, because the path allowlist that hides it is upstream.
+  elif in_list "$ext" TEXT_SKIPPED_EXTS; then
     if [ -z "$pdf_canary" ]; then
       if canary_stdin_ok; then pdf_canary=ok; else pdf_canary=bad; fi
     fi
@@ -395,27 +590,24 @@ while IFS= read -r -d '' path; do
       unknown+=("$path (gitleaks on PATH has no working \`stdin\` scan — needs 8.x)")
       continue
     fi
-    # A blob that cannot be read is UNKNOWN, not a reason to abort. Under `set -e`
-    # a failure here killed the whole scan, so one unreadable file suppressed the
-    # verdict on every other staged file -- and the caller saw a non-zero exit with
-    # no finding, which reads as "the gate broke" rather than "this was not read".
-    if ! git cat-file blob ":$path" > "$staged" 2>/dev/null; then
-      unknown+=("$path (staged blob could not be read)")
+    git cat-file blob "$BLOB_PREFIX$path" > "$staged" || {
+      # Without this the failure is a bare git diagnostic under set -e, naming
+      # neither this script nor the file it could not read -- and an unreadable
+      # staged blob is UNKNOWN, not clean.
+      unknown+=("$path (could not read the staged blob)")
       continue
-    fi
+    }
     run_gitleaks_stdin "$path" "$staged"
   elif in_list "$ext" OPAQUE_EXTS; then
     opaque+=("$path")
   fi
-  # Anything else is text: `gitleaks protect --staged` already covered it.
-#
-# --no-renames is load-bearing, not cosmetic. With rename detection ON, staging a
-# renamed file produces an `R` record, which --diff-filter=ACM silently DROPPED --
-# so `git mv secret.pdf report.pdf && git commit` sailed past this gate entirely.
-# Turning detection off decomposes the rename into D(old) + A(new), and the new
-# path is scanned like any other addition. T catches a type change (e.g. a symlink
-# replaced by a real file). Verified by selftest-binary-scan.sh case 11.
-done < "$TMPDIR_SCAN/staged.list"
+  # Anything else is text AND not path-skipped, so the primary `secrets` gate
+  # already read it. Formats the primary gate skips belong in TEXT_SKIPPED_EXTS.
+# ACMRT, not ACM. A `git mv` of a binary is status R and a symlink replaced by
+# a real file is T; both were enumerated as NOTHING, so the scan printed "no
+# binary or document files staged" and exited 0 over a staged secret. Verified.
+# D is excluded (no blob to read) and U (unmerged) has no single staged blob.
+done < "$STAGED_LIST"
 
 # ---------------------------------------------------------------------------
 # Report. N-scanned is the point: "nothing was reported" and "the check never
@@ -423,11 +615,14 @@ done < "$TMPDIR_SCAN/staged.list"
 # ---------------------------------------------------------------------------
 total=$((inspected + ${#opaque[@]} + ${#unknown[@]}))
 if [ "$total" -eq 0 ]; then
-  echo "  binary scan: no binary or document files staged"
+  # Name the source that was searched. "no binary or document files" alone reads
+  # identically whether the gate examined the right revision or the wrong one, and
+  # in CI nobody is standing there knowing which range they meant.
+  echo "  binary scan: no binary or document files found in $enum_desc"
   exit 0
 fi
 
-echo "  binary scan: inspected $inspected file(s), $inspected_bytes bytes read"
+echo "  binary scan: $enum_desc — inspected $inspected file(s), $inspected_bytes bytes read"
 
 if [ "${#opaque[@]}" -gt 0 ]; then
   echo "  ⓘ NOT INSPECTED — no text scanner can read these (${#opaque[@]}):"
@@ -442,6 +637,14 @@ if [ "${#unknown[@]}" -gt 0 ]; then
   exit 1
 fi
 
-[ "$leaks" -gt 0 ] && { echo "  ✗ $leaks file(s) contain secrets — commit blocked"; exit 1; }
+# "commit blocked" is only true at pre-commit. In CI nothing is being committed, and
+# a message naming the wrong action sends the reader looking for a local hook.
+[ "$leaks" -gt 0 ] && {
+  case "$MODE" in
+    staged) echo "  ✗ $leaks file(s) contain secrets — commit blocked" ;;
+    *)      echo "  ✗ $leaks file(s) contain secrets — failing this check" ;;
+  esac
+  exit 1
+}
 
 exit 0

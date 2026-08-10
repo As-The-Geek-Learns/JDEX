@@ -45,24 +45,27 @@ SECRET="cr-""0123456789abcdefghijklmnop"
 #                then goes green while proving nothing about the version canary
 #                they exist to check. This is the dangerous one: silent, and it
 #                looks identical to success.
-# ...and skipping loudly is still not enough, because `exit 0` IS "pass" to every
-# caller. lefthook, CI and `&&` chains all read status, not prose: the message
-# scrolled past while the gate went green, which is the same fail-open shape this
-# suite exists to detect, sitting in the suite's own preamble.
+# A missing tool is a FAILURE, not a skip. This exited 0 under the banner
+# "skipping loudly beats passing falsely" -- but the loudness was only in the
+# message. lefthook reads the exit code, so `selftest-binary-scan` went GREEN on
+# a machine that could not run the cases, and a green self-test is exactly the
+# claim "the binary gate is verified". Verified on a PATH without pdftotext:
+# it printed the SKIP line and exited 0.
 #
-# So: exit NON-ZERO. A missing tool means the suite did not run, and "did not run"
-# must never be reportable as "passed". pdftotext is the only genuinely optional
-# one, and requiring it here is consistent with scan-staged-binaries.sh, which
-# already treats a missing pdftotext as UNKNOWN and blocks the commit rather than
-# waving the PDF through.
-missing=""
+# Exit 1 instead. If a machine genuinely cannot run this, that is a fact about
+# the gate's coverage there and should be visible, not absorbed.
+# All three are checked before exiting, so a machine missing two tools learns
+# about both in one run instead of one per attempt.
+_missing=0
 for tool in gitleaks python3 pdftotext; do
-  command -v "$tool" >/dev/null 2>&1 || missing="${missing}${tool} "
+  command -v "$tool" >/dev/null 2>&1 || {
+    printf '\n✗ %s is not installed — this suite cannot distinguish pass from no-op without it.\n' "$tool" >&2
+    [ "$tool" = pdftotext ] && printf '      brew install poppler\n' >&2
+    _missing=1
+  }
 done
-if [ -n "$missing" ]; then
-  echo "✗ NOT RUN: missing ${missing}— this suite cannot tell a pass from a no-op without it" >&2
-  case "$missing" in *pdftotext*) echo "    pdftotext comes from poppler:  brew install poppler" >&2 ;; esac
-  echo "    Reporting failure rather than success: an unrun check is UNKNOWN, not clean." >&2
+if [ "$_missing" -ne 0 ]; then
+  printf '  A skipped case is not a passed case; refusing to report success.\n\n' >&2
   exit 1
 fi
 
@@ -127,14 +130,7 @@ new_repo() {
   # `git config user.email t@t.t` below landed in the shared config in the same breath.
   # The unset above prevents it. This assertion is what makes a regression loud and
   # local instead of silent and repo-wide.
-  # --absolute-git-dir, NOT --show-toplevel. With an ambient GIT_DIR and no
-  # GIT_WORK_TREE, git reports the CWD as the work tree while the object store,
-  # index and refs still belong to the other repository -- so --show-toplevel
-  # returns exactly what this assertion wants to see and the tripwire never
-  # fires. The learnings note in this same PR says so explicitly; this guard
-  # was the weaker form it warns against.
-  local gd; gd="$(git rev-parse --absolute-git-dir 2>/dev/null || echo '')"
-  local root; root="${gd%/.git}"
+  local root; root="$(git rev-parse --show-toplevel 2>/dev/null || echo '')"
   if [ "$root" != "$(pwd -P)" ]; then
     echo "FATAL: temp repo resolved to '${root:-<none>}', not '$(pwd -P)'." >&2
     echo "       An ambient GIT_DIR is leaking in. Refusing to touch that repository." >&2
@@ -146,7 +142,20 @@ new_repo() {
   git add .gitleaks.toml
 }
 
-run_sut() { set +e; SUT_OUT="$("$SUT" 2>&1)"; SUT_RC=$?; set -e; }
+# The assignment sits in an `if` so a non-zero exit is consumed by the condition
+# rather than by errexit -- which keeps `set -e` ARMED for the rest of the suite.
+# `set +e`/`set -e` around it also works, but it disarms errexit for the duration,
+# and a suite that turns off its own safety to observe a failure is one edit away
+# from leaving it off.
+run_sut() {
+  if SUT_OUT="$("$SUT" 2>&1)"; then SUT_RC=0; else SUT_RC=$?; fi
+}
+# Same capture, with arguments. Kept separate so the no-argument default path --
+# the one the pre-commit hook actually invokes -- is still exercised by a call
+# that passes literally nothing.
+run_sut_args() {
+  if SUT_OUT="$("$SUT" "$@" 2>&1)"; then SUT_RC=0; else SUT_RC=$?; fi
+}
 
 echo "scan-staged-binaries.sh self-test"
 
@@ -161,16 +170,24 @@ else bad "compressed PDF: secret NOT detected (rc=$SUT_RC)" "$SUT_OUT"; fi
 # 2. REGRESSION GUARD for the approach itself: prove the raw-byte scan this
 #    replaces would have MISSED that same file. If this ever starts passing,
 #    raw scanning became viable and the pdftotext dependency can be revisited.
-#
-#    This case reads secret.pdf from the directory case 1 left, and assumes case 1
-#    built it. If case 1 is ever reordered or dropped, the redirect fails, the grep
-#    fails, and this reports "raw-byte scan now finds it" -- naming the wrong cause
-#    entirely. Assert the fixture before drawing any conclusion from its absence.
-[ -f secret.pdf ] || { echo "FATAL: case 2 needs the fixture built by case 1" >&2; exit 1; }
-if gitleaks stdin --no-banner --redact --config .gitleaks.toml < secret.pdf 2>&1 \
-     | grep -q "no leaks found"; then
+# rc is captured rather than piped: under `pipefail` ANY non-zero from gitleaks
+# failed the pipeline, so an ERROR (exit 2, bad config, unreadable file) was
+# reported as "raw-byte scan now finds it" -- a message pointing at the opposite
+# conclusion from what happened. 0 = clean, 1 = leaks found, anything else = the
+# scanner failed and this case proves nothing either way.
+# `VAR=$(cmd); rc=$?` does NOT work under errexit: the assignment IS the command,
+# so a non-zero substitution aborts the script before $? is ever read. Verified.
+# That would have killed the suite precisely when gitleaks exits 1 -- the case
+# this assertion exists to detect. `|| RAW_RC=$?` keeps errexit from firing.
+RAW_RC=0
+RAW_OUT=$(gitleaks stdin --no-banner --redact --config .gitleaks.toml < secret.pdf 2>&1) || RAW_RC=$?
+if [ "$RAW_RC" -eq 0 ] && grep -q "no leaks found" <<<"$RAW_OUT"; then
   ok "raw-byte scan of the same PDF finds nothing (why pdftotext is required)"
-else bad "raw-byte scan now finds it — revisit the pdftotext dependency" ""; fi
+elif [ "$RAW_RC" -eq 1 ]; then
+  bad "raw-byte scan now finds it — revisit the pdftotext dependency" "$RAW_OUT"
+else
+  bad "raw-byte scan could not run (gitleaks exit $RAW_RC) — this case proved nothing" "$RAW_OUT"
+fi
 
 # 3. Secret inside a real xlsx (zip container) must be caught.
 new_repo c3
@@ -194,9 +211,71 @@ else bad "clean binaries: wrong verdict or zero-byte 'pass' (rc=$SUT_RC)" "$SUT_
 new_repo c5
 build_pdf scanned.pdf ""
 git add scanned.pdf; run_sut
-if [ "$SUT_RC" -ne 0 ] && grep -q "UNKNOWN" <<<"$SUT_OUT"; then
+# Names the file AND the reason. A bare "UNKNOWN" match passes whenever ANY file
+# is unknown, so this case would have stayed green while a different file failed
+# and scanned.pdf sailed through -- the assertion would survive the very
+# regression it exists to catch.
+# -F and a bounded token: the `.` in "scanned.pdf" is a regex any-char, so a
+# plain grep would also match "scannedXpdf". Fixed-string match, and the reason
+# text is included so the assertion pins WHY the file was unknown, not just that
+# its name appeared somewhere in the output.
+if [ "$SUT_RC" -ne 0 ] && grep -qF 'scanned.pdf (no text layer' <<<"$SUT_OUT"; then
   ok "image-only PDF reports UNKNOWN instead of clean"
 else bad "image-only PDF reported clean (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 5b. A RENAMED binary is still scanned. `--diff-filter=ACM` enumerated a rename
+#     as nothing at all, so a `git mv` of a file holding a secret produced
+#     "no binary or document files staged" and exit 0. Regression guard for ACMRT.
+new_repo c5b
+# Without this, a repo (or a user) with diff.renames=false reports the staged
+# `git mv` as A, so --diff-filter=ACMRT never exercises the R path and this case
+# silently stops testing what it was written to test.
+git config diff.renames true
+build_xlsx orig.xlsx "$SECRET"
+git add orig.xlsx; git commit -qm "add" >/dev/null 2>&1
+git mv orig.xlsx renamed.xlsx; git add -A; run_sut
+if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in renamed.xlsx" <<<"$SUT_OUT"; then
+  ok "a renamed binary is still scanned (ACMRT, not ACM)"
+else bad "renamed binary escaped the scan (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 5c. SVG is TEXT that the primary gate skips by path. It must be INSPECTED --
+#     not bucketed opaque, which reports "judge by hand" and passes.
+new_repo c5c
+printf '<svg xmlns="http://www.w3.org/2000/svg"><desc>k %s</desc></svg>\n' "$SECRET" > logo.svg
+git add logo.svg; run_sut
+if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in logo.svg" <<<"$SUT_OUT"; then
+  ok "a secret in an .svg is inspected, not reported opaque"
+else bad "svg not inspected (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 5d. ...and a clean SVG must actually be READ, not silently skipped: a zero-byte
+#     "pass" is the failure this whole file exists to catch.
+new_repo c5d
+printf '<svg xmlns="http://www.w3.org/2000/svg"><desc>company logo</desc></svg>\n' > clean.svg
+git add clean.svg; run_sut
+if [ "$SUT_RC" -eq 0 ] && grep -qE "inspected 1 file\(s\), [1-9][0-9]* bytes read" <<<"$SUT_OUT"; then
+  ok "a clean .svg is read, with non-zero bytes reported"
+else bad "clean svg not actually inspected (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 5e. A legacy-Office file is REPORTED, not invisible. .doc is skipped by
+#     gitleaks' built-in path allowlist, so if it is also in no bucket here it
+#     vanishes: the primary scan never reads it and this script says "no binary
+#     or document files staged". The svg double-miss, measured again for OLE.
+new_repo c5e
+for _e in doc xls suo wsuo v2 vsidx; do
+  printf 'key = %s\n' "$SECRET" > "memo.$_e"
+done
+git add memo.*; run_sut
+# One staged set, one run, one JOINED assertion per extension (the filename must
+# appear WITHIN the NOT INSPECTED record -- -A8 spans the six-line list), so no
+# extension can quietly fall back into the invisible gap this case closed, and
+# a name landing in UNKNOWN instead cannot masquerade as covered.
+_5e_bad=""
+for _e in doc xls suo wsuo v2 vsidx; do
+  grep -A8 "NOT INSPECTED" <<<"$SUT_OUT" | grep -qF "memo.$_e" || _5e_bad="$_5e_bad memo.$_e"
+done
+if [ "$SUT_RC" -eq 0 ] && [ -z "$_5e_bad" ]; then
+  ok "all six built-in-skipped formats are reported NOT INSPECTED (doc xls suo wsuo v2 vsidx)"
+else bad "vanished or wrong bucket:${_5e_bad} (rc=$SUT_RC)" "$SUT_OUT"; fi
 
 # 6. Opaque formats are reported as NOT INSPECTED but do not block.
 new_repo c6
@@ -234,8 +313,11 @@ else bad "scanned worktree instead of staged blob (rc=$SUT_RC)" "$SUT_OUT"; fi
 new_repo c9
 printf 'plain text, primary gate handles this\n' > notes.md
 git add notes.md; run_sut
-if [ "$SUT_RC" -eq 0 ] && grep -q "no binary or document files staged" <<<"$SUT_OUT"; then
-  ok "no binaries staged: explicit no-op"
+# The message names the SOURCE searched ("...found in the index"). That is asserted
+# rather than matched loosely: in CI the same sentence without a source reads the
+# same whether the gate examined the right revision or the wrong one.
+if [ "$SUT_RC" -eq 0 ] && grep -q "no binary or document files found in the index" <<<"$SUT_OUT"; then
+  ok "no binaries staged: explicit no-op, names the source"
 else bad "empty case wrong (rc=$SUT_RC)" "$SUT_OUT"; fi
 
 # 10. The version canary must fail closed. lefthook runs a bare `gitleaks`, so an
@@ -251,88 +333,205 @@ chmod +x "$WORK/stub/gitleaks"
 set +e
 STUB_OUT="$(PATH="$WORK/stub:$PATH" "$SUT" 2>&1)"; STUB_RC=$?
 set -e
-# Assert the CAUSE, not just the word UNKNOWN.
-#
-# "UNKNOWN" alone is emitted by several unrelated paths -- notably a missing
-# pdftotext -- so matching it proved only that something went wrong, not that the
-# version canary was what caught it. The precondition check above now rules out
-# the pdftotext case, and this asserts the specific reason string so the two can
-# never be confused again even if that check is later relaxed.
-# shellcheck disable=SC2016  # single quotes are deliberate: the backticks are literal
-if [ "$STUB_RC" -ne 0 ] && grep -q 'no working `stdin` scan' <<<"$STUB_OUT"; then
-  ok "unsupported gitleaks on PATH fails closed as UNKNOWN (named the version canary)"
-else bad "unsupported gitleaks did not fail closed via the version canary (rc=$STUB_RC)" "$STUB_OUT"; fi
+# Assert the CAUSE, not just the word UNKNOWN -- and the cause moved. The
+# version PRE-FLIGHT (guard in assertion-only mode) now rejects an unsupported
+# binary before any scan runs, which is strictly earlier and better-attributed
+# than the stdin canary that used to catch this. The canary remains as
+# defence-in-depth for the case the guard cannot see: a binary that PASSES the
+# version floor but whose subcommands still misbehave.
+if [ "$STUB_RC" -ne 0 ] && grep -qF 'fails the version guard' <<<"$STUB_OUT"; then
+  ok "unsupported gitleaks on PATH is refused by the version pre-flight"
+else bad "unsupported gitleaks was not refused up front (rc=$STUB_RC)" "$STUB_OUT"; fi
 
-# 11. A RENAMED binary must still be scanned. This is a regression test for a real
-#     hole: the walk used `--diff-filter=ACM`, and a staged rename is an `R` record,
-#     so `git mv secret.pdf report.pdf` skipped the gate entirely. Committing a
-#     secret required only renaming the file that carried it.
+# ---------------------------------------------------------------------------
+# CI SOURCES. Everything above scans the index. The job this kit calls
+# authoritative has no index, and for the whole life of this script that meant it
+# ran no binary scan at all: a secret-bearing .xlsx was blocked locally and PASSED
+# CI. These cases cover the sources that close that gap.
+#
+# Each one COMMITS the fixture and leaves the index clean on purpose. That is what
+# makes them regression tests rather than restatements: run any of them against the
+# pre-parameterisation script and it reports "no binary or document files staged"
+# and exits 0, because a committed-but-unstaged file was invisible to it.
+# ---------------------------------------------------------------------------
+
+# 11. --range: a secret introduced by the branch must be caught.
 new_repo c11
-build_pdf original.pdf "API key: $SECRET"
-git add original.pdf
-git -c user.email=t@t.t -c user.name=t commit -q -m "chore: add doc" --no-verify
-git mv original.pdf renamed.pdf
-run_sut
-if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in renamed.pdf" <<<"$SUT_OUT"; then
-  ok "renamed binary is still scanned (--diff-filter=ACM regression)"
-else bad "renamed binary escaped the scan (rc=$SUT_RC)" "$SUT_OUT"; fi
+git commit -qm "base" >/dev/null 2>&1
+RANGE_BASE=$(git rev-parse HEAD)
+build_xlsx book.xlsx "API key: $SECRET"
+git add book.xlsx; git commit -qm "add xlsx" >/dev/null 2>&1
+run_sut_args --range "$RANGE_BASE" HEAD
+if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in book.xlsx" <<<"$SUT_OUT"; then
+  ok "--range: secret in a committed xlsx detected"
+else bad "--range missed a committed secret (rc=$SUT_RC)" "$SUT_OUT"; fi
 
-# 12. A filename containing sed metacharacters must not corrupt the report. The
-#     probe->real-path rewrite interpolates BOTH sides into an s/// expression, and
-#     a staged filename is attacker-influenced in any repo taking contributions.
-#     NOTE ON THE ASSERTIONS: "nonzero exit" and "the name appears" are BOTH true of
-#     the broken version too -- it dies mid-report with `sed: bad flag in substitute
-#     command`, after the name was already echoed. The first draft of this case passed
-#     against a deliberately unescaped build, i.e. proved nothing. What separates them
-#     is whether the scan RAN TO COMPLETION: the summary line is printed after the
-#     rewrite, so it is absent when sed blows up. Assert that, and that no sed error
-#     was emitted at all.
-new_repo c12
-build_xlsx 'we|rd&name.xlsx' "token $SECRET"
-git add 'we|rd&name.xlsx'; run_sut
-if [ "$SUT_RC" -ne 0 ] \
-   && grep -q 'SECRET in we|rd&name.xlsx' <<<"$SUT_OUT" \
-   && grep -q 'binary scan: inspected 1 file' <<<"$SUT_OUT" \
-   && ! grep -q 'sed:' <<<"$SUT_OUT"; then
-  ok "filename with sed metacharacters reported intact, scan completed"
-else bad "sed metacharacters in filename broke the report (rc=$SUT_RC)" "$SUT_OUT"; fi
-
-# 13. SVG is XML text, not an opaque raster. It must be INSPECTED, not filed under
-#     "no text scanner can read this" -- it was excluded both here and in
-#     .gitleaks.toml, leaving it with no scanning gate at all.
+# 12. --range must not report files the branch never touched. Two dots instead of
+#     three would enumerate everything that landed on the base since the fork point
+#     and blame this branch for it.
 #
-#     ASSERT DETECTION, NOT SILENCE. The first draft of this case passed whenever
-#     run_sut simply emitted nothing about the file -- which is also what happens if
-#     `.svg` returns to the .gitleaks.toml path allowlist. It tested that svg had left
-#     one exclusion list while staying blind to the other, i.e. it would have gone
-#     green on the very regression it exists to catch. The load-bearing check is that
-#     the PRIMARY scanner actually finds the token in a staged .svg.
+#     THE HISTORIES MUST DIVERGE for this to test anything. When BASE is a plain
+#     ancestor of HEAD, `BASE..HEAD` and `BASE...HEAD` produce identical diffs, so
+#     against a linear fixture this case passes whichever operator the script uses
+#     and cannot detect the regression it is named for. So: fork the feature branch
+#     FIRST, then add the secret to the base branch afterwards, and compare the
+#     feature tip against the later base tip. Now two-dot would drag in
+#     preexisting.xlsx (which the feature branch never saw) and three-dot does not.
+new_repo c12
+printf 'seed\n' > seed.txt; git add seed.txt; git commit -qm "fork point" >/dev/null 2>&1
+git checkout -q -b feature
+printf 'text\n' > notes.md; git add notes.md; git commit -qm "innocent change" >/dev/null 2>&1
+git checkout -q -
+build_xlsx preexisting.xlsx "API key: $SECRET"
+git add preexisting.xlsx; git commit -qm "secret lands on base AFTER the fork" >/dev/null 2>&1
+RANGE_BASE=$(git rev-parse HEAD)
+git checkout -q feature
+run_sut_args --range "$RANGE_BASE" HEAD
+# The range must also be NAMED in the output. Asserting only "clean and did not
+# mention the file" is satisfied by a scanner that enumerated nothing at all --
+# which is precisely how the pre-parameterisation script behaved, so that form of
+# the check passed against the very defect it was added for. Requiring the source
+# in the message makes the case fail unless a range was genuinely walked.
+if [ "$SUT_RC" -eq 0 ] \
+   && ! grep -q "preexisting.xlsx" <<<"$SUT_OUT" \
+   && grep -q "$RANGE_BASE...HEAD" <<<"$SUT_OUT"; then
+  ok "--range: pre-existing secrets outside the range are not attributed to it"
+else bad "--range reported a file the range does not contain, or never walked a range (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 13. --tree: the push/full-audit source sees the whole tree, including files no
+#     recent commit touched.
 new_repo c13
-printf '<svg xmlns="http://www.w3.org/2000/svg"><desc>token %s</desc></svg>\n' "$SECRET" > diagram.svg
-git add diagram.svg
-# The PRIMARY gate cannot see this and that is not a bug we can fix locally: the
-# built-in allowlist skips .svg upstream, exactly as it does .pdf, so removing svg
-# from .gitleaks.toml was necessary and not sufficient. Assert the control that
-# actually reaches it -- the binary scanner's stdin route -- and require a POSITIVE
-# detection. Asserting "no output about the file" would go green if svg were quietly
-# returned to either exclusion list, which is the regression this guards.
-set +e
-PRIMARY_OUT=$("$SCRIPT_DIR/gitleaks-guard.sh" git --staged --redact --no-banner --verbose 2>&1)
-PRIMARY_RC=$?
-set -e
-run_sut
-if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in diagram.svg" <<<"$SUT_OUT"; then
-  ok "svg: secret in a staged .svg is detected (via the stdin route)"
-else
-  bad "svg NOT detected — it is XML text with no gate (rc=$SUT_RC)" "$SUT_OUT"
-fi
-# Record the upstream exclusion as a fact rather than an assumption: if this ever
-# starts failing, gitleaks changed its built-in allowlist and the extra route can go.
-if [ "$PRIMARY_RC" -eq 0 ]; then
-  ok "confirmed: the primary gate still cannot see .svg (upstream allowlist)"
-else
-  bad "primary gate now scans .svg — TEXT_ALLOWLISTED_EXTS may be redundant" "$PRIMARY_OUT"
-fi
+build_xlsx book.xlsx "API key: $SECRET"
+git add book.xlsx; git commit -qm "add xlsx" >/dev/null 2>&1
+printf 'text\n' > notes.md; git add notes.md; git commit -qm "unrelated" >/dev/null 2>&1
+run_sut_args --tree HEAD
+if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in book.xlsx" <<<"$SUT_OUT"; then
+  ok "--tree: audits the whole tree, not just recent changes"
+else bad "--tree missed a secret already in the tree (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 14. An UNRECOGNISED ARGUMENT MUST BE FATAL. This is the sharpest case here.
+#     The pre-parameterisation script ignored every argument it did not expect, so
+#     `--range A B` printed "no binary or document files staged" and exited 0 --
+#     meaning the obvious way to wire this into CI produced a green check that had
+#     enumerated nothing, in the reassuring words of a clean result. A gate that
+#     silently ignores the flag telling it WHAT TO SCAN has the same defect as one
+#     that scans zero bytes and calls it clean.
+new_repo c14
+build_xlsx book.xlsx "API key: $SECRET"
+git add book.xlsx
+run_sut_args --not-a-real-flag
+if [ "$SUT_RC" -eq 2 ] && grep -q "unrecognised argument" <<<"$SUT_OUT"; then
+  ok "unknown argument is fatal, never silently ignored"
+else bad "unknown argument did not fail loudly (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 15. A BAD REF must fail closed. `git diff` against a ref that does not exist
+#     errors, and an errored enumeration produces an empty list -- which reads
+#     exactly like "nothing to scan" unless the failure is checked. Same shape as
+#     the git-shim case the staged path already covers, reached the new way.
+new_repo c15
+git commit -qm "base" >/dev/null 2>&1
+run_sut_args --range 0000000000000000000000000000000000000000 HEAD
+if [ "$SUT_RC" -ne 0 ] && grep -q "could not enumerate" <<<"$SUT_OUT"; then
+  ok "--range with an unresolvable ref fails closed"
+else bad "bad ref did not fail closed (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 16. A missing --config must be refused, not silently swapped for gitleaks'
+#     built-in ruleset. That fallback still finds plenty and still exits 0 on a
+#     clean file, so a typo'd path would scan with different coverage than
+#     .gitleaks.toml documents and nothing in the output would say so.
+new_repo c16
+git commit -qm "base" >/dev/null 2>&1
+run_sut_args --tree HEAD --config "$WORK/definitely-not-here.toml"
+if [ "$SUT_RC" -ne 0 ] && grep -q "cannot read gitleaks config" <<<"$SUT_OUT"; then
+  ok "unreadable --config is refused"
+else bad "missing --config was not refused (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 17. A ONE-SHOT --config must be refused. `--config <(git show base:.gitleaks.toml)`
+#     is the obvious way to pass a config from another ref, and it fails in the worst
+#     direction: the config is read several times here, the FIFO serves the first read
+#     and returns EOF to the rest, so gitleaks parses an empty config, loads no rules
+#     and exits 0. Found by hitting it while building the live test for this change --
+#     a green "no leaks found" over a file that certainly had one.
+new_repo c17
+build_xlsx book.xlsx "API key: $SECRET"
+git add book.xlsx; git commit -qm "add xlsx" >/dev/null 2>&1
+run_sut_args --tree HEAD --config <(cat "$SCRIPT_DIR/../.gitleaks.toml")
+# Assert the CAUSE, not just a non-zero exit. The fixture in this repo CONTAINS the
+# canary, so a run that got as far as scanning would also exit non-zero -- for the
+# opposite reason. Without matching the diagnostic, this case passes whether the
+# FIFO was refused or silently accepted, which is precisely the confusion it exists
+# to detect.
+if [ "$SUT_RC" -ne 0 ] \
+   && grep -q "cannot read gitleaks config as a regular file" <<<"$SUT_OUT"; then
+  ok "a one-shot (FIFO) --config is refused, not silently read empty"
+else bad "FIFO --config was not refused by name (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 18. Empty --range operands must be refused. `--range "" HEAD` passes a bare count
+#     check, and git reads `...HEAD` as HEAD...HEAD -- an empty diff, exit 0. This
+#     is how an unset CI expression arrives: as an empty string, not as a missing
+#     argument.
+new_repo c18
+build_xlsx book.xlsx "API key: $SECRET"
+git add book.xlsx; git commit -qm "add xlsx" >/dev/null 2>&1
+run_sut_args --range "" HEAD
+if [ "$SUT_RC" -eq 2 ] && grep -q "must both be non-empty" <<<"$SUT_OUT"; then
+  ok "empty --range operand is refused, not read as HEAD...HEAD"
+else bad "empty --range operand was accepted (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 19. --tree must enumerate the WHOLE tree from any working directory. `git ls-tree`
+#     is cwd-sensitive in a way `git diff` is not: from a subdirectory it lists only
+#     that subtree, so without --full-tree this scans a subset and reports it as the
+#     whole tree. Measured: from `sub/`, `ls-tree -r HEAD` omitted the root file.
+new_repo c19
+mkdir -p sub
+build_xlsx sub/deep.xlsx "API key: $SECRET"
+git add sub/deep.xlsx; git commit -qm "secret in a subdirectory" >/dev/null 2>&1
+mkdir -p other
+if SUT_OUT="$( cd other && "$SUT" --tree HEAD 2>&1 )"; then SUT_RC=0; else SUT_RC=$?; fi
+if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in sub/deep.xlsx" <<<"$SUT_OUT"; then
+  ok "--tree scans the whole tree when run from a subdirectory"
+else bad "--tree run from a subdirectory missed the secret (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 20/21. Enumeration failure must fail closed in EVERY mode, not only --range. A git
+#     that exits non-zero writes nothing, and an empty file list is indistinguishable
+#     from "nothing to scan" unless the exit status is checked. Simulated with a git
+#     shim that fails only the enumerating subcommand, so the rest of the script
+#     still reaches the point where it would report clean.
+for mode in staged tree; do
+  new_repo "c20-$mode"
+  git commit -qm base >/dev/null 2>&1
+  mkdir -p "$WORK/gitstub-$mode"
+  case "$mode" in
+    staged) failing="diff" ;;
+    tree)   failing="ls-tree" ;;
+  esac
+  # $(command -v git) is expanded HERE, at generation time, deliberately: resolving
+  # it inside the stub would find the stub itself and recurse. The quotes around it
+  # are literal in an unquoted heredoc, and they matter -- an unquoted git path
+  # containing a space emits a stub that runs the wrong command, and the case then
+  # fails for a reason that has nothing to do with enumeration.
+  cat > "$WORK/gitstub-$mode/git" <<STUB
+#!/bin/sh
+for a in "\$@"; do
+  [ "\$a" = "$failing" ] && exit 128
+done
+exec "$(command -v git)" "\$@"
+STUB
+  chmod +x "$WORK/gitstub-$mode/git"
+  # An ARRAY, not `set --`. Rewriting \$@ here would rewrite it for the whole suite:
+  # nothing reads arguments today, so it is invisible, but a later \$1 at the top of
+  # this file would be silently destroyed by these two cases mid-run.
+  # ${a[@]+"${a[@]}"} is the bash 3.2-safe empty-array expansion -- a bare
+  # "${a[@]}" on an empty array is an unbound-variable error under `set -u` there.
+  sut_args=()
+  [ "$mode" = tree ] && sut_args=(--tree HEAD)
+  if OUT="$(PATH="$WORK/gitstub-$mode:$PATH" "$SUT" "${sut_args[@]+"${sut_args[@]}"}" 2>&1)"; then
+    RC=0
+  else RC=$?; fi
+  if [ "$RC" -ne 0 ] && grep -q "could not enumerate" <<<"$OUT"; then
+    ok "$mode: a failed enumeration fails closed"
+  else bad "$mode: failed enumeration did not fail closed (rc=$RC)" "$OUT"; fi
+done
 
 echo
 echo "  $pass passed, $fail failed"

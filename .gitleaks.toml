@@ -16,42 +16,55 @@ id = "coderabbit-api-key"
 description = "CodeRabbit API key"
 regex = '''cr-[A-Za-z0-9_\-]{20,}'''
 tags = ["key", "coderabbit"]
-keywords = ["cr-"]
 
 [[rules]]
 id = "vsphere-credential-literal"
 description = "Hardcoded vCenter/ESXi credential in PowerCLI"
-regex = '''(?i)(Connect-VIServer|Connect-CisServer)[^\n]{0,200}?-Password\s+['"][^'"]{4,}['"]'''
+# Same defect, different cause: this rule had NO capture group, so the whole
+# match was the reported secret and `--redact` masked the entire line including
+# the cmdlet -- while the password travelled inside it. secretGroup isolates the
+# credential.
+regex = '''(?i)(?:Connect-VIServer|Connect-CisServer)[^\n]{0,200}?-Password\s+['"]([^'"]{4,})['"]'''
+secretGroup = 1
 tags = ["credential", "powercli"]
-keywords = ["Connect-VIServer", "Connect-CisServer"]
 
 [[rules]]
 id = "powershell-plaintext-password"
 description = "Plaintext password variable in PowerShell"
-regex = '''(?i)\$(password|passwd|pwd|secret|apikey|api_key|token)\s*=\s*['"][^'"$][^'"]{5,}['"]'''
+# The optional scope prefix is not decoration: `$script:password = "..."` and
+# `$global:pwd = "..."` are ordinary PowerShell and were BOTH missed by the
+# unprefixed pattern, while the plain `$password = "..."` was caught -- so the
+# rule read as working. `env:` is deliberately included: assigning a literal to
+# `$env:X` is still a plaintext secret, and a mere REFERENCE to an env var is
+# already covered by the `\$env:` allowlist regex below.
+# The {5,} after the first character means a 6-character minimum, which is what
+# keeps "abc" and other obvious placeholders out.
+# secretGroup points at the VALUE. Without it the only capture group was the
+# variable NAME, so `--redact` masked "password" and printed the credential:
+#   Secret: REDACTED      Match: $REDACTED = "SuperSecretValue123"
+# Inverted redaction, in the output the pre-commit gate prints to a terminal and
+# CI writes to a log. Verified before and after.
+regex = '''(?i)\$(?:(?:script|global|local|private|env|using):)?(?:password|passwd|pwd|secret|apikey|api_key|token)\s*=\s*['"]([^'"$][^'"]{5,})['"]'''
+secretGroup = 1
 tags = ["credential", "powershell"]
-keywords = ["password", "passwd", "pwd", "secret", "apikey", "api_key", "token"]
 
 [[rules]]
 id = "internal-hostname"
 description = "Internal hostname or FQDN leaking into code"
 regex = '''(?i)\b[a-z0-9\-]+\.(ufl|shands|ufhealth)\.(edu|org)\b'''
 tags = ["pii", "internal"]
-keywords = ["ufl.edu", "shands.org", "ufhealth.org", "shands.edu", "ufhealth.edu", "ufl.org"]
 
 [[rules]]
 id = "tailscale-authkey"
 description = "Tailscale auth key"
 regex = '''tskey-(auth|api|client)-[A-Za-z0-9\-]{10,}'''
 tags = ["key", "tailscale"]
-keywords = ["tskey-"]
 
 [[rules]]
 id = "anthropic-api-key"
 description = "Anthropic API key"
 regex = '''sk-ant-[A-Za-z0-9\-_]{20,}'''
 tags = ["key", "anthropic"]
-keywords = ["sk-ant-"]
 
 # ---------------------------------------------------------------------------
 # Allowlist — reduce false positives without punching holes
@@ -152,19 +165,38 @@ description = "Known-safe paths and placeholder values"
 # pure bug fix -- recorded here so it is not rediscovered as one.
 #
 # test-gitleaks-guard.sh asserts BOTH directions: `mexico` is flagged, `probe.png` is not.
-#
-# ⚠️ svg WAS REMOVED FROM THIS LIST 2026-08-08 (flagged in review). The stated reason for
-# excluding images -- "a credential in a screenshot is invisible to a text scanner" -- is
-# true of rasters and FALSE of SVG, which is plain XML. A token in a <text>, <desc> or
-# <metadata> node is directly readable. It was excluded here AND classified as opaque in
-# scan-staged-binaries.sh, so it had no scanning gate whatsoever; both were removed
-# together. Rasters stay: for those the original justification does hold.
 paths = [
+  # 'svg' REMOVED 2026-08-09, for the same reason 'pdf' was removed above and with
+  # the same caveat: SVG is XML, so a credential in one is plainly readable, and a
+  # local exclusion duplicating gitleaks' built-in one reads as THE reason it is
+  # skipped -- sending the next person to fix the wrong file. Deleting it does not
+  # by itself make SVG scanned; the built-in allowlist still skips it. That is
+  # closed by scripts/scan-staged-binaries.sh, which routes svg through
+  # `gitleaks stdin` (TEXT_SKIPPED_EXTS), asserted by selftest-binary-scan.sh.
   '''(?i)\.(png|jpg|jpeg|gif|webp|ico)$''',
-  '''(.*?)\.lock$''',
+  # NO .lock EXCLUSION -- removed 2026-08-09 after measuring, same as dist/ before it.
+  # The rationale was "lockfile hashes are high-entropy and generate constant false
+  # positives". Measured across 8 fleet repos: removing it changes NOTHING (0->0 on
+  # six, 14->14 on astgl-store, 2->2 on studydeck). It suppressed no noise, while a
+  # `.lock` glob is wide -- it matches any path ending in .lock, not just package
+  # lockfiles, so a `credentials.lock` or `secrets.lock` would have been exempt.
+  # Reinstate per-repo if a real lockfile ever does generate noise.
+  # Vendored dependency trees. Not ours to fix, and enormous.
   '''(^|/)node_modules/''',
   '''(^|/)\.venv/''',
-  '''(^|/)dist/''',
+  # NO dist/ EXCLUSION — removed 2026-08-09, and the removal is the point.
+  #
+  # It was here on the theory that minified build output trips entropy rules on
+  # every build. That was never measured. It was, on the two fleet repos that
+  # actually COMMIT a dist/ (13 tracked files between them): scanning them
+  # produces exactly the same findings as excluding them -- 0 and 14, every one
+  # of the 14 outside dist/. So the exclusion suppressed no noise, and its only
+  # live effect was that a bundler baking a leaked env var into committed build
+  # output would be invisible to every scanner in this stack.
+  #
+  # If minified noise does appear, add the exclusion in THAT repo rather than
+  # fleet-wide: a blanket allowlist entry that hides a real class of secret to
+  # pre-empt a hypothetical class of noise is the wrong trade.
   '''(^|/)tests?/fixtures/''',
 ]
 
@@ -173,5 +205,9 @@ regexes = [
   '''(?i)xxxx+''',
   '''<[A-Z_]{3,}>''',            # <API_KEY> style placeholders in docs
   '''\$\{[A-Za-z_][A-Za-z0-9_]*\}''',  # ${ENV_VAR} references
-  '''\$env:[A-Za-z_][A-Za-z0-9_]*''',  # PowerShell env var references
+  # ANCHORED. Unanchored, this matched any secret merely CONTAINING $env:NAME
+  # anywhere in it, which is a far wider exemption than "this value is an env var
+  # reference". Measured: anchoring changes no finding across 8 fleet repos, so the
+  # narrowing costs nothing. A reference is the WHOLE value or it is not a reference.
+  '''(?i)^\$env:[A-Za-z_][A-Za-z0-9_]*$''',  # PowerShell env var references
 ]

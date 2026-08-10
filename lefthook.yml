@@ -12,33 +12,78 @@
 #   LEFTHOOK_EXCLUDE=tests git push      skip one job
 #   git commit --no-verify               nuclear option
 
-min_version: 1.5.0
+# 1.7.3 is where list-of-globs `exclude` landed. Below that the lint-yaml
+# exclusions below are silently ignored.
+min_version: 1.7.3
 colors: true
 
 # ---------------------------------------------------------------------------
 pre-commit:
-  # SEQUENTIAL ON PURPOSE — this was `parallel: true` and that was a correctness bug,
-  # not just a lock-contention annoyance.
-  #
-  # `format-python` carries `stage_fixed: true`, so ruff re-runs `git add` on the files
-  # it rewrites. Run concurrently with `secrets` / `secrets-binaries`, which read the
-  # STAGED index, the two race: a file can be scanned and then reformatted-and-restaged
-  # afterwards, so the bytes that get committed are not the bytes that were scanned.
-  # That is a hole in the data-egress boundary, reachable without anyone doing anything
-  # unusual. The visible symptom is the milder one — `.git/index.lock: File exists`.
-  #
-  # Commands run in declaration order, so formatting completes (and finishes staging)
-  # before any scanner reads the index. Cost is small: every job here is either a
-  # fast no-op on a glob miss or ~1s, and correctness of the scan outranks the
-  # "cheap and always-on" budget in the header.
-  parallel: false
+  parallel: true
   commands:
 
+    # ADVISORY as of 2026-08-09 — reports, does not rewrite, does not block.
+    #
+    # WHY the `stage_fixed: true` went away: it re-stages after the ENTIRE hook
+    # finishes, not after the command that owns it. Measured, fully serialised,
+    # formatter declared first:
+    #
+    #   STEP1 formatter, immediately after writing:  staged=ORIGINAL
+    #   STEP2 validator:                             staged=ORIGINAL
+    #   STEP3 later job:                             staged=ORIGINAL
+    #   after the hook completes:                    FORMATTED
+    #
+    # So every gate in this hook inspected the PRE-format blob while the
+    # POST-format blob was committed. That is wrong for every gate here, in
+    # different sizes: `secrets`, `secrets-binaries` and `aikido` cleared bytes
+    # that were not the ones committed, and `no-big-files` measured a blob that
+    # was not the one committed either — a reformat changes whitespace and line
+    # breaks, so a file sitting just under the limit can cross it on the way in.
+    # Unlikely at a 5 MiB threshold, but "unlikely" is not "cannot", and a gate
+    # whose correctness rests on an unstated size assumption is not a gate. A
+    # gate that inspects the wrong artifact is the defect this whole file exists
+    # to avoid.
+    #
+    # Ordering does NOT fix it, which is the counter-intuitive part and the
+    # reason this is not simply `parallel: false`. That was measured too:
+    # `parallel: false` and `priority` both still show the validator the
+    # pre-format blob, and `parallel: false` costs 3x the wall clock (3793ms vs
+    # 1216ms on a six-job sample) against this file's 1-3s budget. Nothing
+    # in-hook can move the index in time, because lefthook does not update it
+    # until the hook is over.
+    #
+    # The cost is stated rather than hidden: newly unformatted Python is now
+    # REPORTED, not fixed for you. The contract, stated so nobody has to infer
+    # it from the shell: exit 0 is clean, exit 1 is "would reformat" and is
+    # ADVISORY so it passes, anything above 1 is ruff itself failing and BLOCKS.
+    #
+    # This is `ruff format --check` — the FORMATTER, where --check is a flag.
+    # `lint-python` below runs `ruff check`, the LINTER, a different subcommand.
+    # They are separate tools with separate exit-code meanings, so do not reason
+    # from one to the other. This job also has no blanket `|| true`; that one
+    # does.
+    #
+    # To make formatting blocking again, change that `-gt 1` to `-gt 0`, so a
+    # would-reformat (exit 1) fails too. Do NOT restore
+    # `stage_fixed: true` to get auto-formatting back without re-reading the
+    # above: it returns every gate in this hook to inspecting stale content.
     format-python:
       tags: format
       glob: "*.py"
-      run: ruff format {staged_files}
-      stage_fixed: true
+      run: |
+        rc=0
+        ruff format --check -- {staged_files} || rc=$?
+        # 0 clean, 1 would-reformat. Advisory covers the SECOND one only.
+        # Anything else is ruff failing rather than a formatting difference:
+        # 2 = bad config or internal error, 127 = not installed. `|| true`
+        # swallowed all four identically, so a broken or absent formatter
+        # reported as a clean pass — the failure mode this whole file exists to
+        # avoid. Before this job went advisory it had no `|| true` at all and
+        # those DID block; that behaviour is restored here deliberately.
+        if [ "$rc" -gt 1 ]; then
+          echo "✗ ruff format exited $rc — the formatter itself failed; this is not a formatting difference"
+          exit "$rc"
+        fi
 
     # ADVISORY, by deliberate choice — reports but does not block.
     #
@@ -58,26 +103,53 @@ pre-commit:
     lint-python:
       tags: lint
       glob: "*.py"
-      run: ruff check {staged_files} || true
+      run: ruff check -- {staged_files} || true
 
     lint-shell:
       tags: lint
       glob: "*.{sh,bash}"
-      run: shellcheck {staged_files} || true
+      run: shellcheck -- {staged_files} || true
 
     lint-powershell:
       tags: lint
       glob: "*.{ps1,psm1,psd1}"
-      run: >
-        pwsh -NoProfile -Command
-        "$r = Invoke-ScriptAnalyzer -Path {staged_files} -Severity Error,Warning;
-         if ($r) { $r | Format-Table -AutoSize; exit 1 }"
+      # WHY single quotes and an env var, not a double-quoted string: in the old
+      # form the SHELL expanded $r before pwsh ever saw it, so pwsh received
+      # `= Invoke-ScriptAnalyzer -Path … ; if () { … }` and died with a
+      # ParserError. Reproduced 2026-08-08: the gate never analysed anything and
+      # hard-failed on every staged .ps1. Single quotes keep $r for PowerShell;
+      # the env var also survives filenames containing spaces (verified).
+      #
+      # The Get-Command guard and $ErrorActionPreference = Stop are defence in
+      # depth, so an unavailable analyser is a failure rather than a pass.
+      # HONEST SCOPE: the "missing module exits 0" failure this was said to fix
+      # did NOT reproduce on pwsh 7.5.4 / current PSScriptAnalyzer -- both the
+      # old and new forms exit 1 there, for a missing command and for a
+      # non-terminating error alike. Kept because failing closed by construction
+      # is right regardless, but do not cite it as an observed bug.
+      run: |
+        for f in {staged_files}; do
+          PSSA_PATH="$f" pwsh -NoProfile -Command '
+            $ErrorActionPreference = "Stop"
+            if (-not (Get-Command Invoke-ScriptAnalyzer -ErrorAction SilentlyContinue)) {
+              Write-Error "PSScriptAnalyzer not installed: Install-Module PSScriptAnalyzer -Scope CurrentUser"
+              exit 1
+            }
+            $r = Invoke-ScriptAnalyzer -Path $env:PSSA_PATH -Severity Error,Warning
+            if ($r) { $r | Format-Table -AutoSize; exit 1 }
+          ' || exit 1
+        done
 
     lint-yaml:
       tags: lint
       glob: "*.{yml,yaml}"
-      exclude: "lefthook.yml|.coderabbit.yaml"
-      run: yamllint -d relaxed {staged_files}
+      # `exclude` must be a LIST of globs. The old "a|b" regex form was removed
+      # in lefthook v2.0.0, so it silently matched nothing — yamllint was linting
+      # lefthook.yml itself and reporting line-length warnings on every commit.
+      exclude:
+        - "lefthook.yml"
+        - ".coderabbit.yaml"
+      run: yamllint -d relaxed -- {staged_files}
 
     # The single most important hook in this file. Secrets must never reach
     # GitHub *or* CodeRabbit's cloud. This is your data-egress boundary.
@@ -136,7 +208,7 @@ pre-commit:
     lint-workflows:
       tags: lint
       glob: ".github/workflows/*.{yml,yaml}"
-      run: actionlint {staged_files}
+      run: actionlint -- {staged_files}
 
     # Keep the CodeRabbit config honest.
     #
@@ -267,12 +339,38 @@ pre-push:
     tests:
       tags: tests
       run: |
-        if [ -f pyproject.toml ] && grep -q pytest pyproject.toml 2>/dev/null; then
-          pytest -q --maxfail=1
-        elif [ -d tests ]; then
-          pytest -q --maxfail=1
+        # WHY this is not "pytest whenever a tests/ dir exists": a tests/
+        # directory does not imply Python. In a shell-only repo
+        # (tests/test-*.sh) pytest collects nothing and exits 5, which
+        # lefthook reads as a failed gate -- so pre-push blocked EVERY push,
+        # with nothing in the output naming the cause. Verified 2026-08-08 in
+        # UpdateKit, content-repurposer, geekspace, macstudio-dr,
+        # openclaw-swarm, viceroy.
+        #
+        # WHY the exit code is switched on rather than short-circuited with
+        # &&: collection has THREE outcomes, not two. 0 = collected,
+        # 5 = nothing to collect, anything else = collection ERRORED
+        # (claudeclaw returns 2 on broken imports). Short-circuiting would
+        # silently skip a suite that is genuinely broken -- trading a blocked
+        # push for an invisible one, which is the worse failure and the one
+        # this repo exists to prevent. Only 5 is a legitimate skip.
+        #
+        # Shell suites (tests/test-*.sh) are deliberately still NOT run here.
+        # Making 63 repos start executing them on pre-push is a separate
+        # decision with its own blast radius.
+        if ! command -v pytest >/dev/null 2>&1; then
+          echo "  (pytest not installed — skipping)"
         else
-          echo "  (no tests configured — skipping)"
+          pytest -q --collect-only >/dev/null 2>&1
+          collect_rc=$?
+          case "$collect_rc" in
+            0) pytest -q --maxfail=1 ;;
+            5) echo "  (no Python tests collected — skipping)" ;;
+            *) echo "  pytest collection FAILED (exit $collect_rc)." >&2
+               echo "  This is NOT 'no tests' -- see the error below." >&2
+               pytest -q --collect-only
+               exit "$collect_rc" ;;
+          esac
         fi
 
     typecheck:
@@ -333,22 +431,18 @@ pre-push:
     # verifies is how the original hole survived review in the first place.
     selftest-binary-scan:
       tags: security
-      #
-      # The `[ -x ]` form used to be the whole condition, which meant that losing the
-      # execute bit turned this into a green check that ran nothing -- precisely the
-      # defect the gate exists to catch, sitting inside the gate. `secret-scan-selftest`
-      # above calls its script directly, so the two security self-tests behaved
-      # differently on the identical fault. Now a present-but-unexecutable script is
-      # reported and run via bash rather than skipped, and only genuine ABSENCE is
-      # tolerated (the template ships to repos that may not carry this script yet).
       run: |
-        if [ -x scripts/selftest-binary-scan.sh ]; then
-          scripts/selftest-binary-scan.sh
-        elif [ -f scripts/selftest-binary-scan.sh ]; then
-          echo "! scripts/selftest-binary-scan.sh is present but not executable —"
-          echo "  running it via bash. Restore the mode: chmod +x scripts/selftest-binary-scan.sh"
-          bash scripts/selftest-binary-scan.sh
+        # NOT `[ -x ]`. A guard that skips when the file is missing or lost its
+        # execute bit turns "the binary gate is unverified" into a silent pass —
+        # the same fail-open this self-test exists to detect. The neighbouring
+        # secret-scan-selftest runs its script unconditionally; match it.
+        # `bash <script>` rather than `./<script>` so a dropped execute bit is
+        # not itself a failure mode.
+        if [ ! -f scripts/selftest-binary-scan.sh ]; then
+          echo "✗ scripts/selftest-binary-scan.sh is missing — the binary gate is unverified"
+          exit 1
         fi
+        bash scripts/selftest-binary-scan.sh
 
 # ---------------------------------------------------------------------------
 # Metered CodeRabbit review — NOT wired to a git hook on purpose.
@@ -357,22 +451,4 @@ pre-push:
 review:
   commands:
     coderabbit:
-      # BASE SELECTION. `.coderabbit.yaml` sets `base_branches: [".*"]`, so the PR bot
-      # reviews into ANY base. A hardcoded `--base main` reviewed a different
-      # comparison than the bot for any PR not targeting main -- a stacked PR reads as
-      # containing its whole parent branch -- while `.coderabbit.yaml` claims local and
-      # PR review agree with each other. Shipping an entire hardening stack unreviewed
-      # is the failure that claim was supposed to prevent.
-      #
-      # Order: CR_BASE override -> the open PR's real base (via gh) -> main. The gh
-      # lookup is best-effort; it is absent or unauthenticated on plenty of machines,
-      # and this is a metered convenience command, not a gate. The base actually used
-      # is ECHOED, because reviewing the wrong comparison is invisible in the output.
-      run: |
-        base="${CR_BASE:-}"
-        if [ -z "$base" ] && command -v gh >/dev/null 2>&1; then
-          base="$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null || true)"
-        fi
-        [ -z "$base" ] && base=main
-        echo "cr review --base $base   (override: CR_BASE=<branch> lefthook run review)"
-        cr review --base "$base"
+      run: cr review --base "${CR_BASE:-main}"
