@@ -72,6 +72,15 @@ pre-commit:
       glob: "*.py"
       run: |
         rc=0
+        # {staged_files} IS SHELL-QUOTED by lefthook — measured, not assumed. #8
+        # carried this and three sibling jobs as "take {staged_files} unquoted",
+        # which would make any filename with a space split into two arguments.
+        # Differential run: two files with spaces in their names, one deliberately
+        # invalid, staged together. yamllint received the whole path and reported
+        # `bad name.yml  2:3 error syntax error`. A mangled expansion would have
+        # produced "No such file" instead, so the control distinguishes the two.
+        # The `--` below is still worth keeping: it covers a filename that BEGINS
+        # with `-`, which quoting does not address.
         ruff format --check -- {staged_files} || rc=$?
         # 0 clean, 1 would-reformat. Advisory covers the SECOND one only.
         # Anything else is ruff failing rather than a formatting difference:
@@ -99,7 +108,13 @@ pre-commit:
     # unused, which during this kit's pilot removed a `# noqa: E402` that
     # existed because matplotlib.use("Agg") must precede the pyplot import.
     #
-    # Making these blocking again is a one-line change: drop the `|| true`.
+    # Making the jobs BELOW this line blocking again is a one-line change: drop
+    # their `|| true`. The scope matters, because this sentence sits directly
+    # under format-python, which has NO `|| true` at all since the exit-code fix —
+    # for that job the one-line change is `-gt 1` → `-gt 0`, stated correctly in
+    # its own block above. A reader scanning upward from here got the wrong
+    # instruction for the nearest job, and the two adjacent jobs now use
+    # genuinely different mechanisms.
     lint-python:
       tags: lint
       glob: "*.py"
@@ -185,7 +200,21 @@ pre-commit:
     # read but could not comes back UNKNOWN, never clean.
     secrets-binaries:
       tags: security
-      run: scripts/scan-staged-binaries.sh
+      # NOT `[ -x ]`, for the reason spelled out at selftest-binary-scan: a guard
+      # that SKIPS when the script is missing converts "binaries were never scanned"
+      # into a silent pass, which is the exact failure this job exists to close.
+      # #18 suggested adding that guard so the YAML could be propagated ahead of the
+      # scripts; the kit went the other way, and provisioning now ships both together.
+      # A bare `run:` does fail when the file is absent — but ANONYMOUSLY, as a shell
+      # "no such file" naming neither the job nor what went unscanned. Name it.
+      run: |
+        if [ ! -f scripts/scan-staged-binaries.sh ]; then
+          echo "✗ scripts/scan-staged-binaries.sh is missing — binaries in this commit are UNSCANNED"
+          echo "    This is not a clean result. Restore it from the kit:"
+          echo "    10-repo-init.sh --path . --no-remote"
+          exit 1
+        fi
+        bash scripts/scan-staged-binaries.sh
 
     # Aikido secret scanner.
     #
@@ -283,39 +312,21 @@ pre-commit:
     # `&& continue`, because a failing `&&` list would itself trip errexit.
     no-big-files:
       tags: hygiene
+      # MOVED OUT OF THIS FILE, deliberately. The logic is unchanged in what it
+      # blocks; what changes is that it can now be TESTED. This check was wrong in
+      # four distinct ways in a single day and three of those were introduced while
+      # fixing the previous one (#12) — an inline `run:` block cannot be exercised by
+      # anything, so every version was validated by reading it, which is precisely
+      # how four wrong versions shipped. scripts/selftest-no-big-files.sh covers 17
+      # shapes including the ones that produced each historical defect.
+      # Named absence, never a skip, for the reason at secrets-binaries above.
       run: |
-        set -eu
-        LIMIT=5242880
-        TAB=$(printf '\t')
-        staged=$(mktemp)
-        trap 'rm -f "$staged"' EXIT
-        git diff --cached --raw --diff-filter=ACMRT > "$staged"
-        while IFS= read -r rec; do
-          # :<srcmode> <dstmode> <srcsha> <dstsha> <status><TAB><path>
-          r=${rec#:}
-          r=${r#* }
-          dstmode=${r%% *}; r=${r#* }
-          r=${r#* }
-          dstsha=${r%% *}; r=${r#* }
-          path=${r##*"$TAB"}
-          if [ "$dstmode" = 160000 ]; then
-            continue
-          fi
-          # An all-zero destination sha has no object to size. Only status D
-          # produces one and D is already filtered out, so this is defensive:
-          # if some git version emits one, cat-file would fail and set -e would
-          # refuse the commit. Costs one string comparison, no subprocess.
-          case "$dstsha" in
-            *[!0]*) ;;
-            *) continue ;;
-          esac
-          size=$(git cat-file -s "$dstsha")
-          if [ "$size" -gt "$LIMIT" ]; then
-            printf '✗ %s is %s bytes, over the %s byte limit — use LFS or add to .gitignore\n' \
-              "$path" "$size" "$LIMIT"
-            exit 1
-          fi
-        done < "$staged"
+        if [ ! -f scripts/check-big-files.sh ]; then
+          echo "✗ scripts/check-big-files.sh is missing — large blobs are UNCHECKED"
+          echo "    Restore it from the kit:  10-repo-init.sh --path . --no-remote"
+          exit 1
+        fi
+        bash scripts/check-big-files.sh
 
 # ---------------------------------------------------------------------------
 commit-msg:
@@ -333,6 +344,22 @@ commit-msg:
 
 # ---------------------------------------------------------------------------
 pre-push:
+  # DELIBERATE BUT UNMEASURED, and recorded as such so nobody invents a
+  # justification for it later. pre-commit runs `parallel: true`; the 4x wall-clock
+  # cost that #16 measured, and the staging-race story that was used to justify
+  # serialising, both belong to that hook and are settled there. The reasoning does
+  # NOT transfer: no pre-push job writes the index either, so ordering buys nothing
+  # here for the same reason it bought nothing there.
+  #
+  # It stays `false` anyway because the cost has not been demonstrated. An attempt
+  # to measure it produced a null result that was pure artifact -- every pre-push
+  # job reported `(skip) no matching push files`, so the ~570ms recorded was
+  # lefthook's own startup and said nothing about parallelism. A real measurement
+  # needs a repo where `tests`, `typecheck` and both self-test suites actually run.
+  #
+  # If you come to change this: measure first, and confirm the jobs RAN. Do not
+  # re-derive a mechanism from this comment -- that is exactly how `parallel: false`
+  # reached 42 repos on a staging race that does not exist (#16).
   parallel: false
   commands:
 
@@ -389,7 +416,17 @@ pre-push:
     # because the installed binary is a property of this machine and CI cannot check it.
     secret-scan-selftest:
       tags: security
-      run: ./scripts/test-gitleaks-guard.sh
+      # Same reasoning as secrets-binaries and selftest-binary-scan: name the
+      # absence rather than failing as a bare "no such file", and never skip.
+      # `bash <script>` so a dropped execute bit is not itself a failure mode.
+      run: |
+        if [ ! -f scripts/test-gitleaks-guard.sh ]; then
+          echo "✗ scripts/test-gitleaks-guard.sh is missing — the secret scanner is unverified"
+          echo "    A scanner nobody checks is how the binary blind spot survived."
+          echo "    Restore it from the kit:  10-repo-init.sh --path . --no-remote"
+          exit 1
+        fi
+        bash scripts/test-gitleaks-guard.sh
 
     # Scan the commits actually being pushed.
     #
@@ -429,6 +466,21 @@ pre-push:
 
     # The binary secret gate is itself testable, so test it. A scanner nobody
     # verifies is how the original hole survived review in the first place.
+    selftest-no-big-files:
+      tags: hygiene
+      # The recurrence probe from #12. Same shape and same reason as
+      # selftest-binary-scan below: a gate that was wrong four times in one day is
+      # guarded by a suite that ships with it, so every provisioned repo inherits
+      # the regression test rather than one repo holding a copy that the next
+      # repo-init overwrites.
+      run: |
+        if [ ! -f scripts/selftest-no-big-files.sh ]; then
+          echo "✗ scripts/selftest-no-big-files.sh is missing — the size gate is unverified"
+          echo "    Restore it from the kit:  10-repo-init.sh --path . --no-remote"
+          exit 1
+        fi
+        bash scripts/selftest-no-big-files.sh
+
     selftest-binary-scan:
       tags: security
       run: |

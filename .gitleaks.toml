@@ -200,11 +200,19 @@ paths = [
   '''(^|/)tests?/fixtures/''',
 ]
 
+# ALL ANCHORED, for the reason spelled out at the $env: entry below and measured the
+# same way. Unanchored, every one of these exempted any secret merely CONTAINING the
+# placeholder token, which is a categorically different claim from "this value IS a
+# placeholder". Demonstrated against gitleaks' own default rules: of three real
+# GitHub PATs, the unanchored list suppressed TWO — one because the token happened to
+# contain `example`, one because it contained `xxxx`. A credential does not stop being
+# a credential because the word "example" appears inside it.
+# Cost measured across all 22 fleet repos: ZERO findings change. Same outcome as #28.
 regexes = [
-  '''(?i)(example|sample|placeholder|dummy|redacted|changeme|your[_-]?key[_-]?here)''',
-  '''(?i)xxxx+''',
-  '''<[A-Z_]{3,}>''',            # <API_KEY> style placeholders in docs
-  '''\$\{[A-Za-z_][A-Za-z0-9_]*\}''',  # ${ENV_VAR} references
+  '''(?i)^(example|sample|placeholder|dummy|redacted|changeme|your[_-]?key[_-]?here)$''',
+  '''(?i)^x{4,}$''',
+  '''^<[A-Z_]{3,}>$''',            # <API_KEY> style placeholders in docs
+  '''^\$\{[A-Za-z_][A-Za-z0-9_]*\}$''',  # ${ENV_VAR} references
   # ANCHORED. Unanchored, this matched any secret merely CONTAINING $env:NAME
   # anywhere in it, which is a far wider exemption than "this value is an env var
   # reference". Measured: anchoring changes no finding across 8 fleet repos, so the

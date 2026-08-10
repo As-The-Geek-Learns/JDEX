@@ -400,11 +400,23 @@ run_gitleaks_stdin() {
 
 # $1 = human label, $2 = path to an archive-shaped file
 run_gitleaks_archive() {
-  local label="$1" src="$2" probe out rc=0 bytes
+  # _pat and _rep are declared HERE rather than assigned bare further down. Without
+  # `local` they leak into the global scope and persist between files in the walk, so
+  # a later iteration that skips the rewrite branch would still hold the previous
+  # file's pattern -- and the one message that names which file holds a secret is
+  # exactly where a stale value must not survive.
+  local label="$1" src="$2" probe out rc=0 bytes _pat _rep
   # The .zip extension is the whole trick: it is absent from gitleaks' built-in
   # allowlist, so the file is no longer skipped by path.
   probe="$TMPDIR_SCAN/probe.zip"
-  cp "$src" "$probe"
+  # Name the copy failure. Under `set -e` a failed cp aborts the whole script with a
+  # bare cp diagnostic naming neither this scanner nor the contract it just broke --
+  # and an abort mid-walk means the remaining files are never examined, with no
+  # summary line to say so. UNKNOWN, reported, and the walk continues.
+  if ! cp "$src" "$probe" 2>/dev/null; then
+    unknown+=("$label (could not stage a copy for archive traversal)")
+    return
+  fi
   out="$TMPDIR_SCAN/out.log"
   gitleaks dir --no-banner --redact --config "$CONFIG" \
     --max-archive-depth "$MAX_ARCHIVE_DEPTH" "$probe" > "$out" 2>&1 || rc=$?

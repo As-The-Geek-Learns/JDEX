@@ -118,6 +118,12 @@ PY
 # Each case runs in a throwaway repo so staging state never leaks between them.
 new_repo() {
   local d="$WORK/$1"; mkdir -p "$d"; cd "$d"
+  # BEFORE `git init`, not after. This started life below the init and that was
+  # wrong: `init.templateDir` and `init.defaultBranch` are read BY init, so a
+  # developer's global config still shaped the fixture -- and a templateDir can
+  # install hooks that then fire on every fixture commit in this suite. Isolating
+  # after the fact leaves exactly the window the isolation exists to close.
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
   git init -q .
 
   # Refuse to continue unless `git init` really produced a repo HERE.
@@ -137,6 +143,11 @@ new_repo() {
     exit 1
   fi
 
+  # Identity only. The config ISOLATION is above, before `git init` -- see the
+  # comment there for why the order matters. `--local` pins who the commits are
+  # from; GIT_CONFIG_GLOBAL/SYSTEM stop everything else (core.hooksPath,
+  # commit.gpgsign, core.autocrlf, a diff/merge driver, an alias shadowing a
+  # porcelain command) from making this suite's result a property of whoever ran it.
   git config --local user.email t@t.t; git config --local user.name t
   cp "$SCRIPT_DIR/../.gitleaks.toml" .
   git add .gitleaks.toml
@@ -163,7 +174,7 @@ echo "scan-staged-binaries.sh self-test"
 new_repo c1
 build_pdf secret.pdf "API key: $SECRET"
 git add secret.pdf; run_sut
-if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in secret.pdf" <<<"$SUT_OUT"; then
+if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in secret.pdf" <<<"$SUT_OUT"; then
   ok "compressed PDF: secret detected, commit blocked"
 else bad "compressed PDF: secret NOT detected (rc=$SUT_RC)" "$SUT_OUT"; fi
 
@@ -193,7 +204,7 @@ fi
 new_repo c3
 build_xlsx book.xlsx "token $SECRET"
 git add book.xlsx; run_sut
-if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in book.xlsx" <<<"$SUT_OUT"; then
+if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in book.xlsx" <<<"$SUT_OUT"; then
   ok "xlsx: secret inside zip container detected"
 else bad "xlsx: secret NOT detected (rc=$SUT_RC)" "$SUT_OUT"; fi
 
@@ -232,9 +243,9 @@ new_repo c5b
 # silently stops testing what it was written to test.
 git config diff.renames true
 build_xlsx orig.xlsx "$SECRET"
-git add orig.xlsx; git commit -qm "add" >/dev/null 2>&1
+git add orig.xlsx; git commit -qm "add" >/dev/null
 git mv orig.xlsx renamed.xlsx; git add -A; run_sut
-if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in renamed.xlsx" <<<"$SUT_OUT"; then
+if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in renamed.xlsx" <<<"$SUT_OUT"; then
   ok "a renamed binary is still scanned (ACMRT, not ACM)"
 else bad "renamed binary escaped the scan (rc=$SUT_RC)" "$SUT_OUT"; fi
 
@@ -243,7 +254,7 @@ else bad "renamed binary escaped the scan (rc=$SUT_RC)" "$SUT_OUT"; fi
 new_repo c5c
 printf '<svg xmlns="http://www.w3.org/2000/svg"><desc>k %s</desc></svg>\n' "$SECRET" > logo.svg
 git add logo.svg; run_sut
-if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in logo.svg" <<<"$SUT_OUT"; then
+if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in logo.svg" <<<"$SUT_OUT"; then
   ok "a secret in an .svg is inspected, not reported opaque"
 else bad "svg not inspected (rc=$SUT_RC)" "$SUT_OUT"; fi
 
@@ -293,7 +304,7 @@ git add "My Quarterly Report.pdf"; run_sut
 # Assert on "SECRET in <name>", not merely on the name appearing somewhere: the
 # name also shows up in the UNKNOWN list, so the looser check passed against a
 # deliberately broken build.
-if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in My Quarterly Report.pdf" <<<"$SUT_OUT"; then
+if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in My Quarterly Report.pdf" <<<"$SUT_OUT"; then
   ok "filename with spaces handled"
 else bad "filename with spaces mishandled (rc=$SUT_RC)" "$SUT_OUT"; fi
 
@@ -305,7 +316,7 @@ build_pdf sneaky.pdf "API key: $SECRET"
 git add sneaky.pdf
 build_pdf sneaky.pdf "totally innocent now"   # worktree cleaned AFTER staging
 run_sut
-if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in sneaky.pdf" <<<"$SUT_OUT"; then
+if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in sneaky.pdf" <<<"$SUT_OUT"; then
   ok "scans the staged blob, not the worktree copy"
 else bad "scanned worktree instead of staged blob (rc=$SUT_RC)" "$SUT_OUT"; fi
 
@@ -316,7 +327,7 @@ git add notes.md; run_sut
 # The message names the SOURCE searched ("...found in the index"). That is asserted
 # rather than matched loosely: in CI the same sentence without a source reads the
 # same whether the gate examined the right revision or the wrong one.
-if [ "$SUT_RC" -eq 0 ] && grep -q "no binary or document files found in the index" <<<"$SUT_OUT"; then
+if [ "$SUT_RC" -eq 0 ] && grep -qF "no binary or document files found in the index" <<<"$SUT_OUT"; then
   ok "no binaries staged: explicit no-op, names the source"
 else bad "empty case wrong (rc=$SUT_RC)" "$SUT_OUT"; fi
 
@@ -357,12 +368,12 @@ else bad "unsupported gitleaks was not refused up front (rc=$STUB_RC)" "$STUB_OU
 
 # 11. --range: a secret introduced by the branch must be caught.
 new_repo c11
-git commit -qm "base" >/dev/null 2>&1
+git commit -qm "base" >/dev/null
 RANGE_BASE=$(git rev-parse HEAD)
 build_xlsx book.xlsx "API key: $SECRET"
-git add book.xlsx; git commit -qm "add xlsx" >/dev/null 2>&1
+git add book.xlsx; git commit -qm "add xlsx" >/dev/null
 run_sut_args --range "$RANGE_BASE" HEAD
-if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in book.xlsx" <<<"$SUT_OUT"; then
+if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in book.xlsx" <<<"$SUT_OUT"; then
   ok "--range: secret in a committed xlsx detected"
 else bad "--range missed a committed secret (rc=$SUT_RC)" "$SUT_OUT"; fi
 
@@ -378,12 +389,12 @@ else bad "--range missed a committed secret (rc=$SUT_RC)" "$SUT_OUT"; fi
 #     feature tip against the later base tip. Now two-dot would drag in
 #     preexisting.xlsx (which the feature branch never saw) and three-dot does not.
 new_repo c12
-printf 'seed\n' > seed.txt; git add seed.txt; git commit -qm "fork point" >/dev/null 2>&1
+printf 'seed\n' > seed.txt; git add seed.txt; git commit -qm "fork point" >/dev/null
 git checkout -q -b feature
-printf 'text\n' > notes.md; git add notes.md; git commit -qm "innocent change" >/dev/null 2>&1
+printf 'text\n' > notes.md; git add notes.md; git commit -qm "innocent change" >/dev/null
 git checkout -q -
 build_xlsx preexisting.xlsx "API key: $SECRET"
-git add preexisting.xlsx; git commit -qm "secret lands on base AFTER the fork" >/dev/null 2>&1
+git add preexisting.xlsx; git commit -qm "secret lands on base AFTER the fork" >/dev/null
 RANGE_BASE=$(git rev-parse HEAD)
 git checkout -q feature
 run_sut_args --range "$RANGE_BASE" HEAD
@@ -402,10 +413,10 @@ else bad "--range reported a file the range does not contain, or never walked a 
 #     recent commit touched.
 new_repo c13
 build_xlsx book.xlsx "API key: $SECRET"
-git add book.xlsx; git commit -qm "add xlsx" >/dev/null 2>&1
-printf 'text\n' > notes.md; git add notes.md; git commit -qm "unrelated" >/dev/null 2>&1
+git add book.xlsx; git commit -qm "add xlsx" >/dev/null
+printf 'text\n' > notes.md; git add notes.md; git commit -qm "unrelated" >/dev/null
 run_sut_args --tree HEAD
-if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in book.xlsx" <<<"$SUT_OUT"; then
+if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in book.xlsx" <<<"$SUT_OUT"; then
   ok "--tree: audits the whole tree, not just recent changes"
 else bad "--tree missed a secret already in the tree (rc=$SUT_RC)" "$SUT_OUT"; fi
 
@@ -429,7 +440,7 @@ else bad "unknown argument did not fail loudly (rc=$SUT_RC)" "$SUT_OUT"; fi
 #     exactly like "nothing to scan" unless the failure is checked. Same shape as
 #     the git-shim case the staged path already covers, reached the new way.
 new_repo c15
-git commit -qm "base" >/dev/null 2>&1
+git commit -qm "base" >/dev/null
 run_sut_args --range 0000000000000000000000000000000000000000 HEAD
 if [ "$SUT_RC" -ne 0 ] && grep -q "could not enumerate" <<<"$SUT_OUT"; then
   ok "--range with an unresolvable ref fails closed"
@@ -440,7 +451,7 @@ else bad "bad ref did not fail closed (rc=$SUT_RC)" "$SUT_OUT"; fi
 #     clean file, so a typo'd path would scan with different coverage than
 #     .gitleaks.toml documents and nothing in the output would say so.
 new_repo c16
-git commit -qm "base" >/dev/null 2>&1
+git commit -qm "base" >/dev/null
 run_sut_args --tree HEAD --config "$WORK/definitely-not-here.toml"
 if [ "$SUT_RC" -ne 0 ] && grep -q "cannot read gitleaks config" <<<"$SUT_OUT"; then
   ok "unreadable --config is refused"
@@ -454,7 +465,7 @@ else bad "missing --config was not refused (rc=$SUT_RC)" "$SUT_OUT"; fi
 #     a green "no leaks found" over a file that certainly had one.
 new_repo c17
 build_xlsx book.xlsx "API key: $SECRET"
-git add book.xlsx; git commit -qm "add xlsx" >/dev/null 2>&1
+git add book.xlsx; git commit -qm "add xlsx" >/dev/null
 run_sut_args --tree HEAD --config <(cat "$SCRIPT_DIR/../.gitleaks.toml")
 # Assert the CAUSE, not just a non-zero exit. The fixture in this repo CONTAINS the
 # canary, so a run that got as far as scanning would also exit non-zero -- for the
@@ -472,7 +483,7 @@ else bad "FIFO --config was not refused by name (rc=$SUT_RC)" "$SUT_OUT"; fi
 #     argument.
 new_repo c18
 build_xlsx book.xlsx "API key: $SECRET"
-git add book.xlsx; git commit -qm "add xlsx" >/dev/null 2>&1
+git add book.xlsx; git commit -qm "add xlsx" >/dev/null
 run_sut_args --range "" HEAD
 if [ "$SUT_RC" -eq 2 ] && grep -q "must both be non-empty" <<<"$SUT_OUT"; then
   ok "empty --range operand is refused, not read as HEAD...HEAD"
@@ -485,10 +496,10 @@ else bad "empty --range operand was accepted (rc=$SUT_RC)" "$SUT_OUT"; fi
 new_repo c19
 mkdir -p sub
 build_xlsx sub/deep.xlsx "API key: $SECRET"
-git add sub/deep.xlsx; git commit -qm "secret in a subdirectory" >/dev/null 2>&1
+git add sub/deep.xlsx; git commit -qm "secret in a subdirectory" >/dev/null
 mkdir -p other
 if SUT_OUT="$( cd other && "$SUT" --tree HEAD 2>&1 )"; then SUT_RC=0; else SUT_RC=$?; fi
-if [ "$SUT_RC" -ne 0 ] && grep -q "SECRET in sub/deep.xlsx" <<<"$SUT_OUT"; then
+if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in sub/deep.xlsx" <<<"$SUT_OUT"; then
   ok "--tree scans the whole tree when run from a subdirectory"
 else bad "--tree run from a subdirectory missed the secret (rc=$SUT_RC)" "$SUT_OUT"; fi
 
@@ -499,7 +510,7 @@ else bad "--tree run from a subdirectory missed the secret (rc=$SUT_RC)" "$SUT_O
 #     still reaches the point where it would report clean.
 for mode in staged tree; do
   new_repo "c20-$mode"
-  git commit -qm base >/dev/null 2>&1
+  git commit -qm base >/dev/null
   mkdir -p "$WORK/gitstub-$mode"
   case "$mode" in
     staged) failing="diff" ;;
@@ -535,4 +546,23 @@ done
 
 echo
 echo "  $pass passed, $fail failed"
+# ZERO CASES RUN IS NOT A PASS. `0 passed, 0 failed` exits 0 and reads exactly like a
+# clean suite -- and it is reachable without anyone noticing: an early `return`, a
+# fixture helper that aborts a subshell, a bad edit that drops the case block, a
+# refactor that renames run_sut. lefthook and CI both read only the exit code, so the
+# binary gate would report itself verified having asserted nothing. Same shape as the
+# zero-assertion guard in #23 and as "scanned ~0 bytes" one layer down.
+# EXACT, not a floor. This was a floor, and the floor was the weakness: a minimum of
+# 20 against 25 cases let five disappear while the suite still reported success. A
+# guard that tolerates loss cannot detect loss.
+# Bumping this when you add a case is the point: it forces the change to be noticed.
+_EXPECTED_CASES=25
+_total=$((pass + fail))
+if [ "$_total" -ne "$_EXPECTED_CASES" ]; then
+  echo "  ✗ $_total case(s) ran, expected exactly $_EXPECTED_CASES"
+  echo "      A suite that asserted less than it claims is UNKNOWN, not clean."
+  echo "      If cases were added, bump _EXPECTED_CASES deliberately; if lost, that"
+  echo "      is the regression this guard exists for."
+  exit 1
+fi
 [ "$fail" -eq 0 ] || exit 1

@@ -161,9 +161,22 @@ scan() {
     exit 1
   fi
   [ -n "$raw" ] || return 0
+  # The prefix strip is a shell parameter expansion, NOT `sed "s|^${target}/||"`.
+  # $target is a path, and interpolating a path into a sed program hands sed both a
+  # delimiter and a regex: a `|` anywhere in it ends the s command, and `.` `*` `[`
+  # change what matches. It is built from mktemp here, so it is safe today on this
+  # machine -- but TMPDIR is caller-controlled, and the failure is silent and
+  # ASYMMETRIC, which is what makes it worth removing rather than documenting. A
+  # broken strip leaves absolute paths in the flagged set; expect_flagged still
+  # matches (its glob is a substring test, and the absolute path contains the
+  # relative one) while expect_clean sees a "flag" for every file. And a sed that
+  # errors outright empties the set, which flips it the other way: every
+  # expect_clean passes and the suite reports a clean config it never examined.
+  # ${line#"$prefix"} has no regex semantics at all, so the class is gone.
+  local _prefix="$target/" _line
   printf '%s\n' "$raw" \
     | sed -E 's/.*"File":[[:space:]]*"//; s/"$//' \
-    | sed "s|^${target}/||" \
+    | while IFS= read -r _line; do printf '%s\n' "${_line#"$_prefix"}"; done \
     | sort -u
 }
 
@@ -251,13 +264,35 @@ mkdir -p "$FIX/plain" "$FIX/tests/fixtures"
 printf 'api_key = "%s"\n' "$PROBE_VALUE"          > "$FIX/plain/probe.txt"
 printf 'api_key = "%s"\n' "$PROBE_VALUE"          > "$FIX/plain/probe.md"
 printf 'api_key = "%s"\n' "$PROBE_VALUE"          > "$FIX/plain/probe.pdf"
+# PAIR, in the same shape as the $env: pair below, and for the same reason.
+# placeholder.txt is a REAL token with the word "example" stuck on the end. It used to
+# be asserted CLEAN, which encoded the belief that a credential stops being one when a
+# placeholder word appears anywhere inside it. It does not, and the unanchored
+# allowlist regexes suppressed exactly this: measured against gitleaks' own default
+# rules, two of three real GitHub PATs were silently exempted for containing
+# `example` / `xxxx`. Now flagged.
+# placeholder-exact.txt keeps the legitimate half honest: a value that IS the
+# placeholder stays suppressed, so anchoring cannot be "fixed" by deleting the
+# exemption altogether.
 printf 'api_key = "%sexample"\n' "$PROBE_VALUE"   > "$FIX/plain/placeholder.txt"
+printf 'api_key = "example"\n'                    > "$FIX/plain/placeholder-exact.txt"
 printf 'api_key = "%s"\n' "$PROBE_VALUE"          > "$FIX/tests/fixtures/probe.txt"
 # Regression pair for the image path exclusion. `mexico` ends in the letters "ico"
 # but is not an image; before the pattern was anchored to a literal dot it was
 # silently excluded from scanning. probe.png holds the other direction so a future
 # "fix" cannot pass by simply dropping the exclusion. See .gitleaks.toml.
 printf 'api_key = "%s"\n' "$PROBE_VALUE"          > "$FIX/plain/mexico"
+# THE UNLISTED-EXTENSION CONTRACT, made checkable instead of assumed.
+# scan-staged-binaries.sh routes only the extensions in its four buckets and lets
+# everything else fall through with the comment "anything else is text AND not
+# path-skipped, so the primary gate already read it". That is TRUE TODAY -- probed on
+# 8.30.1 across .sqlite/.db/.parquet/.bak/.unknownext, all flagged by the primary
+# scan -- and it is true only because gitleaks' BUILT-IN path allowlist does not list
+# them. Nothing in either file notices if a future gitleaks adds one: the primary gate
+# would start skipping it by path, the binary scanner would still not route it, and it
+# would be covered by neither. That is precisely how .svg was missed twice.
+# This fixture turns that silent double-miss into a failing assertion.
+printf 'api_key = "%s"\n' "$PROBE_VALUE"          > "$FIX/plain/store.sqlite"
 printf 'api_key = "%s"\n' "$PROBE_VALUE"          > "$FIX/plain/probe.png"
 # Uppercase counterpart. The anchored pattern carries (?i), which is a widening:
 # PHOTO.PNG was scanned before and is not now. Without this fixture, dropping
@@ -291,11 +326,14 @@ FLAGGED=$(scan "$FIX" "$WORK/report-full.json") || exit 1
 
 expect_flagged "flags a coderabbit token in .txt"                 "$FLAGGED" "plain/probe.txt"
 expect_flagged "flags a coderabbit token in .md"                  "$FLAGGED" "plain/probe.md"
-expect_clean   "suppresses a placeholder token (allowlist regex)" "$FLAGGED" "plain/placeholder.txt"
+expect_flagged "a real token merely CONTAINING 'example' is still flagged" "$FLAGGED" "plain/placeholder.txt"
+expect_clean   "a value that IS the placeholder stays suppressed"  "$FLAGGED" "plain/placeholder-exact.txt"
 
 # Both directions of the image exclusion. The first is the regression: it FAILED before
 # the pattern carried a literal dot, and it fails again the moment someone removes one.
 expect_flagged "non-image path ending in 'ico' is still scanned"  "$FLAGGED" "plain/mexico"
+expect_flagged "an extension in NO scan-staged-binaries bucket is covered by the primary gate" \
+               "$FLAGGED" "plain/store.sqlite"
 expect_flagged "a secret in a .lock file is scanned (no blanket exclusion)" "$FLAGGED" "plain/credentials.lock"
 expect_clean   "an exact \$env: reference stays suppressed"        "$FLAGGED" "plain/envref.txt"
 expect_flagged "a secret merely PREFIXED by \$env: is still flagged" "$FLAGGED" "plain/envprefix.txt"
@@ -336,6 +374,31 @@ for _ident in '$password' 'Connect-VIServer'; do
   else
     fail "could not inspect the redacted report (grep exit $_g) — this proves nothing"
   fi
+done
+
+# WHICH RULE FIRED, not merely that the identifier survived. The greps above prove a
+# string is present in the report; they cannot prove the CUSTOM rule produced it. A
+# built-in rule matching the same fixture would leave both identifiers in place and
+# every assertion above would still pass -- the same non-discriminating shape the
+# '$password' comment describes, one level up. That matters here specifically because
+# these two rules carry the secretGroup that makes --redact mask the VALUE rather than
+# the variable name: if a built-in rule is silently doing the work, the redaction
+# contract this section exists to guard is not actually being tested.
+#
+# Related, and the reason a sentinel must never be built on a sequential token:
+# gitleaks' BUILT-IN stopwords suppress alphabet runs. Measured on 8.30.1 --
+# `ghp_abcdefghij...` is NOT reported by the default ruleset while a random-looking
+# token of the same shape IS. The kit's canaries survive only because they match the
+# custom coderabbit-api-key rule; anything pointed at a default rule would go quietly
+# green. Asserting the RuleID is what turns that from luck into a checked property.
+for _rule in vsphere-credential-literal powershell-plaintext-password; do
+  _n=$(jq -r --arg r "$_rule" '[.[] | select(.RuleID == $r)] | length' \
+         "$WORK/report-redacted.json" 2>/dev/null || echo ERR)
+  case "$_n" in
+    ERR|"") fail "could not read RuleID '$_rule' from the report — this proves nothing" ;;
+    0)      fail "no finding carries RuleID '$_rule' — a different rule is doing this work" ;;
+    *)      pass "redaction fixture is matched by RuleID '$_rule' ($_n finding(s))" ;;
+  esac
 done
 expect_clean   "real image extensions stay excluded"              "$FLAGGED" "plain/probe.png"
 expect_clean   "uppercase image extensions stay excluded ((?i))"  "$FLAGGED" "plain/PHOTO.PNG"
@@ -419,12 +482,18 @@ staged_scan() {
 
 STAGE="$WORK/staged"
 mkdir -p "$STAGE"
-# `set -e` is off in this file by design, and these setup commands discard stderr
-# to keep the output readable. Together that used to mean a FAILING git command
-# produced the assertion message below -- "the staged scan produced NO findings --
-# it detected nothing" -- pointing the reader at the scanner when the cause was
-# git. This file exists because an earlier draft could not distinguish those two
-# states; its own setup must not repeat the mistake.
+# STALE CLAIM CORRECTED: `set -e` is ON in this file (line 28, `set -euo pipefail`,
+# added deliberately and verified there). It was off when this paragraph was written
+# and the sentence outlived the change -- which matters more than a wrong comment
+# usually does, because the explicit `|| { ...exit 1; }` guards below exist to
+# compensate for its ABSENCE. A reader trusting this comment would conclude they are
+# load-bearing when errexit already covers the abort; a reader trusting the code
+# might delete them. They stay, and the reason is now the honest one: errexit aborts,
+# but ANONYMOUSLY, and these setup commands discard stdout to keep the output
+# readable. A failing git command would otherwise surface as the assertion message
+# below -- "the staged scan produced NO findings" -- pointing the reader at the
+# scanner when the cause was git. This file exists because an earlier draft could not
+# distinguish those two states; its own setup must not repeat the mistake.
 git -C "$STAGE" init -q 2>/dev/null \
   || { printf '\n✗ could not init the temp repo at %s — the suite never ran\n\n' "$STAGE" >&2; exit 1; }
 
