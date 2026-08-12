@@ -93,6 +93,11 @@ fi
 # fields, which is why this reads fields rather than lines.
 checked=0
 oversize=0
+# Records deliberately not sized (gitlinks, intent-to-add). Counted so the summary
+# can say so: this file's own contract is that "nothing was reported" and "the
+# check never ran" must not look the same, and a gitlink-only commit that printed
+# a bare "checked 0" was exactly that ambiguity one size down.
+skipped=0
 
 # `read` returns non-zero on EOF whether the buffer is empty (clean end, between
 # records) or holds a partial field with no trailing NUL (a truncated stream).
@@ -142,30 +147,23 @@ while true; do
   # hook, and — the part that matters — any large file staged AFTER the gitlink is
   # never reached. Measured: small+gitlink+6MB exited 128 without ever checking the
   # 6MB file.
-  [ "$dstmode" = 160000 ] && continue
+  [ "$dstmode" = 160000 ] && { skipped=$((skipped + 1)); continue; }
 
   # An all-zero destination sha has no object to size. Only status D produces one and
   # D is filtered out above, so this is defensive: if some git version emits one,
   # cat-file would fail and errexit would refuse the commit for the wrong reason.
   case "$dstsha" in
     *[!0]*) ;;
-    *) continue ;;
+    *) skipped=$((skipped + 1)); continue ;;
   esac
 
   # Named failure branch: without it, a cat-file error aborts under errexit with
-
   # a bare git diagnostic — anonymously, the one thing this file says it will
-
   # never do. An unsizable staged blob is a refused commit, with the path named.
-
   size=$(git cat-file -s "$dstsha") || {
-
     echo "  ✗ could not size the staged blob for $path (git cat-file -s $dstsha failed)" >&2
-
     echo "      Refusing to pass a file this script could not measure." >&2
-
     exit 1
-
   }
   checked=$((checked + 1))
   if [ "$size" -gt "$LIMIT" ]; then
@@ -178,11 +176,25 @@ while true; do
   fi
 done < "$records"
 
-# Report N-checked. "nothing was reported" and "the check never ran" must not look the
-# same — this gate has produced the second while appearing to be the first.
+# Report N-checked AND N-skipped. "nothing was reported" and "the check never ran"
+# must not look the same — this gate has produced the second while appearing to be
+# the first. The skip count matters for the same reason: a gitlink-only commit
+# reads "checked 0", and without the skip note that is indistinguishable from a
+# run that enumerated nothing.
+# if-form purely for READABILITY, and the distinction matters enough to state:
+# `[ "$skipped" -gt 0 ] && _skipnote=...` would be perfectly safe under errexit
+# too. A failing test that is a non-final command of an AND-OR list is EXEMPT
+# from `set -e` — the same exemption the gitlink guard above relies on and
+# documents at length. An earlier version of this comment claimed the AND form
+# was fatal here; it is not, and a comment that invents a failure mode is how
+# the next reader gets sent to "fix" working code.
+_skipnote=""
+if [ "$skipped" -gt 0 ]; then
+  _skipnote=" ($skipped record(s) skipped: gitlink or no staged blob)"
+fi
 if [ "$oversize" -gt 0 ]; then
-  echo "  checked $checked staged blob(s); $oversize over the limit"
+  echo "  checked $checked staged blob(s)$_skipnote; $oversize over the limit"
   exit 1
 fi
-echo "  no-big-files: checked $checked staged blob(s), none over $LIMIT bytes"
+echo "  no-big-files: checked $checked staged blob(s)$_skipnote, none over $LIMIT bytes"
 exit 0

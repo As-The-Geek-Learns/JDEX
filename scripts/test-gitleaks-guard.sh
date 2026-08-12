@@ -134,12 +134,27 @@ scan() {
   # Measured gap, stated so it is not rediscovered: a NONEXISTENT target still
   # exits 0 and writes an empty report. Every target here is built by this
   # script, so it cannot fire — do not reuse this helper on caller-supplied paths.
+  # stderr KEPT, not discarded: when the guard or gitleaks aborts, its own
+  # message names the cause (a version refusal, a config parse error), and a
+  # generic "exited N" with that message thrown away sends the reader off to
+  # re-run the scan by hand to learn what this function already knew.
   "$GUARD" dir "$target" \
     --config "$CONFIG" --no-banner --log-level error --exit-code 0 \
-    --report-format json --report-path "$report" "$@" >/dev/null 2>&1 || rc=$?
+    --report-format json --report-path "$report" "$@" \
+    >/dev/null 2>"$WORK/scan-stderr.log" || rc=$?
   if [ "$rc" -ne 0 ]; then
     printf '\n✗ gitleaks exited %s scanning %s — with --exit-code 0 that is an\n' "$rc" "$target" >&2
-    printf '  error, not findings. No assertion below can speak for .gitleaks.toml.\n\n' >&2
+    printf '  error, not findings. No assertion below can speak for .gitleaks.toml.\n' >&2
+    printf '  Its own message:\n' >&2
+    # NOT `|| true`. This sed IS the diagnostic — swallowing its failure would
+    # leave the reader with a bare exit code, which is the state this whole
+    # block was added to avoid. A failure here is itself information (the log
+    # is unreadable or absent), so say that instead of nothing.
+    if ! sed 's/^/      /' "$WORK/scan-stderr.log" >&2; then
+      printf '      (could not read %s — the scanner'"'"'s own message is lost)\n' \
+        "$WORK/scan-stderr.log" >&2
+    fi
+    printf '\n' >&2
     exit 1
   fi
   if [ ! -f "$report" ]; then
@@ -242,10 +257,19 @@ fi
 MINIMAL_PATH="/usr/bin:/bin:/usr/sbin:/sbin"
 if PATH="$MINIMAL_PATH" command -v gitleaks >/dev/null 2>&1; then
   skip "errors when gitleaks is absent" "gitleaks is installed inside $MINIMAL_PATH here"
-elif PATH="$MINIMAL_PATH" "$GUARD" >/dev/null 2>&1; then
-  fail "errors when gitleaks is absent" "guard exited 0 with no scanner available"
 else
-  pass "errors when gitleaks is absent"
+  # The REASON is asserted, not just the non-zero exit: the guard also exits
+  # non-zero for a below-floor version or an unreadable version file, so a bare
+  # status check would pass this case while a different refusal did the work.
+  _absent_rc=0
+  _absent_out=$(PATH="$MINIMAL_PATH" "$GUARD" 2>&1) || _absent_rc=$?
+  if [ "$_absent_rc" -eq 0 ]; then
+    fail "errors when gitleaks is absent" "guard exited 0 with no scanner available"
+  elif printf '%s' "$_absent_out" | grep -qF 'not on PATH'; then
+    pass "errors when gitleaks is absent (named: not on PATH)"
+  else
+    fail "errors when gitleaks is absent" "non-zero exit but the wrong refusal: $(printf '%s' "$_absent_out" | tr '\n' ' ')"
+  fi
 fi
 
 # --- 2. documented scan coverage --------------------------------------------
@@ -309,7 +333,11 @@ printf 'api_key = "%s"\n' "$PROBE_VALUE"          > "$FIX/plain/credentials.lock
 # and must stay suppressed; a value merely CONTAINING one is a secret wearing a
 # reference as a prefix, and the unanchored pattern exempted it. One fixture
 # each, because a single-direction test passes under either pattern.
+# shellcheck disable=SC2016  # the UNEXPANDED $env: literal is the fixture: these
+# lines exist to test how the allowlist treats PowerShell references, and a
+# double-quoted form would expand to nothing and test a different string.
 printf 'token = "$env:GITHUB_TOKEN"\n'            > "$FIX/plain/envref.txt"
+# shellcheck disable=SC2016  # same fixture, other direction
 printf 'token = "$env:X%s"\n' "$PROBE_VALUE"      > "$FIX/plain/envprefix.txt"
 
 # Redaction regression. Both these rules once reported the CREDENTIAL in their
@@ -317,6 +345,7 @@ printf 'token = "$env:X%s"\n' "$PROBE_VALUE"      > "$FIX/plain/envprefix.txt"
 # vsphere-credential-literal had no capture group at all, so the whole line was
 # the "secret". The assertions below check the redacted REPORT, not just that the
 # rule fires -- a rule can fire correctly and still print the password.
+# shellcheck disable=SC2016  # literal $password is the PowerShell fixture under test
 printf '$password = "%s"\n' "$REDACT_PROBE"       > "$FIX/plain/ps_secret.ps1"
 printf 'Connect-VIServer -Server vc01 -Password "%s"\n' "$REDACT_PROBE" > "$FIX/plain/vsphere.ps1"
 
@@ -365,6 +394,8 @@ fi
 # "powershell-plaintext-password" contains the bare word, so a bare-word grep
 # matches the report regardless of what redaction did -- the assertion would be
 # non-discriminating, which is the defect it was added to close.
+# shellcheck disable=SC2016  # the literal, unexpanded '$password' is the point: the
+# RuleID contains the bare word, so only the dollar-prefixed form discriminates.
 for _ident in '$password' 'Connect-VIServer'; do
   _g=0; grep -qF "$_ident" "$WORK/report-redacted.json" || _g=$?
   if [ "$_g" -eq 0 ]; then
@@ -397,14 +428,23 @@ for _rule in vsphere-credential-literal powershell-plaintext-password; do
   # file's JSON parser elsewhere; jq would be the drift the header forbids, and
   # its absence would have surfaced as "could not read the report" — a scanner
   # failure, not a missing dependency.
+  # RuleID AND File matched TOGETHER: a global RuleID count also passes when the
+  # rule fires on some OTHER fixture while its own goes unmatched — the same
+  # non-discrimination one notch up. Each rule is pinned to the fixture written
+  # for it.
+  case "$_rule" in
+    vsphere-credential-literal)      _rfile="plain/vsphere.ps1" ;;
+    powershell-plaintext-password)   _rfile="plain/ps_secret.ps1" ;;
+  esac
   _n=$(python3 -c 'import json,sys
-try: d=json.load(open(sys.argv[2]))
+try: d=json.load(open(sys.argv[3]))
 except Exception: print("ERR"); sys.exit(0)
-print(sum(1 for x in d if x.get("RuleID")==sys.argv[1]))' "$_rule" "$WORK/report-redacted.json" 2>/dev/null || echo ERR)
+print(sum(1 for x in d if x.get("RuleID")==sys.argv[1] and x.get("File","").endswith(sys.argv[2])))' \
+    "$_rule" "$_rfile" "$WORK/report-redacted.json" 2>/dev/null || echo ERR)
   case "$_n" in
     ERR|"") fail "could not read RuleID '$_rule' from the report — this proves nothing" ;;
-    0)      fail "no finding carries RuleID '$_rule' — a different rule is doing this work" ;;
-    *)      pass "redaction fixture is matched by RuleID '$_rule' ($_n finding(s))" ;;
+    0)      fail "no finding carries RuleID '$_rule' on $_rfile — a different rule (or file) is doing this work" ;;
+    *)      pass "redaction fixture $_rfile is matched by RuleID '$_rule' ($_n finding(s))" ;;
   esac
 done
 expect_clean   "real image extensions stay excluded"              "$FLAGGED" "plain/probe.png"
@@ -554,6 +594,18 @@ printf '\n%s assertions run, %s failed, %s skipped\n' "$RUN" "$FAILED" "$SKIPPED
 # catch, in the file that catches it.
 if [ "$RUN" -eq 0 ]; then
   printf '\n✗ no assertions ran — the self-test inspected nothing, which is UNKNOWN, not clean.\n\n'
+  exit 1
+fi
+# EXACT, like both sibling suites, and for their stated reason: a floor tolerates
+# loss, and a guard that tolerates loss cannot detect loss. RUN + SKIPPED because
+# the absent-gitleaks case legitimately skips on machines where gitleaks lives in
+# the system dirs — a skip is a counted decision, not a lost assertion. Bump this
+# when you add an assertion; that forced noticing is the point.
+_EXPECTED_ASSERTIONS=26
+if [ $((RUN + SKIPPED)) -ne "$_EXPECTED_ASSERTIONS" ]; then
+  printf '\n✗ %s assertions ran (+%s skipped), expected exactly %s\n' "$RUN" "$SKIPPED" "$_EXPECTED_ASSERTIONS"
+  printf '    Assertions were added or lost. If added, bump _EXPECTED_ASSERTIONS deliberately;\n'
+  printf '    if lost, that is the regression this guard exists for.\n\n'
   exit 1
 fi
 if [ "$FAILED" -ne 0 ]; then

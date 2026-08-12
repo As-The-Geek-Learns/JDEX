@@ -138,7 +138,14 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-REPO_ROOT="$(git rev-parse --show-toplevel)"
+# Named failure, not a bare git diagnostic: outside a work tree (or with a
+# corrupted .git) rev-parse aborts under `set -e` naming neither this scanner nor
+# what went unscanned — the one failure in this file that still died anonymously.
+REPO_ROOT="$(git rev-parse --show-toplevel)" || {
+  echo "  ✗ cannot resolve the repository root (git rev-parse --show-toplevel failed)" >&2
+  echo "      Not inside a git work tree? Refusing to scan an index this script cannot locate." >&2
+  exit 1
+}
 # No cd. Every path this script touches is either absolute ($TMPDIR_SCAN,
 # $CONFIG, the probe copies) or resolved by git itself: `git diff --cached`
 # prints root-relative names from any cwd, and `git cat-file blob ":<path>"`
@@ -161,9 +168,16 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 # suite cases the first time, which is itself the lesson: probe the resolver
 # from somewhere other than the happy path).
 _SELF_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
-if ! "$_SELF_DIR/gitleaks-guard.sh" >/dev/null 2>&1; then
-  echo "  ✗ gitleaks on PATH fails the version guard — refusing to scan binaries with it"
-  echo "      Run scripts/gitleaks-guard.sh for the specific reason."
+# `bash <script>`, not `./`: the execute bit is a property of the checkout, and a
+# missing one exits 126, which the message below would misreport as a version
+# rejection. lefthook.yml states this same rule for its own script invocations.
+if [ ! -r "$_SELF_DIR/gitleaks-guard.sh" ]; then
+  echo "  ✗ cannot read $_SELF_DIR/gitleaks-guard.sh — refusing to scan binaries unverified" >&2
+  exit 1
+fi
+if ! bash "$_SELF_DIR/gitleaks-guard.sh" >/dev/null 2>&1; then
+  echo "  ✗ gitleaks on PATH fails the version guard — refusing to scan binaries with it" >&2
+  echo "      Run scripts/gitleaks-guard.sh for the specific reason." >&2
   exit 1
 fi
 CONFIG="${CONFIG_OVERRIDE:-$REPO_ROOT/.gitleaks.toml}"
@@ -182,9 +196,30 @@ CONFIG="${CONFIG_OVERRIDE:-$REPO_ROOT/.gitleaks.toml}"
 # and exits 0. Measured while building the live test for this very change: a green
 # "no leaks found" over a file carrying the canary. A one-shot config is UNKNOWN
 # coverage wearing a clean result, so require a real, re-readable file.
-# stderr, like every other refusal in this script: at pre-commit the hook
+# stderr, like every other PRE-SCAN refusal in this script: at pre-commit the hook
 # multiplexes streams, and a refusal on stdout can sort below the clean chatter it
-# contradicts.
+# contradicts. (The UNKNOWN/leak verdicts at the bottom are the scan REPORT, not a
+# refusal to scan, and stay on stdout with the rest of the report.)
+# SAME ROOT AS THE CONFIG, deliberately, and NEVER gitleaks' own default.
+# gitleaks resolves --gitleaks-ignore-path to "." when the flag is absent --
+# the CANDIDATE's cwd, in both the pre-commit hook (repo root) and the CI
+# binary-scan step (the checkout being judged, per --config in secret-scan.yml's
+# own trust-boundary note). Verified live: a one-line .gitleaksignore
+# (":tailscale-authkey:1") added alongside a staged secret-bearing .svg makes
+# this script report "inspected 1 file(s), 95 bytes read" with the leak gone
+# and exit 0 -- genuinely read, silently cleared. stdin findings carry an EMPTY
+# File field, so the fingerprint is just ":<ruleID>:<line>", fully guessable by
+# whoever is trying to smuggle a specific rule past review; the primary
+# `gitleaks git --staged` gate is separately blind to this same file (built-in
+# path allowlist), so this scanner is the ONLY net for svg/PDF-text and this
+# was its only gap. secret-scan.yml's trusted-history step already pins this
+# same flag to $SCANNER_ROOT for the identical reason; this is that fix
+# extended to every gitleaks call in this file, not only the two (stdin) calls
+# a fingerprint could realistically target -- the dir/archive calls embed an
+# unpredictable mktemp path in their fingerprint today, but that safety is an
+# implementation detail of gitleaks' archive-finding format, not a documented
+# contract, and pinning here costs nothing.
+IGNORE_PATH="$(dirname "$CONFIG")"
 if [ ! -f "$CONFIG" ] || [ ! -r "$CONFIG" ]; then
   echo "  ✗ cannot read gitleaks config as a regular file: $CONFIG" >&2
   echo "      Refusing to scan with unknown coverage. If you meant to use a config" >&2
@@ -230,7 +265,15 @@ PDF_EXTS=(pdf)
 # files have no extractor in this stack yet, so they are REPORTED rather than
 # read; ppt/dot/xlt/pot/vsd were probed too and are NOT built-in-skipped, so
 # they stay with the primary scan.
+# gz/tgz/bz2/xz/7z/rar/tar are here because they were previously in NO bucket at
+# all — the svg-shaped double-miss, in compressed-archive form. They cannot ride
+# ARCHIVE_EXTS' *.zip rename trick (gitleaks would try to read a tarball as a zip
+# container), and a raw text scan of compressed bytes reads ~nothing, so until an
+# extractor exists they are REPORTED rather than silently invisible. A secret in
+# a .tgz now shows up as NOT INSPECTED instead of vanishing between the buckets.
+# TODO(james): revisit native tar/gz traversal when the pinned gitleaks grows it.
 OPAQUE_EXTS=(doc xls suo wsuo v2 vsidx
+             gz tgz bz2 xz 7z rar tar
              png jpg jpeg gif webp ico bmp tif tiff avif heic
              mp3 mp4 mov avi mkv wav aiff flac
              exe dll so dylib bin dmg pkg iso
@@ -253,7 +296,10 @@ opaque=()          # not inspectable by any text scanner
 unknown=()         # SHOULD have been inspectable but was not -- fails the gate
 leaks=0
 archive_canary=""  # "" not probed | ok | bad | nopython | buildfail | norule
-pdf_canary=""
+# Named stdin_canary, not pdf_canary: it proves `gitleaks stdin` works, and that
+# path now serves TEXT_SKIPPED_EXTS (svg) as well as extracted PDF text. The old
+# name claimed a narrower scope than the thing it gates.
+stdin_canary=""
 
 TMPDIR_SCAN="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_SCAN"' EXIT
@@ -283,7 +329,8 @@ CANARY_TOKEN="cr-""canary0123456789abcdefghij"
 canary_stdin_ok() {
   local rc=0
   printf 'token %s\n' "$CANARY_TOKEN" \
-    | gitleaks stdin --no-banner --redact --config "$CONFIG" >/dev/null 2>&1 || rc=$?
+    | gitleaks stdin --no-banner --redact --config "$CONFIG" \
+        --gitleaks-ignore-path "$IGNORE_PATH" >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 1 ]
 }
 
@@ -422,8 +469,11 @@ run_gitleaks_archive() {
   # bare cp diagnostic naming neither this scanner nor the contract it just broke --
   # and an abort mid-walk means the remaining files are never examined, with no
   # summary line to say so. UNKNOWN, reported, and the walk continues.
-  if ! cp "$src" "$probe" 2>/dev/null; then
-    unknown+=("$label (could not stage a copy for archive traversal)")
+  # cp's own reason is KEPT, not discarded: "could not stage a copy" with no cause
+  # sends the reader to the wrong place when the actual answer is ENOSPC or EPERM.
+  local _cperr
+  if ! _cperr=$(cp "$src" "$probe" 2>&1); then
+    unknown+=("$label (could not stage a copy for archive traversal: ${_cperr:-cp gave no reason})")
     return
   fi
   out="$TMPDIR_SCAN/out.log"
@@ -447,9 +497,15 @@ run_gitleaks_archive() {
   inspected_bytes=$((inspected_bytes + bytes))
   if [ "$rc" -eq 1 ]; then
     leaks=$((leaks + 1))
-    # %q for the same reason as the sed rewrite below: $label is a staged
-    # filename and may carry newlines or control characters.
-    printf '  ✗ SECRET in %q\n' "$label"
+    # Same quoting rule as run_gitleaks_stdin, so the two finding paths cannot
+    # disagree about how they print the same filename: %q only when the name
+    # carries a control character, plain %s otherwise. (The %q in the sed
+    # replacement below is a DIFFERENT constraint — there a newline would split
+    # the sed program itself, so it stays unconditional.)
+    case "$label" in
+      *[[:cntrl:]]*) printf '  ✗ SECRET in %q\n' "$label" ;;
+      *)             printf '  ✗ SECRET in %s\n' "$label" ;;
+    esac
     # Findings name the temp probe path; point them back at the real file.
     # Both sides are escaped: $label is a STAGED FILENAME, so a `|` ends the s
     # command, a `&` in the replacement re-inserts the whole match, and a `\`
@@ -474,14 +530,22 @@ STAGED_LIST="$TMPDIR_SCAN/staged.list"
 case "$MODE" in
   staged)
     enum_desc="the index"
-    git diff --cached --name-only -z --diff-filter=ACMRT > "$STAGED_LIST" ;;
+    # --no-relative on both diffs: a user or repo carrying `diff.relative=true`
+    # makes `git diff` print CWD-RELATIVE names and OMIT files outside the cwd
+    # entirely — measured: from sub/, a staged root.txt disappears from the
+    # enumeration. The surviving names then also miss `git cat-file "REF:path"`,
+    # which is root-relative by definition. The flag restores the "every path
+    # resolved by git itself, from any cwd" property this file's no-cd design
+    # depends on, config regardless.
+    git diff --cached --no-relative --name-only -z --diff-filter=ACMRT > "$STAGED_LIST" ;;
   range)
     enum_desc="$RANGE_BASE...$RANGE_HEAD"
     # Three dots: changes introduced ON the head side since the merge base, which
     # is the PR's own diff. Two dots would also enumerate everything that landed on
     # the base branch since the fork point -- files this PR never touched, reported
     # against its author.
-    git diff --name-only -z --diff-filter=ACMRT "$RANGE_BASE...$RANGE_HEAD" > "$STAGED_LIST" ;;
+    # --no-relative: same diff.relative hardening as the staged arm above.
+    git diff --no-relative --name-only -z --diff-filter=ACMRT "$RANGE_BASE...$RANGE_HEAD" > "$STAGED_LIST" ;;
   tree)
     enum_desc="every file in $TREE_REF"
     # --full-tree is load-bearing, and its absence fails silently clean. Unlike
@@ -495,6 +559,12 @@ case "$MODE" in
     # the "no cd, every path resolved by git itself" property the rest of this file
     # relies on.
     git ls-tree --full-tree -r -z --name-only "$TREE_REF" > "$STAGED_LIST" ;;
+  # Same argument as the BLOB_PREFIX case above, and the same arm it has: that
+  # $MODE is one of three literals is the parser's property, not this block's,
+  # and a fourth mode added later must fail HERE with a name — not walk an empty
+  # list and report clean.
+  *) printf '\n✗ scan-staged-binaries: no enumeration source for mode: %s\n\n' "$MODE" >&2
+     exit 2 ;;
 esac || {
   # Fail closed on an enumeration that errored. With the loop fed straight from a
   # process substitution, a git that exits non-zero produced an EMPTY stream -- so
@@ -502,8 +572,8 @@ esac || {
   # staged" and exited 0. Verified with a git shim returning 128: a clean verdict
   # over an unknown index. This applies to all three sources; a bad --range ref is
   # the new way to reach it, and it must not read as "nothing to scan".
-  echo "  ✗ could not enumerate files from $enum_desc (git exited non-zero)"
-  echo "      Refusing to report clean over a file list this script could not read."
+  echo "  ✗ could not enumerate files from $enum_desc (git exited non-zero)" >&2
+  echo "      Refusing to report clean over a file list this script could not read." >&2
   exit 1
 }
 
@@ -514,8 +584,8 @@ esac || {
 # nor what it was doing -- which is the failure mode gitleaks-guard.sh exists to
 # replace. This check runs first so the cause has a name.
 if [ ! -r "$STAGED_LIST" ]; then
-  echo "  ✗ staged-file list is unreadable ($STAGED_LIST)"
-  echo "      Refusing to report clean over an index this script could not read."
+  echo "  ✗ staged-file list is unreadable ($STAGED_LIST)" >&2
+  echo "      Refusing to report clean over an index this script could not read." >&2
   exit 1
 fi
 
@@ -575,10 +645,10 @@ while IFS= read -r -d '' path; do
       unknown+=("$path (pdftotext not installed — brew install poppler)")
       continue
     fi
-    if [ -z "$pdf_canary" ]; then
-      if canary_stdin_ok; then pdf_canary=ok; else pdf_canary=bad; fi
+    if [ -z "$stdin_canary" ]; then
+      if canary_stdin_ok; then stdin_canary=ok; else stdin_canary=bad; fi
     fi
-    if [ "$pdf_canary" = bad ]; then
+    if [ "$stdin_canary" = bad ]; then
       unknown+=("$path (gitleaks on PATH has no working \`stdin\` scan — needs 8.x)")
       continue
     fi
@@ -604,10 +674,10 @@ while IFS= read -r -d '' path; do
     fi
     run_gitleaks_stdin "$path" "$text"
   elif in_list "$ext" TEXT_SKIPPED_EXTS; then
-    if [ -z "$pdf_canary" ]; then
-      if canary_stdin_ok; then pdf_canary=ok; else pdf_canary=bad; fi
+    if [ -z "$stdin_canary" ]; then
+      if canary_stdin_ok; then stdin_canary=ok; else stdin_canary=bad; fi
     fi
-    if [ "$pdf_canary" = bad ]; then
+    if [ "$stdin_canary" = bad ]; then
       unknown+=("$path (gitleaks on PATH has no working \`stdin\` scan — needs 8.x)")
       continue
     fi
@@ -651,6 +721,19 @@ if [ "${#opaque[@]}" -gt 0 ]; then
   echo "      Judge these by hand. This is not a clean result."
 fi
 
+# The leak summary prints BEFORE the unknown exit, so a run carrying BOTH still
+# names its secret count: with the old order the unknown branch exited first and
+# the one line saying "N file(s) contain secrets" never printed — the per-file
+# SECRET lines scrolled by mid-walk, but the summary a reader scans for was gone.
+# "commit blocked" is only true at pre-commit. In CI nothing is being committed, and
+# a message naming the wrong action sends the reader looking for a local hook.
+if [ "$leaks" -gt 0 ]; then
+  case "$MODE" in
+    staged) echo "  ✗ $leaks file(s) contain secrets — commit blocked" ;;
+    *)      echo "  ✗ $leaks file(s) contain secrets — failing this check" ;;
+  esac
+fi
+
 if [ "${#unknown[@]}" -gt 0 ]; then
   echo "  ✗ UNKNOWN — these should have been inspectable but were not (${#unknown[@]}):"
   printf '      %s\n' "${unknown[@]}"
@@ -658,14 +741,6 @@ if [ "${#unknown[@]}" -gt 0 ]; then
   exit 1
 fi
 
-# "commit blocked" is only true at pre-commit. In CI nothing is being committed, and
-# a message naming the wrong action sends the reader looking for a local hook.
-[ "$leaks" -gt 0 ] && {
-  case "$MODE" in
-    staged) echo "  ✗ $leaks file(s) contain secrets — commit blocked" ;;
-    *)      echo "  ✗ $leaks file(s) contain secrets — failing this check" ;;
-  esac
-  exit 1
-}
+[ "$leaks" -gt 0 ] && exit 1
 
 exit 0

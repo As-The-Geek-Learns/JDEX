@@ -100,7 +100,12 @@ buf.write(b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1))
 for o in offs:
     buf.write(b"%010d 00000 n \n" % o)
 buf.write(b"trailer <</Size %d/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref))
-open(out, "wb").write(buf.getvalue())
+# `with`, not a bare open().write(): CPython's refcounting happens to close the
+# handle immediately, but the fixture's completeness should not rest on an
+# implementation detail of one interpreter — a truncated PDF here fails cases
+# for reasons that have nothing to do with the scanner.
+with open(out, "wb") as fh:
+    fh.write(buf.getvalue())
 PY
 }
 
@@ -158,14 +163,18 @@ new_repo() {
 # `set +e`/`set -e` around it also works, but it disarms errexit for the duration,
 # and a suite that turns off its own safety to observe a failure is one edit away
 # from leaving it off.
+# `bash "$SUT"`, matching how lefthook and CI invoke the gate — the sibling
+# suite states the rule: executing "$SUT" directly requires the execute bit,
+# which the real invocations deliberately do not depend on, so the suite would
+# be testing a property the gate does not have.
 run_sut() {
-  if SUT_OUT="$("$SUT" 2>&1)"; then SUT_RC=0; else SUT_RC=$?; fi
+  if SUT_OUT="$(bash "$SUT" 2>&1)"; then SUT_RC=0; else SUT_RC=$?; fi
 }
 # Same capture, with arguments. Kept separate so the no-argument default path --
 # the one the pre-commit hook actually invokes -- is still exercised by a call
 # that passes literally nothing.
 run_sut_args() {
-  if SUT_OUT="$("$SUT" "$@" 2>&1)"; then SUT_RC=0; else SUT_RC=$?; fi
+  if SUT_OUT="$(bash "$SUT" "$@" 2>&1)"; then SUT_RC=0; else SUT_RC=$?; fi
 }
 
 echo "scan-staged-binaries.sh self-test"
@@ -276,17 +285,41 @@ for _e in doc xls suo wsuo v2 vsidx; do
   printf 'key = %s\n' "$SECRET" > "memo.$_e"
 done
 git add memo.*; run_sut
-# One staged set, one run, one JOINED assertion per extension (the filename must
-# appear WITHIN the NOT INSPECTED record -- -A8 spans the six-line list), so no
-# extension can quietly fall back into the invisible gap this case closed, and
-# a name landing in UNKNOWN instead cannot masquerade as covered.
+# One staged set, one run, one JOINED assertion per extension: each filename must
+# appear WITHIN the NOT INSPECTED record, so no extension can quietly fall back
+# into the invisible gap this case closed, and a name landing in UNKNOWN instead
+# cannot masquerade as covered. (Policy being asserted: NOT INSPECTED = opaque,
+# reported, NON-blocking; UNKNOWN = should-have-been-readable, reported, FAILS.
+# The two buckets carry different verdicts, which is why landing in the wrong
+# one matters.)
+# The record is extracted by its OWN DELIMITERS — from the header line to the
+# "Judge these" trailer — not by `grep -A8`, which coupled the assertion to the
+# list being exactly six lines: a seventh extension or a reordered summary would
+# silently shrink what the grep could see. Extracted ONCE into a variable, so
+# the match below is a herestring rather than the `| grep -q` pipeline that can
+# die of SIGPIPE (141) under this file's own pipefail.
+_5e_block=$(sed -n '/NOT INSPECTED/,/Judge these by hand/p' <<<"$SUT_OUT")
 _5e_bad=""
 for _e in doc xls suo wsuo v2 vsidx; do
-  grep -A8 "NOT INSPECTED" <<<"$SUT_OUT" | grep -qF "memo.$_e" || _5e_bad="$_5e_bad memo.$_e"
+  grep -qF "memo.$_e" <<<"$_5e_block" || _5e_bad="$_5e_bad memo.$_e"
 done
 if [ "$SUT_RC" -eq 0 ] && [ -z "$_5e_bad" ]; then
   ok "all six built-in-skipped formats are reported NOT INSPECTED (doc xls suo wsuo v2 vsidx)"
 else bad "vanished or wrong bucket:${_5e_bad} (rc=$SUT_RC)" "$SUT_OUT"; fi
+
+# 5f. A TYPE CHANGE (status T) is still scanned. scan-staged-binaries.sh's own
+#     comment records that a symlink replaced by a real file "was enumerated as
+#     NOTHING" before ACMRT — but until this case, no fixture staged one, so two
+#     files claimed a coverage nothing exercised. Same shape as the rename case
+#     above, reached through the T path.
+new_repo c5f
+ln -s /etc/hosts book.xlsx; git add book.xlsx; git commit -qm "symlink base" >/dev/null
+rm book.xlsx
+build_xlsx book.xlsx "token $SECRET"
+git add book.xlsx; run_sut
+if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in book.xlsx" <<<"$SUT_OUT"; then
+  ok "a type change (symlink -> secret-bearing xlsx) is still scanned (T in ACMRT)"
+else bad "type-changed binary escaped the scan (rc=$SUT_RC)" "$SUT_OUT"; fi
 
 # 6. Opaque formats are reported as NOT INSPECTED but do not block.
 new_repo c6
@@ -341,9 +374,9 @@ git add doc.pdf
 mkdir -p "$WORK/stub"
 printf '#!/bin/sh\necho "unknown command" >&2\nexit 2\n' > "$WORK/stub/gitleaks"
 chmod +x "$WORK/stub/gitleaks"
-set +e
-STUB_OUT="$(PATH="$WORK/stub:$PATH" "$SUT" 2>&1)"; STUB_RC=$?
-set -e
+# The `if VAR=$(...)` capture, matching this file's own stated rule above:
+# `set +e`/`set -e` disarms errexit for the duration and a later edit leaves it off.
+if STUB_OUT="$(PATH="$WORK/stub:$PATH" bash "$SUT" 2>&1)"; then STUB_RC=0; else STUB_RC=$?; fi
 # Assert the CAUSE, not just the word UNKNOWN -- and the cause moved. The
 # version PRE-FLIGHT (guard in assertion-only mode) now rejects an unsupported
 # binary before any scan runs, which is strictly earlier and better-attributed
@@ -405,7 +438,7 @@ run_sut_args --range "$RANGE_BASE" HEAD
 # in the message makes the case fail unless a range was genuinely walked.
 if [ "$SUT_RC" -eq 0 ] \
    && ! grep -q "preexisting.xlsx" <<<"$SUT_OUT" \
-   && grep -q "$RANGE_BASE...HEAD" <<<"$SUT_OUT"; then
+   && grep -qF "$RANGE_BASE...HEAD" <<<"$SUT_OUT"; then
   ok "--range: pre-existing secrets outside the range are not attributed to it"
 else bad "--range reported a file the range does not contain, or never walked a range (rc=$SUT_RC)" "$SUT_OUT"; fi
 
@@ -498,7 +531,7 @@ mkdir -p sub
 build_xlsx sub/deep.xlsx "API key: $SECRET"
 git add sub/deep.xlsx; git commit -qm "secret in a subdirectory" >/dev/null
 mkdir -p other
-if SUT_OUT="$( cd other && "$SUT" --tree HEAD 2>&1 )"; then SUT_RC=0; else SUT_RC=$?; fi
+if SUT_OUT="$( cd other && bash "$SUT" --tree HEAD 2>&1 )"; then SUT_RC=0; else SUT_RC=$?; fi
 if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in sub/deep.xlsx" <<<"$SUT_OUT"; then
   ok "--tree scans the whole tree when run from a subdirectory"
 else bad "--tree run from a subdirectory missed the secret (rc=$SUT_RC)" "$SUT_OUT"; fi
@@ -536,7 +569,7 @@ STUB
   # "${a[@]}" on an empty array is an unbound-variable error under `set -u` there.
   sut_args=()
   [ "$mode" = tree ] && sut_args=(--tree HEAD)
-  if OUT="$(PATH="$WORK/gitstub-$mode:$PATH" "$SUT" "${sut_args[@]+"${sut_args[@]}"}" 2>&1)"; then
+  if OUT="$(PATH="$WORK/gitstub-$mode:$PATH" bash "$SUT" "${sut_args[@]+"${sut_args[@]}"}" 2>&1)"; then
     RC=0
   else RC=$?; fi
   if [ "$RC" -ne 0 ] && grep -q "could not enumerate" <<<"$OUT"; then
@@ -556,7 +589,7 @@ echo "  $pass passed, $fail failed"
 # 20 against 25 cases let five disappear while the suite still reported success. A
 # guard that tolerates loss cannot detect loss.
 # Bumping this when you add a case is the point: it forces the change to be noticed.
-_EXPECTED_CASES=25
+_EXPECTED_CASES=26   # +c5f type-change (round-3); bumping this on a new case is the guard's contract
 _total=$((pass + fail))
 if [ "$_total" -ne "$_EXPECTED_CASES" ]; then
   echo "  ✗ $_total case(s) ran, expected exactly $_EXPECTED_CASES"

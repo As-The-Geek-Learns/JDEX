@@ -69,10 +69,15 @@ reviews:
 
   # Never spend review budget on generated or vendored content.
   #
-  # Two BROAD entries were removed 2026-08-10, because an exclusion here is not
-  # only a budget decision — it also removes the file from CodeRabbit's own
-  # gitleaks scan, so a filter written to save money silently narrows secret
-  # coverage:
+  # These are REVIEW-SCOPE exclusions first. Secret-scan coverage does NOT rest
+  # on them: the authoritative scan is the repo's own gitleaks workflow
+  # (secret-scan.yml), which reads nothing from this file. Whether CodeRabbit's
+  # own secret pass also honours these filters is the bot's implementation
+  # detail — the removals below were made so that neither reading is a hole.
+  #
+  # Two BROAD entries were removed 2026-08-10 on exactly that defence-in-depth
+  # reasoning — a filter written to save money must not be able to narrow any
+  # tool's secret coverage:
   #
   #   "!**/*.svg"  — SVG is XML TEXT, not a raster. A token in a <text>, <desc> or
   #                  <metadata> node is directly readable, which is exactly why
@@ -135,11 +140,22 @@ reviews:
         ref. Require explicit least-privilege `permissions:` blocks. Flag missing
         `timeout-minutes` — a hung job burns Actions minutes during an outage.
         Flag secrets referenced in `run:` steps where an env block is safer.
+        Flag `github.event.*` or other expression interpolations inside `run:`
+        bodies — event values must reach the shell through `env:` and quoted
+        variables. Flag versions or checksums consumed from files or outputs
+        without shape validation before use in URLs, filenames, or commands.
 
     - path: "**/*.sh"
       instructions: >
-        Require `set -euo pipefail`. Flag unquoted variable expansions. Flag
-        commands whose failure is silently ignored.
+        Require `set -euo pipefail` in bash scripts (for portable POSIX `sh`,
+        `set -eu` — `pipefail` is not a POSIX option and dash rejects it).
+        Flag unquoted variable expansions. Flag commands whose failure is
+        silently ignored.
+
+    - path: "**/*.bash"
+      instructions: >
+        Same as `**/*.sh`: require `set -euo pipefail`, flag unquoted variable
+        expansions, flag commands whose failure is silently ignored.
 
     - path: "**/*.html"
       instructions: >

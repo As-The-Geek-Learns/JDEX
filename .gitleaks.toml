@@ -128,9 +128,12 @@ description = "Known-safe paths and placeholder values"
 # quietly rotting.
 #
 # STANDING LIMIT, now narrower: pdf/xlsx/docx ARE read (see above). What no text scanner
-# can read is formats with no text layer -- images, fbx, exe, and scanned/image-only PDFs.
-# Those are REPORTED as NOT INSPECTED rather than passed silently. A green check on one of
-# them still means "not inspected," never "clean." This repo family already shipped a
+# can read is formats with no text layer -- images, fbx, exe, compressed archives
+# (tar/gz/7z...), and scanned/image-only PDFs. The never-text formats are REPORTED as
+# NOT INSPECTED (non-blocking); an image-only PDF is the deliberate exception -- PDF is
+# a text-normal format, so one with no text layer is anomalous and FAILS as UNKNOWN,
+# forcing a human decision instead of a shrug. A green check on any reported file still
+# means "not inspected," never "clean." This repo family already shipped a
 # commit whose only file was a 34KB .xlsx that gitleaks passed after scanning ~0 bytes;
 # that exact case is now covered. Judge the remaining opaque formats by hand.
 #

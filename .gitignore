@@ -58,3 +58,4 @@ rules/
 .lefthook-local.yml
 .cr-cache/
 *.cr-review.md
+lefthook-local.yml

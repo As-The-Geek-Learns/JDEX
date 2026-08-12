@@ -36,6 +36,23 @@ SUT="${SUT_OVERRIDE:-$SCRIPT_DIR/check-big-files.sh}"
 # The broken implementation is the ORIGINAL defect, not an arbitrary mutation: it
 # takes its paths from the working tree rather than the index, which is exactly what
 # let "stage large, delete, blob commits" through.
+# Unknown arguments are FATAL, the same contract scan-staged-binaries.sh states
+# and for the same reason: `selftest-no-big-files.sh --self-chekc` (typo'd) ran
+# the NORMAL suite and reported success — a green that claims the control ran
+# when nothing of the kind happened. An ignored argument that changes WHAT WAS
+# TESTED is the same defect as an ignored flag that changes what was scanned.
+#
+# The ARITY is checked, not just $1. A first version tested only the first
+# argument, so `--self-check --typo` ran the control and reported it green --
+# reintroducing the very defect this guard was added for, one argument to the
+# right. The accepted forms are exactly two: no arguments, or a single
+# --self-check.
+if [ "$#" -gt 1 ] || { [ "$#" -eq 1 ] && [ "${1:-}" != --self-check ]; }; then
+  echo "✗ selftest-no-big-files: unrecognised argument(s): $*" >&2
+  echo "    Usage: selftest-no-big-files.sh [--self-check]   (no other form)" >&2
+  echo "    Refusing to run — an ignored argument here means reporting on the wrong test." >&2
+  exit 2
+fi
 if [ "${1:-}" = --self-check ]; then
   _broken=$(mktemp)
   trap 'rm -f "$_broken"' EXIT
@@ -98,6 +115,7 @@ ok()  { pass=$((pass+1)); echo "  ✓ $1"; }
 # argument the test is false, the function returns 1, and errexit killed the
 # whole suite at its first one-argument bad() — a reporter that aborts the
 # report. The if-form returns 0 either way.
+# shellcheck disable=SC2001  # prefixing EVERY line needs sed; ${x//a/b} cannot. (Same directive as the sibling suite.)
 bad() { fail=$((fail+1)); echo "  ✗ $1"; if [ -n "${2:-}" ]; then echo "$2" | sed 's/^/        /'; fi; }
 
 # For fixture SETUP failures, as distinct from assertion failures.
@@ -195,29 +213,67 @@ new_repo c7;  big f; git add f; git commit -qm base >/dev/null
 # file is checked — so the ordering in c9 is the case that matters.
 new_repo c8
   FIXTURE_OK=1
-  ( mkdir -p "$WORK/sub" && cd "$WORK/sub" && git init -q . \
+  # The subshell's status is CHECKED, not discarded: a bare `( ... )` that fails
+  # trips errexit, the EXIT trap deletes $WORK, and the suite dies with no
+  # diagnostic — while a subshell that "succeeds" without being checked leaves
+  # the failure to surface three lines later as a submodule-add error blamed on
+  # the wrong step. Named cause, then skip: the source repo IS the fixture.
+  if ! ( mkdir -p "$WORK/sub" && cd "$WORK/sub" && git init -q . \
     && git config --local user.email t@t.t && git config --local user.name t \
-    && echo x > a && git add a && git commit -qm s >/dev/null ) 2>/dev/null
+    && echo x > a && git add a && git commit -qm s >/dev/null ) 2>/dev/null; then
+    fixture_fatal "c8: could not build the sub-repository"
+  fi
   # NO `|| true`. Suppressing this leaves c8 with no gitlink at all, so the case
   # passes without ever exercising the guard it exists for -- a fixture that proves
   # nothing while reporting a tick. A setup failure is a suite failure.
-  git -c protocol.file.allow=always submodule add -q "$WORK/sub" sub 2>/dev/null \
-    || { fixture_fatal "c8: could not stage a gitlink"; }
-  git ls-files -s sub | grep -q '^160000' \
-    || fixture_fatal "c8: no gitlink in the index"
+  # Guarded on FIXTURE_OK like every later step: a source repo that failed to
+  # build must report ONCE, not once per downstream consequence.
+  if [ "$FIXTURE_OK" = 1 ]; then
+    git -c protocol.file.allow=always submodule add -q "$WORK/sub" sub 2>/dev/null \
+      || { fixture_fatal "c8: could not stage a gitlink"; }
+  fi
+  # Guarded: an already-failed fixture must report ONCE. fixture_fatal returns 0,
+  # so an unguarded second check double-counts one failure and the case-count
+  # guard then blames added/lost cases — the wrong cause, in the file written to
+  # stop wrong causes.
+  if [ "$FIXTURE_OK" = 1 ]; then
+    git ls-files -s sub | grep -q '^160000' \
+      || fixture_fatal "c8: no gitlink in the index"
+  fi
   if [ "$FIXTURE_OK" = 1 ]; then run_sut; expect "gitlink submodule alone" PASS
   else echo "  – skipped: gitlink submodule alone (fixture failed above)"; fi
 new_repo c9
   FIXTURE_OK=1
-  ( mkdir -p "$WORK/sub2" && cd "$WORK/sub2" && git init -q . \
+  # Same checked-subshell + FIXTURE_OK guard as c8, for the same two reasons.
+  if ! ( mkdir -p "$WORK/sub2" && cd "$WORK/sub2" && git init -q . \
     && git config --local user.email t@t.t && git config --local user.name t \
-    && echo x > a && git add a && git commit -qm s >/dev/null ) 2>/dev/null
-  git -c protocol.file.allow=always submodule add -q "$WORK/sub2" sub 2>/dev/null \
-    || { fixture_fatal "c9: could not stage a gitlink"; }
-  git ls-files -s sub | grep -q '^160000' \
-    || fixture_fatal "c9: no gitlink in the index"
+    && echo x > a && git add a && git commit -qm s >/dev/null ) 2>/dev/null; then
+    fixture_fatal "c9: could not build the sub-repository"
+  fi
+  # NOTE for reviewers: `$WORK/sub2` is the SOURCE repository; the gitlink is
+  # staged at path `sub` (the second operand), which is what the ls-files check
+  # below inspects. Two review rounds have read the source dir as the path.
+  if [ "$FIXTURE_OK" = 1 ]; then
+    git -c protocol.file.allow=always submodule add -q "$WORK/sub2" sub 2>/dev/null \
+      || { fixture_fatal "c9: could not stage a gitlink"; }
+  fi
+  # Guarded for the same reason as c8 above: one fixture failure, one report.
+  if [ "$FIXTURE_OK" = 1 ]; then
+    git ls-files -s sub | grep -q '^160000' \
+      || fixture_fatal "c9: no gitlink in the index"
+  fi
   big after.bin; git add after.bin
-  if [ "$FIXTURE_OK" = 1 ]; then run_sut; expect "gitlink does not mask a large file staged after it" BLOCK
+  # The block must NAME after.bin. expect() alone accepts any exit-1, so a
+  # checker refusing for an unrelated reason (a gitlink mis-skip, say) would
+  # count as this case passing — the assertion exists to prove the file staged
+  # AFTER the gitlink was reached and measured, so pin it to the message.
+  if [ "$FIXTURE_OK" = 1 ]; then
+    run_sut
+    if [ "$RC" -eq 1 ] && grep -qF 'after.bin' <<<"$OUT"; then
+      ok "gitlink does not mask a large file staged after it (after.bin named)"
+    else
+      bad "gitlink case: expected a block NAMING after.bin (rc=$RC)" "$OUT"
+    fi
   else echo "  – skipped: gitlink does not mask a large file (fixture failed above)"; fi
 
 # INTENT-TO-ADD. `git add -N` stages a record with an all-zero destination sha and no
@@ -236,14 +292,26 @@ new_repo c14; big "$(printf 'line1\nline2.bin')"; git add "$(printf 'line1\nline
 new_repo c15; exact e.bin;  git add e.bin;                            run_sut; expect "exactly LIMIT bytes" PASS
 new_repo c16; over1 o.bin;  git add o.bin;                            run_sut; expect "LIMIT + 1 bytes" BLOCK
 
+# N-checked reporting: a run that examined nothing must not read like a clean run.
+# (c17 sits before c18 — the cases were once written down in the other order,
+# which read as a numbering mistake in every review since.)
+new_repo c17; small a.txt; git add a.txt; run_sut
+if grep -q 'checked 1 staged blob' <<<"$OUT"; then
+  ok "reports how many blobs it checked"
+else bad "no N-checked line — 'nothing found' and 'never ran' look identical" "$OUT"; fi
+
 # Truncated --raw stream must FAIL, not report clean. A stream cut mid-metadata
 # (no trailing NUL) makes the outer `read` return non-zero, which a bare
 # `while read` treats as EOF. Simulate with a git shim that emits a partial
 # record, running the REAL checker against it.
 new_repo c18
 _shim="$WORK/c18-shim"; mkdir -p "$_shim"
+# Resolve the real git at generation time; selftest-binary-scan.sh uses the same
+# pattern and records why: a hardcoded /usr/bin/git makes the fallback arm
+# unrunnable on hosts where git lives elsewhere.
+_realgit="$(command -v git)"
 { echo '#!/bin/sh'
-  echo 'case "$*" in *"diff --cached"*"--raw"*) printf ":000000 100644 000 111 A" ;; *) exec /usr/bin/git "$@" ;; esac'
+  echo "case \"\$*\" in *\"diff --cached\"*\"--raw\"*) printf ':000000 100644 000 111 A' ;; *) exec \"$_realgit\" \"\$@\" ;; esac"
 } > "$_shim/git"; chmod +x "$_shim/git"
 if OUT="$(PATH="$_shim:$PATH" bash "$SUT" 2>&1)"; then RC=0; else RC=$?; fi  # bash "$SUT": same parity as run_sut
 # -eq 1, not -ne 0: a deliberate rejection is exit 1. Accepting any non-zero
@@ -254,11 +322,24 @@ if [ "$RC" -eq 1 ] && grep -qi 'truncated' <<<"$OUT"; then
   ok "a truncated --raw stream fails closed with exit 1, not clean"
 else bad "a truncated --raw stream was not cleanly rejected (rc=$RC, want 1)" "$OUT"; fi
 
-# N-checked reporting: a run that examined nothing must not read like a clean run.
-new_repo c17; small a.txt; git add a.txt; run_sut
-if grep -q 'checked 1 staged blob' <<<"$OUT"; then
-  ok "reports how many blobs it checked"
-else bad "no N-checked line — 'nothing found' and 'never ran' look identical" "$OUT"; fi
+# THE LIMIT-VALIDATION BRANCHES, which are the largest documented fail-open
+# defect in the SUT and were until now the one thing nothing exercised: a
+# non-numeric BIG_FILE_LIMIT silently disabled the whole gate (measured in the
+# SUT's own header), and the SUT's answer is a refusal with exit 2. Assert the
+# refusal — and assert it is a REFUSAL (exit 2, named), never a pass and never
+# a would-be BLOCK, because a checker that scanned with a garbage limit could
+# produce either.
+new_repo c19; big oversized.bin; git add oversized.bin
+if OUT="$(BIG_FILE_LIMIT=invalid bash "$SUT" 2>&1)"; then RC=0; else RC=$?; fi
+if [ "$RC" -eq 2 ] && grep -q 'not a non-negative integer' <<<"$OUT"; then
+  ok "a non-numeric BIG_FILE_LIMIT is refused (exit 2), not silently fail-open"
+else bad "non-numeric limit not refused by name (rc=$RC, want 2)" "$OUT"; fi
+
+new_repo c20; big oversized.bin; git add oversized.bin
+if OUT="$(BIG_FILE_LIMIT=99999999999999999999 bash "$SUT" 2>&1)"; then RC=0; else RC=$?; fi
+if [ "$RC" -eq 2 ] && grep -q 'exceeds the shell' <<<"$OUT"; then
+  ok "an integer-overflow BIG_FILE_LIMIT is refused (exit 2), not silently fail-open"
+else bad "overflow limit not refused by name (rc=$RC, want 2)" "$OUT"; fi
 
 echo
 echo "  $pass passed, $fail failed"
@@ -268,7 +349,7 @@ _total=$((pass + fail))
 # EXACT, not a floor. `-lt 15` against 17 cases let two disappear silently, which is
 # the same weakness one size down: a guard that tolerates loss cannot detect loss.
 # Bumping this when you add a case is the point — it forces the change to be noticed.
-_EXPECTED_CASES=18   # c18: truncated --raw stream (kit#46 review)
+_EXPECTED_CASES=20   # +c18 truncated --raw stream (kit#46); +c19/c20 limit validation (round-3)
 if [ "$_total" -ne "$_EXPECTED_CASES" ]; then
   echo "  ✗ $_total case(s) ran, expected exactly $_EXPECTED_CASES"
   echo "      Cases were added or lost. If added, bump _EXPECTED_CASES deliberately;"
