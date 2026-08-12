@@ -392,8 +392,15 @@ done
 # custom coderabbit-api-key rule; anything pointed at a default rule would go quietly
 # green. Asserting the RuleID is what turns that from luck into a checked property.
 for _rule in vsphere-credential-literal powershell-plaintext-password; do
-  _n=$(jq -r --arg r "$_rule" '[.[] | select(.RuleID == $r)] | length' \
-         "$WORK/report-redacted.json" 2>/dev/null || echo ERR)
+  # python3, not jq: this file's header promises it runs identically at pre-push
+  # on a Mac with no extra tooling, and jq is not that. python3 is already this
+  # file's JSON parser elsewhere; jq would be the drift the header forbids, and
+  # its absence would have surfaced as "could not read the report" — a scanner
+  # failure, not a missing dependency.
+  _n=$(python3 -c 'import json,sys
+try: d=json.load(open(sys.argv[2]))
+except Exception: print("ERR"); sys.exit(0)
+print(sum(1 for x in d if x.get("RuleID")==sys.argv[1]))' "$_rule" "$WORK/report-redacted.json" 2>/dev/null || echo ERR)
   case "$_n" in
     ERR|"") fail "could not read RuleID '$_rule' from the report — this proves nothing" ;;
     0)      fail "no finding carries RuleID '$_rule' — a different rule is doing this work" ;;

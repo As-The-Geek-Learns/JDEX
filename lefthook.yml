@@ -182,7 +182,41 @@ pre-commit:
     # (scripts/test-gitleaks-guard.sh asserts the `git --staged` path specifically).
     secrets:
       tags: security
-      run: ./scripts/gitleaks-guard.sh git --staged --redact --no-banner --verbose
+      # Named absence, and invoked through `bash` rather than `./`.
+      #
+      # WHY not `./`: that requires the executable bit, which is a property of the
+      # checkout rather than of the repository -- a copy without `-p`, an archive
+      # export, or a filesystem that drops the mode all produce "permission denied"
+      # from the shell. That message names neither the gate nor what went unscanned.
+      # `bash <script>` needs only the read bit, which is the same thing the file's
+      # content already depends on.
+      #
+      # WHY the existence check: without it a missing file is a bare
+      # "No such file or directory" and a FAILED commit whose output does not say
+      # that the secret scan is the thing that did not run. This is the same
+      # pattern the pre-push secret-scan-selftest job already uses; it was simply
+      # never applied here. Fails closed either way -- the point is that it says
+      # which gate is missing and how to restore it.
+      run: |
+        # `set -eu`, NOT `set -euo pipefail`: lefthook runs commands through
+        # /bin/sh, and on Linux that is dash, where pipefail is not a POSIX
+        # option -- `dash -c 'set -euo pipefail'` fails with "Illegal option -o
+        # pipefail". It works on macOS only because /bin/sh there is bash in
+        # POSIX mode, so this would have broken every commit and push on a Linux
+        # machine while looking correct on the author's. Neither block contains a
+        # pipeline (verified: 0 genuine `|` after discounting `||`), so pipefail
+        # bought nothing here regardless.
+        set -eu
+        # -r as well as -f: `-f` alone accepts a regular file the hook cannot
+        # READ, and `bash <script>` then dies with a shell error that names neither
+        # the gate nor what went unscanned -- which is the exact failure this guard
+        # was added to prevent, one permission bit away.
+        if [ ! -f scripts/gitleaks-guard.sh ] || [ ! -r scripts/gitleaks-guard.sh ]; then
+          echo "✗ scripts/gitleaks-guard.sh is missing or unreadable — staged files were NOT secret-scanned" >&2
+          echo "    Restore it from the kit:  10-repo-init.sh --path . --no-remote" >&2
+          exit 1
+        fi
+        bash scripts/gitleaks-guard.sh git --staged --redact --no-banner --verbose
 
     # Second pass for what the gate above provably cannot see.
     #
@@ -306,10 +340,19 @@ pre-commit:
     # lives in LIMIT so the comparison and the message cannot drift apart.
     #
     # `set -eu` is the fail-closed backstop: an unreadable entry aborts the hook
-    # and REFUSES the commit rather than skipping the file. Two shapes here are
+    # and REFUSES the commit rather than skipping the file. One shape here is
     # deliberate — the loop is fed by REDIRECTION, not a pipe, so `exit 1` exits
-    # the hook instead of a subshell; and the gitlink test is an `if`, not
-    # `&& continue`, because a failing `&&` list would itself trip errexit.
+    # the hook instead of a subshell.
+    #
+    # CORRECTED 2026-08-10: this paragraph used to claim the gitlink test "is an
+    # `if`, not `&& continue`, because a failing `&&` list would itself trip
+    # errexit". Both halves were wrong. The code in check-big-files.sh has always
+    # been `[ "$dstmode" = 160000 ] && continue`, and that is SAFE under errexit:
+    # a command that is not the LAST in an AND-OR list is exempt, so a failing
+    # `[` there simply skips the `continue`. The claim mattered because it would
+    # send the next reader to "fix" working code — and a comment describing shell
+    # semantics that the neighbouring script contradicts is worse than no comment,
+    # since it is the kind of thing people trust rather than re-derive.
     no-big-files:
       tags: hygiene
       # MOVED OUT OF THIS FILE, deliberately. The logic is unchanged in what it
@@ -385,18 +428,113 @@ pre-push:
         # Shell suites (tests/test-*.sh) are deliberately still NOT run here.
         # Making 63 repos start executing them on pre-push is a separate
         # decision with its own blast radius.
-        if ! command -v pytest >/dev/null 2>&1; then
+        # WHICH pytest, and why PATH is the wrong question. `command -v pytest`
+        # finds whatever the shell resolves globally, which is frequently NOT the
+        # environment the project's own deps live in. Verified 2026-08-10 in
+        # substack-scheduler: the repo pinned 3.11.7 in .python-version and
+        # carried its own .venv, yet `pytest` resolved to /opt/homebrew/bin/pytest
+        # (Homebrew Python 3.14, no pytest-cov). pytest.ini's addopts demand
+        # --cov, so collection exited 4 and the catch-all arm below blocked EVERY
+        # push -- including pushes touching no Python at all. Nothing in a repo
+        # activates .venv for a git hook, so the hook has to look for it.
+        #
+        # Preference order, most explicit first: an activated virtualenv beats a
+        # discovered one, a project-local venv beats a global install, and PATH is
+        # the last resort rather than the first.
+        #
+        # This is a REAL behaviour change for repos that carry a stale .venv: they
+        # will now run the gate against it instead of a global pytest that may
+        # have been working. That is the intended direction -- a project's pinned
+        # environment is the one whose verdict means anything -- and the `using:`
+        # line below exists so the surprise is self-diagnosing rather than a
+        # mystery failure. Same rule as everywhere else in this kit: say what was
+        # examined, never just whether it passed.
+        if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/pytest" ]; then
+          PYTEST="${VIRTUAL_ENV}/bin/pytest"
+        elif [ -x .venv/bin/pytest ]; then
+          PYTEST=.venv/bin/pytest
+        elif [ -x venv/bin/pytest ]; then
+          PYTEST=venv/bin/pytest
+        elif command -v pytest >/dev/null 2>&1; then
+          PYTEST=pytest
+        else
+          PYTEST=""
+        fi
+
+        if [ -z "$PYTEST" ]; then
           echo "  (pytest not installed — skipping)"
         else
-          pytest -q --collect-only >/dev/null 2>&1
+          echo "  using: $PYTEST ($("$PYTEST" --version 2>&1 | head -1))"
+          "$PYTEST" -q --collect-only >/dev/null 2>&1
           collect_rc=$?
           case "$collect_rc" in
-            0) pytest -q --maxfail=1 ;;
+            0) "$PYTEST" -q --maxfail=1 ;;
             5) echo "  (no Python tests collected — skipping)" ;;
             *) echo "  pytest collection FAILED (exit $collect_rc)." >&2
                echo "  This is NOT 'no tests' -- see the error below." >&2
-               pytest -q --collect-only
+               "$PYTEST" -q --collect-only
                exit "$collect_rc" ;;
+          esac
+        fi
+
+    # The Node/TypeScript counterpart to `tests` above.
+    #
+    # WHY it exists: `tests` is pytest-only, so in a repo with no Python it
+    # prints a skip and exits 0 -- which reads as "this repo has no tests"
+    # rather than "this gate does not know how to run them". Measured 2026-08-10
+    # in mcp-astgl-knowledge: 7 suites, 106 node:test cases, `npm test` green,
+    # and a pre-push run that reported `(no tests configured -- skipping)`.
+    # 14 of the 39 repos carrying this file have a package.json and no
+    # pyproject.toml, so this is not an edge case -- it is a third of the fleet
+    # pushing behind a gate that has never once run their tests. Same class as
+    # every other bug this file documents: a check that examined nothing and
+    # reported green.
+    #
+    # WHY a sibling job rather than another arm inside `tests`: the two runners
+    # share no logic. pytest is found on PATH or in a venv and signals "nothing
+    # collected" with a distinct exit code; npm is found via package.json and
+    # signals it with a missing script. Folding them together puts two unrelated
+    # state machines in one `run:` block. `tags: tests` keeps the documented
+    # `LEFTHOOK_EXCLUDE=tests` escape hatch covering both, because
+    # LEFTHOOK_EXCLUDE matches tags as well as command names.
+    tests-node:
+      tags: tests
+      run: |
+        # node AND npm, not either: the parse below is node and the runner is
+        # npm. Checking only one lets a half-installed toolchain reach the parse
+        # arm and report a broken package.json that is not broken.
+        if [ ! -f package.json ]; then
+          echo "  (no package.json — skipping)"
+        elif ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+          echo "  (node/npm not installed — skipping)"
+        else
+          # THREE outcomes, the same discipline as the pytest arm above: a script
+          # that is absent, a script that is npm's own placeholder, and a
+          # package.json that cannot be parsed are each different from "the tests
+          # failed". Parsed with node rather than jq so this adds no dependency
+          # the job does not already require.
+          if ! test_script=$(node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8")).scripts?.test ?? ""' 2>/dev/null); then
+            echo "  package.json could not be parsed. This is NOT 'no tests' — see the error below." >&2
+            node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8"))' >/dev/null
+            exit 1
+          fi
+          case "$test_script" in
+            "")
+              echo "  (package.json declares no test script — skipping)" ;;
+            'echo "Error: no test specified" && exit 1')
+              # `npm init` writes exactly this script. Running it blocks every
+              # push in every scaffolded repo, which is exactly how a gate
+              # teaches you to reach for LEFTHOOK_EXCLUDE.
+              #
+              # Matched EXACTLY, not by substring: a real suite whose command
+              # merely contains the phrase (an echo in a wrapper script, a grep
+              # over fixtures) must still run. Only npm's own placeholder is a
+              # skip; anything else that mentions the phrase is a test script.
+              echo "  (package.json carries npm's placeholder test script — skipping)" ;;
+            *)
+              # Say what was examined, never just whether it passed.
+              echo "  using: npm test — $test_script"
+              npm test ;;
           esac
         fi
 
@@ -405,6 +543,70 @@ pre-push:
       run: |
         if command -v mypy >/dev/null 2>&1 && [ -f pyproject.toml ]; then
           mypy . || true   # advisory until the codebase is fully annotated
+        fi
+
+    # The Node/TypeScript counterpart to `typecheck` above.
+    #
+    # Preference order, most explicit first -- the same principle as the pytest
+    # selection in `tests`: a command the repo declares for itself beats one this
+    # template guesses at, and a project-local binary beats anything on PATH.
+    #
+    # There is deliberately NO `npx` fallback. npx DOWNLOADS a missing package,
+    # so an npx fallback turns a git hook into a silent network install -- a
+    # supply-chain surface, not a convenience. If typescript is not installed,
+    # this says so and skips rather than fetching it.
+    #
+    # WHY `--noEmit`: a git hook must not write build output. Running the repo's
+    # `build` script instead would emit into dist/ on every push, and `build`
+    # frequently does more than typecheck (bundling, copying, packing). A
+    # composite or incremental project rejects --noEmit; tsc names the offending
+    # option in its own error, and such a repo should declare a `typecheck`
+    # script, which this job prefers anyway.
+    #
+    # WHY this blocks where the mypy job above is advisory: that one is `|| true`
+    # because most Python repos here are only partly annotated, so it would fail
+    # on debt you did not create. TypeScript has no equivalent gradient -- a repo
+    # that does not compile is broken now, not eventually.
+    typecheck-node:
+      tags: types
+      run: |
+        if [ ! -f package.json ]; then
+          echo "  (no package.json — skipping)"
+        # node only, NOT npm: everything below except the npm-run branch is
+        # pure node (the parse) or a direct binary invocation
+        # (node_modules/.bin/tsc). Gating the whole job on npm skipped the
+        # local-compiler fallback in environments with node and an installed
+        # toolchain but no npm.
+        elif ! command -v node >/dev/null 2>&1; then
+          echo "  (node not installed — skipping)"
+        # Parse ONCE and keep the failure distinct from "no typecheck script".
+        # The earlier `node -e 'process.exit(...)'` form collapsed a JSON parse
+        # error into the same branch as an absent script, so a corrupt
+        # package.json fell through to a false skip or a tsc run — the same
+        # defect tests-node above already guards against.
+        elif ! tc_script=$(node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8")).scripts?.typecheck ?? ""' 2>/dev/null); then
+          echo "  package.json could not be parsed. This is NOT 'no typecheck script' — see the error below." >&2
+          node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8"))' >/dev/null
+          exit 1
+        elif [ -n "$tc_script" ]; then
+          # npm required only HERE — and its absence is a named skip, not a
+          # fall-through to local tsc: the declared script is the repo's own
+          # definition of "typecheck" and may do more than `tsc --noEmit`
+          # (project references, multiple configs). Substituting a weaker check
+          # would report a green the repo's own command might not have given.
+          if ! command -v npm >/dev/null 2>&1; then
+            echo "  (typecheck script declared but npm is not installed — skipping)"
+          else
+            echo "  using: npm run typecheck — $tc_script"
+            npm run typecheck
+          fi
+        elif [ ! -f tsconfig.json ]; then
+          echo "  (no typecheck script and no tsconfig.json — skipping)"
+        elif [ -x node_modules/.bin/tsc ]; then
+          echo "  using: node_modules/.bin/tsc --noEmit ($(node_modules/.bin/tsc --version))"
+          node_modules/.bin/tsc --noEmit
+        else
+          echo "  (tsconfig.json present but typescript is not installed locally — run npm ci; skipping)"
         fi
 
     # Prove the scanner still behaves the way .gitleaks.toml says it does.
@@ -439,7 +641,18 @@ pre-push:
     # to bypass, which costs more than it protects.
     secrets-history:
       tags: security
+      # Same named-absence + `bash` invocation as the pre-commit `secrets` job; see
+      # the reasoning there. Stated separately because the failure lands differently:
+      # this one runs at pre-push, so a bare "permission denied" here reads as a
+      # push problem rather than as "the full-history secret scan did not run".
       run: |
+        set -eu
+        # -r as well as -f; see the pre-commit `secrets` job for why.
+        if [ ! -f scripts/gitleaks-guard.sh ] || [ ! -r scripts/gitleaks-guard.sh ]; then
+          echo "✗ scripts/gitleaks-guard.sh is missing or unreadable — history was NOT secret-scanned" >&2
+          echo "    Restore it from the kit:  10-repo-init.sh --path . --no-remote" >&2
+          exit 1
+        fi
         if git rev-parse --verify --quiet '@{push}' >/dev/null 2>&1; then
           RANGE="@{push}..HEAD"
         else
@@ -452,9 +665,9 @@ pre-push:
           if [ -n "$BASE" ]; then RANGE="$BASE..HEAD"; else RANGE=""; fi
         fi
         if [ -n "$RANGE" ]; then
-          ./scripts/gitleaks-guard.sh git --no-banner --redact --log-opts="$RANGE"
+          bash scripts/gitleaks-guard.sh git --no-banner --redact --log-opts="$RANGE"
         else
-          ./scripts/gitleaks-guard.sh git --no-banner --redact
+          bash scripts/gitleaks-guard.sh git --no-banner --redact
         fi
 
     workflows:
@@ -474,12 +687,24 @@ pre-push:
       # the regression test rather than one repo holding a copy that the next
       # repo-init overwrites.
       run: |
+        # set -e so BOTH invocations below gate. A shell block's status is its
+        # last command's, so without this a failed normal suite would be masked
+        # by a passing --self-check — precisely the false green this job exists
+        # to prevent.
+        set -eu
         if [ ! -f scripts/selftest-no-big-files.sh ]; then
           echo "✗ scripts/selftest-no-big-files.sh is missing — the size gate is unverified"
           echo "    Restore it from the kit:  10-repo-init.sh --path . --no-remote"
           exit 1
         fi
         bash scripts/selftest-no-big-files.sh
+        # The control, not a rerun: --self-check runs the same cases against a
+        # DELIBERATELY broken checker and requires failures. The suite's own
+        # header calls this the point — most shapes pass on a broken hook for
+        # one reason or another, so a suite that has never been seen to fail
+        # proves nothing. Running the control only by hand is how it stops
+        # being run; here it ships with the gate it validates.
+        bash scripts/selftest-no-big-files.sh --self-check
 
     selftest-binary-scan:
       tags: security

@@ -76,7 +76,11 @@ fi
 # record list is indistinguishable from "nothing staged" unless the status is checked.
 records=$(mktemp)
 trap 'rm -f "$records"' EXIT
-if ! git diff --cached -z --raw --diff-filter=ACMRT > "$records"; then
+# --no-abbrev: --raw abbreviates SHAs by default, and an abbreviated sha handed to
+# `git cat-file -s` can be ambiguous in a large object store — failing (or worse,
+# resolving against a different object) for a reason that has nothing to do with
+# the file being sized. Full names cost nothing and remove the class.
+if ! git diff --cached -z --raw --no-abbrev --diff-filter=ACMRT > "$records"; then
   echo "✗ could not enumerate staged files (git exited non-zero)"
   echo "    Refusing to report clean over an index this check could not read."
   exit 1
@@ -90,7 +94,18 @@ fi
 checked=0
 oversize=0
 
-while IFS= read -r -d '' meta; do
+# `read` returns non-zero on EOF whether the buffer is empty (clean end, between
+# records) or holds a partial field with no trailing NUL (a truncated stream).
+# The bare `while read` could not tell them apart: both ended the loop and the
+# script reported clean. Distinguish by the buffer -- non-empty on a failed read
+# means the stream was cut mid-metadata, which is malformed input, not EOF.
+while true; do
+  IFS= read -r -d '' meta || {
+    [ -z "$meta" ] && break
+    echo "  ✗ truncated record from git diff --raw (metadata field has no NUL terminator)" >&2
+    echo "      Refusing to report clean over a stream this script could not parse." >&2
+    exit 1
+  }
   # Strip the leading ':' then walk the five space-separated fields. The two we do
   # not use are STEPPED OVER rather than assigned to named-but-unused variables —
   # each `${r#* }` below is one field, and the comment says which.
@@ -103,9 +118,22 @@ while IFS= read -r -d '' meta; do
 
   # Read the path field(s). R and C carry two; everything else carries one, and the
   # destination is the one that matters because it is what gets committed.
-  IFS= read -r -d '' path || break
+  # A record whose path field is MISSING is malformed input, not end-of-stream:
+  # `|| break` here ended the loop early and every record after the malformed one
+  # went unchecked — a truncated stream reported clean, which is the exact
+  # failure this file's header promises never to have. EOF is only legal at the
+  # top of the loop (the meta read); inside a record it is an error.
+  IFS= read -r -d '' path || {
+    echo "  ✗ malformed record from git diff --raw (status '$status', path field missing)" >&2
+    echo "      Refusing to report clean over a stream this script could not parse." >&2
+    exit 1
+  }
   case "$status" in
-    R*|C*) IFS= read -r -d '' path || break ;;
+    R*|C*) IFS= read -r -d '' path || {
+      echo "  ✗ malformed R/C record from git diff --raw (destination path missing)" >&2
+      echo "      Refusing to report clean over a stream this script could not parse." >&2
+      exit 1
+    } ;;
   esac
 
   # GITLINKS HAVE NO BLOB. A staged submodule pointer is mode 160000 and its sha
@@ -124,7 +152,21 @@ while IFS= read -r -d '' meta; do
     *) continue ;;
   esac
 
-  size=$(git cat-file -s "$dstsha")
+  # Named failure branch: without it, a cat-file error aborts under errexit with
+
+  # a bare git diagnostic — anonymously, the one thing this file says it will
+
+  # never do. An unsizable staged blob is a refused commit, with the path named.
+
+  size=$(git cat-file -s "$dstsha") || {
+
+    echo "  ✗ could not size the staged blob for $path (git cat-file -s $dstsha failed)" >&2
+
+    echo "      Refusing to pass a file this script could not measure." >&2
+
+    exit 1
+
+  }
   checked=$((checked + 1))
   if [ "$size" -gt "$LIMIT" ]; then
     # Report the real numbers. An earlier version truncated to MB and told you a blob

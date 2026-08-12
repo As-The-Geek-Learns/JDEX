@@ -244,7 +244,7 @@ new_repo c5b
 git config diff.renames true
 build_xlsx orig.xlsx "$SECRET"
 git add orig.xlsx; git commit -qm "add" >/dev/null
-git mv orig.xlsx renamed.xlsx; git add -A; run_sut
+git mv orig.xlsx renamed.xlsx; run_sut  # git mv already stages the rename
 if [ "$SUT_RC" -ne 0 ] && grep -qF "SECRET in renamed.xlsx" <<<"$SUT_OUT"; then
   ok "a renamed binary is still scanned (ACMRT, not ACM)"
 else bad "renamed binary escaped the scan (rc=$SUT_RC)" "$SUT_OUT"; fi

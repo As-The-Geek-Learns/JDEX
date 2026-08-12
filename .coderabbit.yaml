@@ -68,8 +68,26 @@ reviews:
       - ".*"
 
   # Never spend review budget on generated or vendored content.
+  #
+  # Two BROAD entries were removed 2026-08-10, because an exclusion here is not
+  # only a budget decision — it also removes the file from CodeRabbit's own
+  # gitleaks scan, so a filter written to save money silently narrows secret
+  # coverage:
+  #
+  #   "!**/*.svg"  — SVG is XML TEXT, not a raster. A token in a <text>, <desc> or
+  #                  <metadata> node is directly readable, which is exactly why
+  #                  `svg` was removed from .gitleaks.toml's allowlist and routed
+  #                  through the binary scanner's stdin path. Keeping it excluded
+  #                  here reintroduced that same blind spot in a different tool.
+  #   "!**/*.lock"  — matched far more than package lockfiles (Terraform's
+  #                  .terraform.lock.hcl is a near miss; anything a project chooses
+  #                  to call *.lock is a direct hit). The three lockfiles actually
+  #                  meant are listed explicitly below and keep their exclusion.
+  #
+  # Rule for anything added here: exclude by exact generated artefact, not by a
+  # wildcard that happens to cover it. A filter you cannot enumerate the members of
+  # is a coverage gap you cannot state.
   path_filters:
-    - "!**/*.lock"
     - "!**/*.min.js"
     - "!**/*.min.css"
     - "!**/dist/**"
@@ -80,7 +98,6 @@ reviews:
     - "!**/__pycache__/**"
     - "!**/*.ipynb_checkpoints/**"
     - "!**/vendor/**"
-    - "!**/*.svg"
     - "!**/package-lock.json"
     - "!**/uv.lock"
     - "!**/poetry.lock"

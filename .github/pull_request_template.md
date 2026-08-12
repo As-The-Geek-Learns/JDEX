@@ -15,6 +15,10 @@
 - [ ] `lefthook run pre-commit` clean
 - [ ] `lefthook run pre-push` clean
 - [ ] `cr review --base main` run and findings addressed
+      <!-- `main` is the executable default. If this PR targets a different
+           branch, substitute it: reviewing a release- or feature-branch PR
+           against main reports drift that is not this PR's diff, and misses
+           drift that is. -->
 - [ ] `act` dry-run passed (if workflows changed)
 
 ## Review focus
@@ -27,5 +31,9 @@
 <!-- ASTGL pipeline: was there a decision point, aha moment, or course
      correction worth writing up? Note it here while it's fresh. -->
 
+**Tick exactly one.** If you tick the second, write the note on the same line —
+an empty "Captured" is indistinguishable from an unticked box, which is the
+thing this section exists to avoid.
+
 - [ ] Nothing to capture
-- [ ] Captured — note:
+- [ ] Captured — note: _(what the decision, aha, or course-correction was)_

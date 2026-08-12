@@ -111,13 +111,22 @@ while [ "$#" -gt 0 ]; do
       # -n as well: an empty operand is not `--`-prefixed, so without it `--tree ""`
       # sets TREE_REF="" and BLOB_PREFIX=":" -- the same silent fall-through to the
       # index as the --range case above.
-      if [ "$#" -ge 2 ] && [ -n "$2" ] && [ "${2#--}" = "$2" ]; then
+      # Any dash-prefixed operand is an option, not a ref: `${2#--}` only caught
+      # double-dash, so `--tree -x` set TREE_REF='-x' and git parsed it as a flag.
+      if [ "$#" -ge 2 ] && [ -n "$2" ] && [ "${2#-}" = "$2" ]; then
         TREE_REF="$2"; shift 2
       else
         shift
       fi ;;
     --config)
-      [ "$#" -ge 2 ] || { echo "✗ --config needs a path" >&2; usage; exit 2; }
+      # -n as well as the count: PRESENT IS NOT NON-EMPTY, same as --range/--tree
+      # above. `--config ""` passed the count check, CONFIG_OVERRIDE became empty,
+      # and the `${CONFIG_OVERRIDE:-...}` fallback below silently used the repo's
+      # own config — which in CI is the CANDIDATE's config, the very allowlist a
+      # PR could widen. The one caller that passes --config is the trust boundary.
+      [ "$#" -ge 2 ] && [ -n "$2" ] || {
+        echo "✗ --config needs a NON-EMPTY path (an unset CI expression lands here)" >&2
+        usage; exit 2; }
       CONFIG_OVERRIDE="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *)
