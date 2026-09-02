@@ -122,14 +122,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Run Semgrep
-        uses: returntocorp/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e5d # v1
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          config: >-
-            p/security-audit
-            p/javascript
-            p/secrets
+          python-version: '3.12'
 
+      - name: Install Semgrep
+        # Installed and invoked directly rather than via returntocorp/semgrep-action, which
+        # does not resolve on the Forgejo runner. Same rulesets as before.
+        run: pip install semgrep
+
+      - name: Run Semgrep
+        run: |
+          semgrep scan --error --quiet \
+            --config p/security-audit \
+            --config p/javascript \
+            --config p/secrets
   # ===========================================================================
   # Secrets Scan
   # ===========================================================================
@@ -143,11 +151,45 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+      - name: Install pinned gitleaks
+        # Downloaded and checksum-verified rather than delegated to gitleaks/gitleaks-action.
+        # A third-party `uses:` action does not resolve on the Forgejo runner: the job died in
+        # ~5s having scanned NOTHING, which is worse than no scan because the red X reads as
+        # flaky CI rather than as absent coverage. The action also wants a GITLEAKS_LICENSE
+        # secret that does not exist on the forge. Pattern from mcp-personal-context.
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-        continue-on-error: true
-        # Gitleaks v2 requires a paid license for org repos.
-        # Review findings manually if they appear.
+          GITLEAKS_PINNED_VERSION: '8.30.1'
+          SHA256_LINUX_X64: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          SHA256_LINUX_ARM64: e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64)  arch=x64;   want="$SHA256_LINUX_X64" ;;
+            aarch64|arm64) arch=arm64; want="$SHA256_LINUX_ARM64" ;;
+            *) echo "::error::unsupported runner architecture $(uname -m)"; exit 1 ;;
+          esac
+          tarball="gitleaks_${GITLEAKS_PINNED_VERSION}_linux_${arch}.tar.gz"
+          curl -sSfL -o "$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_PINNED_VERSION}/${tarball}"
+          got=$(sha256sum "$tarball" | cut -d' ' -f1)
+          if [ "$got" != "$want" ]; then
+            echo "::error::checksum mismatch for ${tarball}"; echo "  expected $want"; echo "  got      $got"; exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/gitleaks-bin"
+          tar -xzf "$tarball" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
+          echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
+
+      - name: Confirm the pinned binary is on PATH
+        # Without this the scan could silently run a different gitleaks whose allowlist
+        # semantics differ, and "which files were actually scanned" is the value of the gate.
+        env:
+          GITLEAKS_PINNED_VERSION: '8.30.1'
+        run: |
+          got=$(gitleaks version)
+          if [ "$got" != "$GITLEAKS_PINNED_VERSION" ]; then
+            echo "::error::expected gitleaks ${GITLEAKS_PINNED_VERSION}, PATH resolved to ${got}"; exit 1
+          fi
+          echo "gitleaks ${got} (pinned, checksum-verified)"
+
+      - name: Run Gitleaks
+        run: gitleaks git --no-banner --redact --verbose
