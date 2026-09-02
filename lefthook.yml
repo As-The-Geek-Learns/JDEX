@@ -1,0 +1,831 @@
+# lefthook.yml — ASTGL standard local gate stack.
+#
+# Design rule: cheap and always-on at pre-commit, expensive at pre-push,
+# metered (CodeRabbit) never automatic.
+#
+#   pre-commit  ~1-3s   format, lint, secrets on staged files only
+#   pre-push    ~5-60s  tests, workflow lint, full-history secret scan
+#   manual      metered `cr review` — you decide when to spend it
+#
+# Escape hatches:
+#   LEFTHOOK=0 git commit ...            skip everything
+#   LEFTHOOK_EXCLUDE=tests git push      skip one job
+#   git commit --no-verify               nuclear option
+
+# The floor exists for the lint-yaml `exclude` LIST below: on the fleet's
+# installed lefthook the list form works and the old "a|b" string form silently
+# matches nothing (measured — yamllint was linting lefthook.yml itself on every
+# commit). 1.7.3 is the oldest version the fleet has verified the list form on;
+# raise it only against a MEASURED failure on some real version, not a changelog
+# guess — three review rounds have each proposed a different "correct" floor.
+min_version: 1.7.3
+colors: true
+
+# ---------------------------------------------------------------------------
+pre-commit:
+  parallel: true
+  commands:
+
+    # ADVISORY as of 2026-08-09 — reports, does not rewrite, does not block.
+    #
+    # WHY the `stage_fixed: true` went away: it re-stages after the ENTIRE hook
+    # finishes, not after the command that owns it. Measured, fully serialised,
+    # formatter declared first:
+    #
+    #   STEP1 formatter, immediately after writing:  staged=ORIGINAL
+    #   STEP2 validator:                             staged=ORIGINAL
+    #   STEP3 later job:                             staged=ORIGINAL
+    #   after the hook completes:                    FORMATTED
+    #
+    # So every gate in this hook inspected the PRE-format blob while the
+    # POST-format blob was committed. That is wrong for every gate here, in
+    # different sizes: `secrets`, `secrets-binaries` and `aikido` cleared bytes
+    # that were not the ones committed, and `no-big-files` measured a blob that
+    # was not the one committed either — a reformat changes whitespace and line
+    # breaks, so a file sitting just under the limit can cross it on the way in.
+    # Unlikely at a 5 MiB threshold, but "unlikely" is not "cannot", and a gate
+    # whose correctness rests on an unstated size assumption is not a gate. A
+    # gate that inspects the wrong artifact is the defect this whole file exists
+    # to avoid.
+    #
+    # Ordering does NOT fix it, which is the counter-intuitive part and the
+    # reason this is not simply `parallel: false`. That was measured too:
+    # `parallel: false` and `priority` both still show the validator the
+    # pre-format blob, and `parallel: false` costs 3x the wall clock (3793ms vs
+    # 1216ms on a six-job sample) against this file's 1-3s budget. Nothing
+    # in-hook can move the index in time, because lefthook does not update it
+    # until the hook is over.
+    #
+    # The cost is stated rather than hidden: newly unformatted Python is now
+    # REPORTED, not fixed for you. The contract, stated so nobody has to infer
+    # it from the shell: exit 0 is clean, exit 1 is "would reformat" and is
+    # ADVISORY so it passes, anything above 1 is ruff itself failing and BLOCKS.
+    #
+    # This is `ruff format --check` — the FORMATTER, where --check is a flag.
+    # `lint-python` below runs `ruff check`, the LINTER, a different subcommand.
+    # They are separate tools with separate exit-code meanings, so do not reason
+    # from one to the other. This job also has no blanket `|| true`; that one
+    # does.
+    #
+    # To make formatting blocking again, change that `-gt 1` to `-gt 0`, so a
+    # would-reformat (exit 1) fails too. Do NOT restore
+    # `stage_fixed: true` to get auto-formatting back without re-reading the
+    # above: it returns every gate in this hook to inspecting stale content.
+    format-python:
+      tags: format
+      glob: "*.py"
+      run: |
+        rc=0
+        # {staged_files} IS SHELL-QUOTED by lefthook — measured, not assumed. #8
+        # carried this and three sibling jobs as "take {staged_files} unquoted",
+        # which would make any filename with a space split into two arguments.
+        # Differential run: two files with spaces in their names, one deliberately
+        # invalid, staged together. yamllint received the whole path and reported
+        # `bad name.yml  2:3 error syntax error`. A mangled expansion would have
+        # produced "No such file" instead, so the control distinguishes the two.
+        # The `--` below is still worth keeping: it covers a filename that BEGINS
+        # with `-`, which quoting does not address.
+        ruff format --check -- {staged_files} || rc=$?
+        # 0 clean, 1 would-reformat. Advisory covers the SECOND one only.
+        # Anything else is ruff failing rather than a formatting difference:
+        # 2 = bad config or internal error, 127 = not installed. `|| true`
+        # swallowed all four identically, so a broken or absent formatter
+        # reported as a clean pass — the failure mode this whole file exists to
+        # avoid. Before this job went advisory it had no `|| true` at all and
+        # those DID block; that behaviour is restored here deliberately.
+        if [ "$rc" -gt 1 ]; then
+          echo "✗ ruff format exited $rc — the formatter itself failed; this is not a formatting difference"
+          exit "$rc"
+        fi
+
+    # ADVISORY, by deliberate choice — reports but does not block.
+    #
+    # WHY: a repo with pre-existing lint debt fails these on the first commit,
+    # every commit, before you have touched the offending file. That teaches you
+    # to reach for LEFTHOOK=0, and a gate you habitually bypass protects nothing
+    # while still costing you the pause. Secrets, commit-msg, big-files and
+    # tests stay hard: those catch things you cannot un-ship.
+    #
+    # Note there is no --fix / stage_fixed here. Advisory means REPORT. A job
+    # that silently rewrites your source while claiming to be non-blocking is
+    # the worst of both — `ruff --fix` will drop `# noqa` directives it judges
+    # unused, which during this kit's pilot removed a `# noqa: E402` that
+    # existed because matplotlib.use("Agg") must precede the pyplot import.
+    #
+    # Making the jobs BELOW this line blocking again is a one-line change: drop
+    # their `|| true`. The scope matters, because this sentence sits directly
+    # under format-python, which has NO `|| true` at all since the exit-code fix —
+    # for that job the one-line change is `-gt 1` → `-gt 0`, stated correctly in
+    # its own block above. A reader scanning upward from here got the wrong
+    # instruction for the nearest job, and the two adjacent jobs now use
+    # genuinely different mechanisms.
+    lint-python:
+      tags: lint
+      glob: "*.py"
+      run: ruff check -- {staged_files} || true
+
+    lint-shell:
+      tags: lint
+      glob: "*.{sh,bash}"
+      run: shellcheck -- {staged_files} || true
+
+    lint-powershell:
+      tags: lint
+      glob: "*.{ps1,psm1,psd1}"
+      # WHY single quotes and an env var, not a double-quoted string: in the old
+      # form the SHELL expanded $r before pwsh ever saw it, so pwsh received
+      # `= Invoke-ScriptAnalyzer -Path … ; if () { … }` and died with a
+      # ParserError. Reproduced 2026-08-08: the gate never analysed anything and
+      # hard-failed on every staged .ps1. Single quotes keep $r for PowerShell;
+      # the env var also survives filenames containing spaces (verified).
+      #
+      # The Get-Command guard and $ErrorActionPreference = Stop are defence in
+      # depth, so an unavailable analyser is a failure rather than a pass.
+      # HONEST SCOPE: the "missing module exits 0" failure this was said to fix
+      # did NOT reproduce on pwsh 7.5.4 / current PSScriptAnalyzer -- both the
+      # old and new forms exit 1 there, for a missing command and for a
+      # non-terminating error alike. Kept because failing closed by construction
+      # is right regardless, but do not cite it as an observed bug.
+      run: |
+        for f in {staged_files}; do
+          PSSA_PATH="$f" pwsh -NoProfile -Command '
+            $ErrorActionPreference = "Stop"
+            if (-not (Get-Command Invoke-ScriptAnalyzer -ErrorAction SilentlyContinue)) {
+              Write-Error "PSScriptAnalyzer not installed: Install-Module PSScriptAnalyzer -Scope CurrentUser"
+              exit 1
+            }
+            $r = Invoke-ScriptAnalyzer -Path $env:PSSA_PATH -Severity Error,Warning
+            if ($r) { $r | Format-Table -AutoSize; exit 1 }
+          ' || exit 1
+        done
+
+    lint-yaml:
+      tags: lint
+      glob: "*.{yml,yaml}"
+      # `exclude` must be a LIST of globs. The old "a|b" regex string form
+      # silently matched nothing on the fleet's installed lefthook — measured:
+      # yamllint was linting lefthook.yml itself and reporting line-length
+      # warnings on every commit. (See the min_version note at the top of this
+      # file; do not re-cite a specific removing version here — the changelog
+      # claim this comment used to carry did not survive verification.)
+      exclude:
+        - "lefthook.yml"
+        - ".coderabbit.yaml"
+      run: yamllint -d relaxed -- {staged_files}
+
+    # The single most important hook in this file. Secrets must never reach
+    # GitHub *or* CodeRabbit's cloud. This is your data-egress boundary.
+    #
+    # Routed through scripts/gitleaks-guard.sh rather than calling gitleaks directly.
+    # WHY: a bare `gitleaks` runs whatever binary is on PATH, and allowlist semantics
+    # differ across versions — local runs used 8.30.1 while a CodeRabbit review sandbox
+    # on PR #5 reported 1.7.3. A scanner whose version you cannot name is a scanner
+    # whose coverage you cannot state. The guard asserts a floor and then execs
+    # gitleaks; the version lives in scripts/gitleaks-version.env.
+    #
+    # `git --staged` rather than the old `protect --staged`: `protect` is a deprecated
+    # alias, already absent from `gitleaks --help` in 8.30.1 and on its way out. Both
+    # forms were checked against the same staged fixture and produce identical results
+    # (scripts/test-gitleaks-guard.sh asserts the `git --staged` path specifically).
+    secrets:
+      tags: security
+      # Named absence, and invoked through `bash` rather than `./`.
+      #
+      # WHY not `./`: that requires the executable bit, which is a property of the
+      # checkout rather than of the repository -- a copy without `-p`, an archive
+      # export, or a filesystem that drops the mode all produce "permission denied"
+      # from the shell. That message names neither the gate nor what went unscanned.
+      # `bash <script>` needs only the read bit, which is the same thing the file's
+      # content already depends on.
+      #
+      # WHY the existence check: without it a missing file is a bare
+      # "No such file or directory" and a FAILED commit whose output does not say
+      # that the secret scan is the thing that did not run. This is the same
+      # pattern the pre-push secret-scan-selftest job already uses; it was simply
+      # never applied here. Fails closed either way -- the point is that it says
+      # which gate is missing and how to restore it.
+      run: |
+        # `set -eu`, NOT `set -euo pipefail`: lefthook runs commands through
+        # /bin/sh, and on Linux that is dash, where pipefail is not a POSIX
+        # option -- `dash -c 'set -euo pipefail'` fails with "Illegal option -o
+        # pipefail". It works on macOS only because /bin/sh there is bash in
+        # POSIX mode, so this would have broken every commit and push on a Linux
+        # machine while looking correct on the author's. Neither block contains a
+        # pipeline (verified: 0 genuine `|` after discounting `||`), so pipefail
+        # bought nothing here regardless.
+        set -eu
+        # -r as well as -f: `-f` alone accepts a regular file the hook cannot
+        # READ, and `bash <script>` then dies with a shell error that names neither
+        # the gate nor what went unscanned -- which is the exact failure this guard
+        # was added to prevent, one permission bit away.
+        if [ ! -f scripts/gitleaks-guard.sh ] || [ ! -r scripts/gitleaks-guard.sh ]; then
+          echo "✗ scripts/gitleaks-guard.sh is missing or unreadable — staged files were NOT secret-scanned" >&2
+          echo "    Restore it from the kit:  10-repo-init.sh --path . --no-remote" >&2
+          exit 1
+        fi
+        bash scripts/gitleaks-guard.sh git --staged --redact --no-banner --verbose
+
+    # Second pass for what the gate above provably cannot see.
+    #
+    # WHY this is a separate step and not a config tweak: gitleaks' built-in
+    # allowlist -- inherited by .gitleaks.toml via `[extend] useDefault = true`
+    # -- skips pdf/xlsx/docx/bin/exe BY PATH, so `secrets` prints "no leaks
+    # found" after reading ~0 bytes of them. Verified 2026-08-08 on gitleaks
+    # 8.30.1. You cannot fix that in .gitleaks.toml: the exclusion is upstream,
+    # and dropping useDefault to escape it would discard the entire built-in
+    # ruleset -- a far worse trade. The script sidesteps it by changing the PATH
+    # gitleaks sees (a *.zip temp name, or extracted text via stdin), which keeps
+    # .gitleaks.toml as the single source of truth with every built-in rule live.
+    #
+    # It reports N-scanned and fails closed: a file it should have been able to
+    # read but could not comes back UNKNOWN, never clean.
+    secrets-binaries:
+      tags: security
+      # NOT `[ -x ]`, for the reason spelled out at selftest-binary-scan: a guard
+      # that SKIPS when the script is missing converts "binaries were never scanned"
+      # into a silent pass, which is the exact failure this job exists to close.
+      # #18 suggested adding that guard so the YAML could be propagated ahead of the
+      # scripts; the kit went the other way, and provisioning now ships both together.
+      # A bare `run:` does fail when the file is absent — but ANONYMOUSLY, as a shell
+      # "no such file" naming neither the job nor what went unscanned. Name it.
+      run: |
+        if [ ! -f scripts/scan-staged-binaries.sh ] || [ ! -r scripts/scan-staged-binaries.sh ]; then
+          echo "✗ scripts/scan-staged-binaries.sh is missing or unreadable — binaries in this commit are UNSCANNED"
+          echo "    This is not a clean result. Restore it from the kit:"
+          echo "    10-repo-init.sh --path . --no-remote"
+          exit 1
+        fi
+        bash scripts/scan-staged-binaries.sh
+
+    # Aikido secret scanner.
+    #
+    # WHY this lives here: this machine sets core.hooksPath globally to
+    # ~/.git-hooks, where an Aikido pre-commit hook runs in every repo. Because
+    # core.hooksPath makes Git ignore .git/hooks entirely, 10-repo-init.sh sets
+    # a repo-LOCAL core.hooksPath=.git/hooks so lefthook's hooks fire at all.
+    # That local override also takes this repo out of Aikido's global reach, so
+    # the scan is re-attached here rather than lost.
+    #
+    # Guarded so the template stays portable: no scanner, no-op, no failure.
+    aikido:
+      tags: security
+      run: |
+        SCANNER="$HOME/.local/bin/aikido-local-scanner"
+        [ -x "$SCANNER" ] || exit 0
+        "$SCANNER" pre-commit-scan "$(git rev-parse --show-toplevel)"
+
+    # Catch broken workflows before they burn Actions minutes on a flaky day.
+    lint-workflows:
+      tags: lint
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: actionlint -- {staged_files}
+
+    # Keep the CodeRabbit config honest.
+    #
+    # Requires CLI >= 0.7.0. Older builds answer "Unknown command: config" and
+    # this gate fails on the first commit that stages .coderabbit.yaml — which
+    # is the provisioning commit itself. 00-bootstrap-machine.sh warns on an
+    # older CLI; upgrade with `brew upgrade --cask coderabbit`.
+    #
+    # Note the schema caps tone_instructions at 250 characters, and the CLI
+    # treats an over-length value as an ERROR. Measure before editing.
+    validate-coderabbit:
+      tags: config
+      glob: ".coderabbit.yaml"
+      run: cr config validate
+
+    # Fail fast on accidentally committed large files.
+    #
+    # WHY this job enumerates the index itself instead of taking {staged_files}:
+    # lefthook filters that list to paths present in the WORKING TREE, so
+    # `git add big.bin` followed by `rm big.bin` sent the blob into the commit
+    # unchecked. Measured: git reports the path, lefthook passes an empty list
+    # and then skips the job outright -- the log line is literally
+    # "no-big-files (skip) no files for inspection". The gate does not pass,
+    # it never runs, which is why this is a path-source fix and not a
+    # measurement fix: no care inside the loop can see a file the loop is
+    # never given.
+    #
+    # `git diff --cached --raw` is the source because one record carries
+    # everything needed: the entry exists regardless of the working tree, the
+    # destination blob sha is right there, the mode identifies submodules, and
+    # the path follows a TAB (git C-quotes anything with a newline, so one
+    # record stays on one line). Not a whitespace fix — lefthook does quote
+    # {staged_files} correctly, verified — but it does drop the dependency on
+    # that quoting, the same way reading the index drops the dependency on
+    # lefthook's stashing below.
+    #
+    # WHY the size comes from the staged blob and not the working tree: for
+    # ordinary file shapes they differ, and `wc -c` measured the wrong one.
+    #   - symlink: `wc -c` follows it and reports the TARGET's size, while the
+    #     blob is just the link path
+    #   - clean filter (git-lfs): the working tree holds the whole asset, the
+    #     blob is a small pointer
+    # The old check blocked both — advising you to "use LFS" about a file
+    # already stored in LFS. Note it did NOT leak a blob on a stage-then-shrink,
+    # contrary to the reasoning in astgl-articles PR 44: lefthook hides
+    # partially staged files, so the working tree already matched the staged
+    # content and the old check blocked there too.
+    #
+    # The gitlink skip is required now that the index is the source: a submodule
+    # is mode 160000 and points at a commit in the SUBMODULE's object store,
+    # which this repo does not have, so `git cat-file` fails on it. Taking the
+    # mode from the same --raw record makes the check free; a per-file
+    # `git ls-files -s` probe doubled the loop (5.6s -> 10.6s over 200 files).
+    #
+    # The filter is ACMRT, not ACMR. A type change counts: if HEAD has a
+    # symlink at a path and the index now has a 6MB regular file there, the
+    # status is T and ACMR enumerates NOTHING -- verified, the blob went
+    # straight through. D is excluded because a deletion stages no blob, and
+    # U because an unmerged entry has no single destination sha and would
+    # abort the hook mid conflict-resolution.
+    #
+    # The rejection message prints exact bytes, not a rounded unit. 1048576 is
+    # a MiB, and the old `$((size/1048576))MB` both mislabelled it and truncated:
+    # a blob one byte over the limit reported "is 5MB" against a 5MB limit,
+    # reading as though it were AT the limit rather than over it. The threshold
+    # lives in LIMIT so the comparison and the message cannot drift apart.
+    #
+    # `set -eu` is the fail-closed backstop: an unreadable entry aborts the hook
+    # and REFUSES the commit rather than skipping the file. One shape here is
+    # deliberate — the loop is fed by REDIRECTION, not a pipe, so `exit 1` exits
+    # the hook instead of a subshell.
+    #
+    # CORRECTED 2026-08-10: this paragraph used to claim the gitlink test "is an
+    # `if`, not `&& continue`, because a failing `&&` list would itself trip
+    # errexit". Both halves were wrong. The code in check-big-files.sh has always
+    # been `[ "$dstmode" = 160000 ] && continue`, and that is SAFE under errexit:
+    # a command that is not the LAST in an AND-OR list is exempt, so a failing
+    # `[` there simply skips the `continue`. The claim mattered because it would
+    # send the next reader to "fix" working code — and a comment describing shell
+    # semantics that the neighbouring script contradicts is worse than no comment,
+    # since it is the kind of thing people trust rather than re-derive.
+    no-big-files:
+      tags: hygiene
+      # MOVED OUT OF THIS FILE, deliberately. The logic is unchanged in what it
+      # blocks; what changes is that it can now be TESTED. This check was wrong in
+      # four distinct ways in a single day and three of those were introduced while
+      # fixing the previous one (#12) — an inline `run:` block cannot be exercised by
+      # anything, so every version was validated by reading it, which is precisely
+      # how four wrong versions shipped. scripts/selftest-no-big-files.sh covers the
+      # shapes that produced each historical defect; the authoritative case count
+      # lives in that file's _EXPECTED_CASES guard, not here, where it drifted
+      # stale within one release of being written down.
+      # Named absence, never a skip, for the reason at secrets-binaries above.
+      run: |
+        if [ ! -f scripts/check-big-files.sh ] || [ ! -r scripts/check-big-files.sh ]; then
+          echo "✗ scripts/check-big-files.sh is missing or unreadable — large blobs are UNCHECKED"
+          echo "    Restore it from the kit:  10-repo-init.sh --path . --no-remote"
+          exit 1
+        fi
+        bash scripts/check-big-files.sh
+
+# ---------------------------------------------------------------------------
+commit-msg:
+  commands:
+    conventional:
+      # CodeRabbit and `gh pr create --fill` both key off commit subjects.
+      # Consistent prefixes make PR titles write themselves.
+      #
+      # GIT'S OWN SUBJECTS ARE EXEMPT, deliberately: `git revert` writes
+      # `Revert "..."` and a conflict-resolution `git merge` writes
+      # `Merge branch '...'` — neither passes the conventional pattern, and a
+      # gate that blocks git's own porcelain teaches you to reach for
+      # --no-verify at exactly the moments (reverting, resolving) when you are
+      # least inclined to hand-edit a subject. The prefixes are anchored and
+      # literal, so a hand-written subject cannot ride the exemption by merely
+      # containing the words.
+      run: |
+        # {1} IS QUOTED HERE, and unlike {staged_files} it is NOT quoted by
+        # lefthook — measured, not assumed: with an unquoted `[ ! -r {1} ]` and a
+        # message-file path containing a space, sh reports `[: too many
+        # arguments`. Reachable in a worktree whose directory name has a space,
+        # since the hook argument is then `.git/worktrees/<name>/COMMIT_EDITMSG`.
+        # The old `head -n1 {1}` carried the same latent defect more quietly: it
+        # would read the wrong files and judge an EMPTY subject, blocking a
+        # perfectly good commit for a reason nothing in the output names.
+        #
+        # Readable-check first: an unreadable message file would fail the grep
+        # and misreport as "subject not conventional" — the wrong cause, named
+        # confidently.
+        if [ ! -r "{1}" ]; then
+          echo "✗ cannot read the commit message file ({1}) — refusing to judge a subject that could not be read"
+          exit 1
+        fi
+        subject=$(head -n1 "{1}")
+        case "$subject" in
+          "Merge "*|"Revert \""*) exit 0 ;;
+        esac
+        printf '%s\n' "$subject" | grep -qE '^(feat|fix|docs|refactor|test|chore|perf|ci|build|revert)(\(.+\))?!?: .{3,}' || {
+          echo "✗ Commit subject must be conventional, e.g.:"
+          echo "    feat(ladder): add project 07 file walker"
+          echo "    fix(jdex): handle missing index on first run"
+          echo "  (git-generated Merge/Revert subjects are exempt)"
+          exit 1
+        }
+
+# ---------------------------------------------------------------------------
+pre-push:
+  # DELIBERATE BUT UNMEASURED, and recorded as such so nobody invents a
+  # justification for it later. pre-commit runs `parallel: true`; the 4x wall-clock
+  # cost that #16 measured, and the staging-race story that was used to justify
+  # serialising, both belong to that hook and are settled there. The reasoning does
+  # NOT transfer: no pre-push job writes the index either, so ordering buys nothing
+  # here for the same reason it bought nothing there.
+  #
+  # It stays `false` anyway because the cost has not been demonstrated. An attempt
+  # to measure it produced a null result that was pure artifact -- every pre-push
+  # job reported `(skip) no matching push files`, so the ~570ms recorded was
+  # lefthook's own startup and said nothing about parallelism. A real measurement
+  # needs a repo where `tests`, `typecheck` and both self-test suites actually run.
+  #
+  # If you come to change this: measure first, and confirm the jobs RAN. Do not
+  # re-derive a mechanism from this comment -- that is exactly how `parallel: false`
+  # reached 42 repos on a staging race that does not exist (#16).
+  parallel: false
+  commands:
+
+    tests:
+      tags: tests
+      run: |
+        # WHY this is not "pytest whenever a tests/ dir exists": a tests/
+        # directory does not imply Python. In a shell-only repo
+        # (tests/test-*.sh) pytest collects nothing and exits 5, which
+        # lefthook reads as a failed gate -- so pre-push blocked EVERY push,
+        # with nothing in the output naming the cause. Verified 2026-08-08 in
+        # UpdateKit, content-repurposer, geekspace, macstudio-dr,
+        # openclaw-swarm, viceroy.
+        #
+        # WHY the exit code is switched on rather than short-circuited with
+        # &&: collection has THREE outcomes, not two. 0 = collected,
+        # 5 = nothing to collect, anything else = collection ERRORED
+        # (claudeclaw returns 2 on broken imports). Short-circuiting would
+        # silently skip a suite that is genuinely broken -- trading a blocked
+        # push for an invisible one, which is the worse failure and the one
+        # this repo exists to prevent. Only 5 is a legitimate skip.
+        #
+        # Shell suites (tests/test-*.sh) are deliberately still NOT run here.
+        # Making 63 repos start executing them on pre-push is a separate
+        # decision with its own blast radius.
+        # WHICH pytest, and why PATH is the wrong question. `command -v pytest`
+        # finds whatever the shell resolves globally, which is frequently NOT the
+        # environment the project's own deps live in. Verified 2026-08-10 in
+        # substack-scheduler: the repo pinned 3.11.7 in .python-version and
+        # carried its own .venv, yet `pytest` resolved to /opt/homebrew/bin/pytest
+        # (Homebrew Python 3.14, no pytest-cov). pytest.ini's addopts demand
+        # --cov, so collection exited 4 and the catch-all arm below blocked EVERY
+        # push -- including pushes touching no Python at all. Nothing in a repo
+        # activates .venv for a git hook, so the hook has to look for it.
+        #
+        # Preference order, most explicit first: an activated virtualenv beats a
+        # discovered one, a project-local venv beats a global install, and PATH is
+        # the last resort rather than the first.
+        #
+        # This is a REAL behaviour change for repos that carry a stale .venv: they
+        # will now run the gate against it instead of a global pytest that may
+        # have been working. That is the intended direction -- a project's pinned
+        # environment is the one whose verdict means anything -- and the `using:`
+        # line below exists so the surprise is self-diagnosing rather than a
+        # mystery failure. Same rule as everywhere else in this kit: say what was
+        # examined, never just whether it passed.
+        if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/pytest" ]; then
+          PYTEST="${VIRTUAL_ENV}/bin/pytest"
+        elif [ -x .venv/bin/pytest ]; then
+          PYTEST=.venv/bin/pytest
+        elif [ -x venv/bin/pytest ]; then
+          PYTEST=venv/bin/pytest
+        elif command -v pytest >/dev/null 2>&1; then
+          PYTEST=pytest
+        else
+          PYTEST=""
+        fi
+
+        if [ -z "$PYTEST" ]; then
+          echo "  (pytest not installed — skipping)"
+        else
+          echo "  using: $PYTEST ($("$PYTEST" --version 2>&1 | head -1))"
+          # Collected ONCE, output kept. The old form collected twice — silently
+          # for the verdict, again for the error display — and a flaky collection
+          # (import-order, plugin state, clock-sensitive discovery) could show the
+          # reader a DIFFERENT failure than the one that was judged. The captured
+          # output is replayed instead. if-capture rather than a bare `$?` so the
+          # status is read where the command runs.
+          if collect_out=$("$PYTEST" -q --collect-only 2>&1); then
+            collect_rc=0
+          else
+            collect_rc=$?
+          fi
+          case "$collect_rc" in
+            0) "$PYTEST" -q --maxfail=1 ;;
+            5) echo "  (no Python tests collected — skipping)" ;;
+            *) echo "  pytest collection FAILED (exit $collect_rc)." >&2
+               echo "  This is NOT 'no tests' -- see the error below." >&2
+               printf '%s\n' "$collect_out" >&2
+               exit "$collect_rc" ;;
+          esac
+        fi
+
+    # The Node/TypeScript counterpart to `tests` above.
+    #
+    # WHY it exists: `tests` is pytest-only, so in a repo with no Python it
+    # prints a skip and exits 0 -- which reads as "this repo has no tests"
+    # rather than "this gate does not know how to run them". Measured 2026-08-10
+    # in mcp-astgl-knowledge: 7 suites, 106 node:test cases, `npm test` green,
+    # and a pre-push run that reported `(no tests configured -- skipping)`.
+    # 14 of the 39 repos carrying this file have a package.json and no
+    # pyproject.toml, so this is not an edge case -- it is a third of the fleet
+    # pushing behind a gate that has never once run their tests. Same class as
+    # every other bug this file documents: a check that examined nothing and
+    # reported green.
+    #
+    # WHY a sibling job rather than another arm inside `tests`: the two runners
+    # share no logic. pytest is found on PATH or in a venv and signals "nothing
+    # collected" with a distinct exit code; npm is found via package.json and
+    # signals it with a missing script. Folding them together puts two unrelated
+    # state machines in one `run:` block. `tags: tests` keeps the documented
+    # `LEFTHOOK_EXCLUDE=tests` escape hatch covering both, because
+    # LEFTHOOK_EXCLUDE matches tags as well as command names.
+    tests-node:
+      tags: tests
+      run: |
+        # node AND npm, not either: the parse below is node and the runner is
+        # npm. Checking only one lets a half-installed toolchain reach the parse
+        # arm and report a broken package.json that is not broken.
+        if [ ! -f package.json ]; then
+          echo "  (no package.json — skipping)"
+        elif ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+          echo "  (node/npm not installed — skipping)"
+        else
+          # THREE outcomes, the same discipline as the pytest arm above: a script
+          # that is absent, a script that is npm's own placeholder, and a
+          # package.json that cannot be parsed are each different from "the tests
+          # failed". Parsed with node rather than jq so this adds no dependency
+          # the job does not already require.
+          if ! test_script=$(node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8")).scripts?.test ?? ""' 2>/dev/null); then
+            echo "  package.json could not be parsed. This is NOT 'no tests' — see the error below." >&2
+            node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8"))' >/dev/null
+            exit 1
+          fi
+          case "$test_script" in
+            "")
+              echo "  (package.json declares no test script — skipping)" ;;
+            'echo "Error: no test specified" && exit 1')
+              # `npm init` writes exactly this script. Running it blocks every
+              # push in every scaffolded repo, which is exactly how a gate
+              # teaches you to reach for LEFTHOOK_EXCLUDE.
+              #
+              # Matched EXACTLY, not by substring: a real suite whose command
+              # merely contains the phrase (an echo in a wrapper script, a grep
+              # over fixtures) must still run. Only npm's own placeholder is a
+              # skip; anything else that mentions the phrase is a test script.
+              echo "  (package.json carries npm's placeholder test script — skipping)" ;;
+            *)
+              # Say what was examined, never just whether it passed.
+              echo "  using: npm test — $test_script"
+              npm test ;;
+          esac
+        fi
+
+    typecheck:
+      tags: types
+      run: |
+        # Same resolution ladder as the pytest selection in `tests`, for the same
+        # measured reason: PATH finds whatever the machine resolves globally,
+        # which is frequently NOT the environment the project's own deps and
+        # stubs live in — a PATH mypy typechecks against the wrong site-packages
+        # and its verdict describes some other environment. Most explicit first;
+        # PATH is the last resort, not the first.
+        if [ ! -f pyproject.toml ]; then
+          exit 0
+        fi
+        if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/mypy" ]; then
+          MYPY="${VIRTUAL_ENV}/bin/mypy"
+        elif [ -x .venv/bin/mypy ]; then
+          MYPY=.venv/bin/mypy
+        elif [ -x venv/bin/mypy ]; then
+          MYPY=venv/bin/mypy
+        elif command -v mypy >/dev/null 2>&1; then
+          MYPY=mypy
+        else
+          MYPY=""
+        fi
+        if [ -n "$MYPY" ]; then
+          echo "  using: $MYPY"
+          "$MYPY" . || true   # advisory until the codebase is fully annotated
+        fi
+
+    # The Node/TypeScript counterpart to `typecheck` above.
+    #
+    # Preference order, most explicit first -- the same principle as the pytest
+    # selection in `tests`: a command the repo declares for itself beats one this
+    # template guesses at, and a project-local binary beats anything on PATH.
+    #
+    # There is deliberately NO `npx` fallback. npx DOWNLOADS a missing package,
+    # so an npx fallback turns a git hook into a silent network install -- a
+    # supply-chain surface, not a convenience. If typescript is not installed,
+    # this says so and skips rather than fetching it.
+    #
+    # WHY `--noEmit`: a git hook must not write build output. Running the repo's
+    # `build` script instead would emit into dist/ on every push, and `build`
+    # frequently does more than typecheck (bundling, copying, packing). A
+    # composite or incremental project rejects --noEmit; tsc names the offending
+    # option in its own error, and such a repo should declare a `typecheck`
+    # script, which this job prefers anyway.
+    #
+    # WHY this blocks where the mypy job above is advisory: that one is `|| true`
+    # because most Python repos here are only partly annotated, so it would fail
+    # on debt you did not create. TypeScript has no equivalent gradient -- a repo
+    # that does not compile is broken now, not eventually.
+    typecheck-node:
+      tags: types
+      run: |
+        if [ ! -f package.json ]; then
+          echo "  (no package.json — skipping)"
+        # node only, NOT npm: everything below except the npm-run branch is
+        # pure node (the parse) or a direct binary invocation
+        # (node_modules/.bin/tsc). Gating the whole job on npm skipped the
+        # local-compiler fallback in environments with node and an installed
+        # toolchain but no npm.
+        elif ! command -v node >/dev/null 2>&1; then
+          echo "  (node not installed — skipping)"
+        # Parse ONCE and keep the failure distinct from "no typecheck script".
+        # The earlier `node -e 'process.exit(...)'` form collapsed a JSON parse
+        # error into the same branch as an absent script, so a corrupt
+        # package.json fell through to a false skip or a tsc run — the same
+        # defect tests-node above already guards against.
+        elif ! tc_script=$(node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8")).scripts?.typecheck ?? ""' 2>/dev/null); then
+          echo "  package.json could not be parsed. This is NOT 'no typecheck script' — see the error below." >&2
+          node -p 'JSON.parse(require("fs").readFileSync("package.json","utf8"))' >/dev/null
+          exit 1
+        elif [ -n "$tc_script" ]; then
+          # npm required only HERE — and its absence is a named skip, not a
+          # fall-through to local tsc: the declared script is the repo's own
+          # definition of "typecheck" and may do more than `tsc --noEmit`
+          # (project references, multiple configs). Substituting a weaker check
+          # would report a green the repo's own command might not have given.
+          if ! command -v npm >/dev/null 2>&1; then
+            echo "  (typecheck script declared but npm is not installed — skipping)"
+          else
+            echo "  using: npm run typecheck — $tc_script"
+            npm run typecheck
+          fi
+        elif [ ! -f tsconfig.json ]; then
+          echo "  (no typecheck script and no tsconfig.json — skipping)"
+        elif [ -x node_modules/.bin/tsc ]; then
+          echo "  using: node_modules/.bin/tsc --noEmit ($(node_modules/.bin/tsc --version))"
+          node_modules/.bin/tsc --noEmit
+        else
+          echo "  (tsconfig.json present but typescript is not installed locally — run npm ci; skipping)"
+        fi
+
+    # Prove the scanner still behaves the way .gitleaks.toml says it does.
+    #
+    # WHY this runs BEFORE secrets-history: the history scan's verdict is only worth
+    # what the scanner's coverage is worth. A version floor rules out the catastrophic
+    # old-binary case but says nothing about semantic drift above the floor, so the
+    # coverage claims are asserted directly. Costs ~1s; runs on this machine on purpose,
+    # because the installed binary is a property of this machine and CI cannot check it.
+    secret-scan-selftest:
+      tags: security
+      # Same reasoning as secrets-binaries and selftest-binary-scan: name the
+      # absence rather than failing as a bare "no such file", and never skip.
+      # `bash <script>` so a dropped execute bit is not itself a failure mode.
+      run: |
+        if [ ! -f scripts/test-gitleaks-guard.sh ] || [ ! -r scripts/test-gitleaks-guard.sh ]; then
+          echo "✗ scripts/test-gitleaks-guard.sh is missing or unreadable — the secret scanner is unverified"
+          echo "    A scanner nobody checks is how the binary blind spot survived."
+          echo "    Restore it from the kit:  10-repo-init.sh --path . --no-remote"
+          exit 1
+        fi
+        bash scripts/test-gitleaks-guard.sh
+
+    # Scan the commits actually being pushed.
+    #
+    # WHY the range is computed rather than hardcoded to @{push}: that revision
+    # only resolves once the branch HAS an upstream. With push.autoSetupRemote
+    # enabled (00-bootstrap-machine.sh sets it globally) the upstream is created
+    # BY the push — so during pre-push on a brand-new branch @{push} fails with
+    # "no upstream configured", and the gate blocks the first push of every
+    # feature branch. A gate that fires on every new branch is a gate you learn
+    # to bypass, which costs more than it protects.
+    secrets-history:
+      tags: security
+      # Same named-absence + `bash` invocation as the pre-commit `secrets` job; see
+      # the reasoning there. Stated separately because the failure lands differently:
+      # this one runs at pre-push, so a bare "permission denied" here reads as a
+      # push problem rather than as "the full-history secret scan did not run".
+      run: |
+        set -eu
+        # -r as well as -f; see the pre-commit `secrets` job for why.
+        if [ ! -f scripts/gitleaks-guard.sh ] || [ ! -r scripts/gitleaks-guard.sh ]; then
+          echo "✗ scripts/gitleaks-guard.sh is missing or unreadable — history was NOT secret-scanned" >&2
+          echo "    Restore it from the kit:  10-repo-init.sh --path . --no-remote" >&2
+          exit 1
+        fi
+        if git rev-parse --verify --quiet '@{push}' >/dev/null 2>&1; then
+          RANGE="@{push}..HEAD"
+        else
+          # No upstream yet. Diff against the remote's default branch if we can
+          # see it; otherwise scan the whole history (first push of a new repo).
+          BASE=""
+          # if-form for the reader, not for errexit: a failing non-final command
+          # of an AND-OR list is exempt from `set -e` (the CORRECTED paragraph at
+          # no-big-files documents the same exemption), so the old
+          # `show-ref && { ... }` DID fall through to the whole-history scan.
+          # Verified in a repo with no origin/main|master before rewording.
+          for c in main master; do
+            if git show-ref --verify --quiet "refs/remotes/origin/$c"; then
+              BASE="origin/$c"
+              break
+            fi
+          done
+          if [ -n "$BASE" ]; then RANGE="$BASE..HEAD"; else RANGE=""; fi
+        fi
+        if [ -n "$RANGE" ]; then
+          bash scripts/gitleaks-guard.sh git --no-banner --redact --log-opts="$RANGE"
+        else
+          bash scripts/gitleaks-guard.sh git --no-banner --redact
+        fi
+
+    workflows:
+      tags: lint
+      run: |
+        if [ -d .github/workflows ]; then
+          actionlint
+        fi
+
+    # The size gate is itself testable, so test it. (This header once described
+    # the BINARY gate — a job was inserted between a comment and the job it
+    # described, and the comment stayed put. Each selftest job now carries its
+    # own header.)
+    selftest-no-big-files:
+      tags: hygiene
+      # The recurrence probe from #12. Same shape and same reason as
+      # selftest-binary-scan below: a gate that was wrong four times in one day is
+      # guarded by a suite that ships with it, so every provisioned repo inherits
+      # the regression test rather than one repo holding a copy that the next
+      # repo-init overwrites.
+      run: |
+        # set -e so BOTH invocations below gate. A shell block's status is its
+        # last command's, so without this a failed normal suite would be masked
+        # by a passing --self-check — precisely the false green this job exists
+        # to prevent.
+        set -eu
+        if [ ! -f scripts/selftest-no-big-files.sh ] || [ ! -r scripts/selftest-no-big-files.sh ]; then
+          echo "✗ scripts/selftest-no-big-files.sh is missing or unreadable — the size gate is unverified"
+          echo "    Restore it from the kit:  10-repo-init.sh --path . --no-remote"
+          exit 1
+        fi
+        bash scripts/selftest-no-big-files.sh
+        # The control, not a rerun: --self-check runs the same cases against a
+        # DELIBERATELY broken checker and requires failures. The suite's own
+        # header calls this the point — most shapes pass on a broken hook for
+        # one reason or another, so a suite that has never been seen to fail
+        # proves nothing. Running the control only by hand is how it stops
+        # being run; here it ships with the gate it validates.
+        bash scripts/selftest-no-big-files.sh --self-check
+
+    selftest-binary-scan:
+      tags: security
+      run: |
+        # NOT `[ -x ]`. A guard that skips when the file is missing or lost its
+        # execute bit turns "the binary gate is unverified" into a silent pass —
+        # the same fail-open this self-test exists to detect. The neighbouring
+        # secret-scan-selftest runs its script unconditionally; match it.
+        # `bash <script>` rather than `./<script>` so a dropped execute bit is
+        # not itself a failure mode.
+        if [ ! -f scripts/selftest-binary-scan.sh ] || [ ! -r scripts/selftest-binary-scan.sh ]; then
+          echo "✗ scripts/selftest-binary-scan.sh is missing or unreadable — the binary gate is unverified"
+          exit 1
+        fi
+        bash scripts/selftest-binary-scan.sh
+
+# ---------------------------------------------------------------------------
+# Metered CodeRabbit review — NOT wired to a git hook on purpose.
+# Free tier is 3 reviews/hour; the usage add-on bills per file reviewed.
+# Run deliberately:  lefthook run review
+review:
+  commands:
+    coderabbit:
+      # The base is RESOLVED, not hardcoded. `--base main` on a stacked PR
+      # reports drift that is not this PR's diff and misses drift that is — the
+      # same silent-wrong-base failure the auto_review note in .coderabbit.yaml
+      # documents from the bot's side. Precedence: an explicit CR_BASE always
+      # wins; otherwise ask gh for the OPEN PR's actual base; fall back to main
+      # only when there is no PR to ask (or no gh). A metered, deliberately-run
+      # review already talks to the network, so the gh lookup adds no new class
+      # of dependency — and it prints which base it chose, so a wrong guess is
+      # visible rather than silent.
+      run: |
+        if [ -n "${CR_BASE:-}" ]; then
+          base="$CR_BASE"
+          echo "  review base: $base (CR_BASE)"
+        elif command -v gh >/dev/null 2>&1 \
+             && base=$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null) \
+             && [ -n "$base" ]; then
+          echo "  review base: $base (from the open PR)"
+        else
+          base=main
+          echo "  review base: main (no CR_BASE, no open PR — override with CR_BASE=<branch>)"
+        fi
+        cr review --base "$base"

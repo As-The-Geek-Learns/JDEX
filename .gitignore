@@ -54,3 +54,8 @@ rules/
 .husky/_
 # Editor-specific files
 .cursor/
+.coderabbit.local.yaml
+.lefthook-local.yml
+.cr-cache/
+*.cr-review.md
+lefthook-local.yml
